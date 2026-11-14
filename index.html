@@ -753,7 +753,7 @@ function statusLine(it){
   if(it.status==="error")return "沒有完成："+(it.error||"未知的問題");
   if(it.note)return it.note;
   const p=it.progress||{};
-  if(p.phase==="transcribe")return `正在讀影片內容，已完成 ${p.done||0} 段（每段 10 分鐘）`;
+  if(p.phase==="transcribe")return p.total?`正在讀影片內容，${p.done||0} / ${p.total} 段（每段 5 分鐘）`:`正在讀影片內容，已完成 ${p.done||0} 段（每段 5 分鐘）`;
   return "正在"+(STEP[p.phase]||"排隊")+"…";
 }
 function renderHome(){

@@ -24,19 +24,23 @@ Deno.serve(async (req) => {
     });
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return json({ error: "請先登入。" }, 401);
+    // Only the owner may spend the Gemini key (see reader_access in schema.sql).
+    const { data: allowed } = await sb.rpc("reader_access");
+    if (!allowed) return json({ error: "這個帳號沒有使用權限。" }, 403);
 
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
     if (!geminiKey) return json({ error: "後端還沒有設定 GEMINI_API_KEY。" }, 500);
+    const body = await req.json().catch(() => ({}));
+    const pick = (v: unknown) => (typeof v === "string" && /^[a-z0-9.\-]{3,60}$/.test(v) ? v : "");
     const deps = {
       fetch,
       geminiKey,
-      videoModel: Deno.env.get("GEMINI_VIDEO_MODEL") || "gemini-2.5-flash",
-      textModel: Deno.env.get("GEMINI_TEXT_MODEL") || Deno.env.get("GEMINI_VIDEO_MODEL") || "gemini-2.5-flash",
+      videoModel: pick(body.video_model) || Deno.env.get("GEMINI_VIDEO_MODEL") || "gemini-3.8-flash",
+      textModel: pick(body.text_model) || Deno.env.get("GEMINI_TEXT_MODEL") || Deno.env.get("GEMINI_VIDEO_MODEL") || "gemini-3.8-flash",
       anthropicKey: Deno.env.get("ANTHROPIC_API_KEY") || "",
       claudeModel: Deno.env.get("CLAUDE_MODEL") || "",
     };
 
-    const body = await req.json().catch(() => ({}));
     const summary = (r: any) => ({ video_id: r.video_id, title: r.title, status: r.status, progress: r.progress, error: r.error });
 
     if (body.action === "diag") {

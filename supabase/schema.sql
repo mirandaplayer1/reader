@@ -42,3 +42,29 @@ create policy "own videos only" on public.videos
   for all to authenticated
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
+
+-- Who may spend the Gemini key. The first real account to sign in becomes the owner; later sign-ups are refused.
+create table if not exists public.members (
+  email      text primary key,
+  created_at timestamptz not null default now()
+);
+alter table public.members enable row level security;
+drop policy if exists "see own membership" on public.members;
+create policy "see own membership" on public.members
+  for select to authenticated
+  using (email = (select auth.jwt() ->> 'email'));
+
+create or replace function public.reader_access() returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare e text := auth.jwt() ->> 'email';
+begin
+  if e is null then return false; end if;
+  if exists (select 1 from public.members m where m.email = e) then return true; end if;
+  if not exists (select 1 from public.members m where m.email not like '%@reader.invalid') then
+    insert into public.members (email) values (e) on conflict do nothing;
+    return true;
+  end if;
+  return false;
+end $$;
+revoke all on function public.reader_access() from public, anon;
+grant execute on function public.reader_access() to authenticated;

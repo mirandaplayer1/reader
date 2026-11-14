@@ -2,8 +2,8 @@
 // Supabase edge function and in local tests. Every call does ONE unit of work and returns
 // the new row, so a failed unit is retried on its own and a long video never hits a timeout.
 
-export const CHUNK_SECONDS = 600;      // video is read ten minutes at a time
-export const MAX_CHUNKS = 48;          // hard stop at eight hours
+export const CHUNK_SECONDS = 300;      // video is read five minutes at a time: longer clips lose words and drift in time
+export const MAX_CHUNKS = 96;          // hard stop at eight hours
 export const TRANSLATE_BATCH = 50;     // sentences per translation call
 
 const GEMINI = "https://generativelanguage.googleapis.com/v1beta";
@@ -55,13 +55,53 @@ function parseJSON(text) {
   return JSON.parse(s);
 }
 
-async function gemini(deps, model, parts, maxTokens = 32768) {
+// "12:34" or "1:02:03" -> seconds. Models report clock times far more accurately than raw second counts.
+export function clockToSeconds(v) {
+  if (typeof v === "number") return Math.round(v);
+  const p = String(v || "").trim().split(":").map((x) => Number(x));
+  if (!p.length || p.some((x) => !Number.isFinite(x))) return NaN;
+  return Math.round(p.reduce((a, x) => a * 60 + x, 0));
+}
+
+// Exact video length without downloading anything: token counting is free, and audio is a fixed number of tokens per second.
+async function videoLength(deps, url) {
+  const count = async (meta) => {
+    const part = { file_data: { file_uri: url } };
+    if (meta) part.video_metadata = meta;
+    const res = await deps.fetch(`${GEMINI}/models/${deps.videoModel}:countTokens`, {
+      method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": deps.geminiKey },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [part] }] }),
+    });
+    if (!res.ok) return 0;
+    const j = await res.json();
+    const a = (j.promptTokensDetails || []).find((d) => d.modality === "AUDIO");
+    return a ? Number(a.tokenCount) || 0 : 0;
+  };
+  const sample = await count({ start_offset: "0s", end_offset: "60s" });
+  const all = await count(null);
+  if (!sample || !all) return 0;
+  const perSecond = sample / 60;
+  return all <= sample ? Math.round(all / 32) : Math.round(all / perSecond);
+}
+
+// Forces the transcript into a fixed shape, so a malformed reply cannot happen.
+const TRANSCRIPT_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    turns: { type: "ARRAY", items: { type: "OBJECT", properties: { ts: { type: "STRING" }, speaker: { type: "STRING" }, text: { type: "STRING" } }, required: ["ts", "speaker", "text"] } },
+    visuals: { type: "ARRAY", items: { type: "OBJECT", properties: { ts: { type: "STRING" }, text: { type: "STRING" } }, required: ["ts", "text"] } },
+    reached_end: { type: "BOOLEAN" },
+  },
+  required: ["turns", "visuals", "reached_end"],
+};
+
+async function gemini(deps, model, parts, maxTokens = 32768, schema = null) {
   const res = await deps.fetch(`${GEMINI}/models/${model}:generateContent`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-goog-api-key": deps.geminiKey },
     body: JSON.stringify({
       contents: [{ role: "user", parts }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.2, maxOutputTokens: maxTokens },
+      generationConfig: Object.assign({ responseMimeType: "application/json", temperature: deps.temperature ?? 0.2, maxOutputTokens: maxTokens }, schema ? { responseSchema: schema } : {}),
     }),
   });
   const body = await res.json().catch(() => ({}));
@@ -110,48 +150,66 @@ export async function ingestStep(row, deps) {
       const r = await deps.fetch("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(url));
       if (r.ok) { const j = await r.json(); title = j.title || title; channel = j.author_name || ""; }
     } catch (_) { /* title is filled in by the outline step if this is blocked */ }
+    try { work.length = await videoLength(deps, url); } catch (_) { work.length = 0; }
+    if (!work.length) delete work.length;      // unknown: the end is then detected from the clips
     work.channel = channel;
     work.phase = "transcribe";
-    return { title, status: "processing", work, progress: { phase: "transcribe", done: 0, total: null } };
+    return { title, status: "processing", work, progress: { phase: "transcribe", done: 0, total: work.length ? Math.ceil(work.length / CHUNK_SECONDS) : null } };
   }
 
   if (work.phase === "transcribe") {
     const i = work.next, a = i * CHUNK_SECONDS, b = a + CHUNK_SECONDS;
     const known = [...new Set(work.turns.map((t) => t.speaker))].slice(0, 8);
     const prompt =
-      `You are transcribing one clip of a YouTube video for a study tool. The clip covers ${clock(a)} to ${clock(b)} of the full video (absolute video time).\n` +
-      `Return JSON only, in this shape:\n` +
-      `{"turns":[{"t":<integer, ABSOLUTE second in the full video where this turn starts>,"speaker":"<name>","text":"<verbatim words>"}],` +
-      `"visuals":[{"t":<integer absolute second>,"text":"<text shown on screen>"}],"reached_end":<true|false>}\n` +
-      `Rules:\n` +
-      `- "text" is a verbatim transcript in the language actually spoken. Do not translate, summarise or tidy the wording. Keep it complete.\n` +
-      `- Start a new turn when the speaker changes, and at least every 45 seconds of continuous speech.\n` +
-      `- "speaker": use the person's real name if it is said or shown; otherwise "Speaker 1", "Speaker 2". ` +
+      `Transcribe the speech in this video clip verbatim, in the language spoken. The clip is the part of the video from ${clock(a)} to ${clock(b)}.\n` +
+      `Return JSON only: {"turns":[{"ts":"MM:SS","speaker":"name","text":"..."}],"visuals":[{"ts":"MM:SS","text":"..."}],"reached_end":true|false}\n` +
+      `- "ts" is the timestamp in the FULL video (not relative to the clip) where the turn starts, as MM:SS, or H:MM:SS past one hour.\n` +
+      `- Start a new turn at every speaker change and at least every 30 seconds.\n` +
+      `- Transcribe everything that is said from the first second of the clip to the last. Do not skip, shorten, summarise or translate.\n` +
+      `- "speaker": the person's real name if it is said or shown; otherwise "Speaker 1", "Speaker 2". ` +
       (known.length ? `Speakers already identified earlier in this video: ${known.join(", ")}. Reuse these exact labels for the same people.\n` : `\n`) +
-      `- "visuals": only text or figures on slides, whiteboards, code or screen recordings that carry information the speech does not say aloud. Empty array if none.\n` +
-      `- "reached_end" is true only if the video ends inside this clip. If the clip is past the end of the video or has no speech, return empty arrays and reached_end true.`;
-    const out = await gemini(deps, deps.videoModel, [
-      { file_data: { file_uri: url }, video_metadata: { start_offset: a + "s", end_offset: b + "s" } },
-      { text: prompt },
-    ], 32768);
+      `- "visuals": text or figures on slides, whiteboards, code or screen recordings that carry information the speech does not say aloud. Empty array if none.\n` +
+      `- If a stretch has no speech but shows something (slides, a demo, a scene), add a turn with speaker "On screen" whose text quotes any visible text exactly and then says in one plain sentence what happens.\n` +
+      `- "reached_end" is true only if the video itself finishes before ${clock(b)}. Reaching the end of this clip is not the end of the video. If the clip lies entirely after the end of the video, return empty arrays and reached_end true.`;
+    const saved = deps.temperature; deps.temperature = 0;
+    let out;
+    try {
+      out = await gemini(deps, deps.videoModel, [
+        { file_data: { file_uri: url }, video_metadata: { start_offset: a + "s", end_offset: b + "s" } },
+        { text: prompt },
+      ], 32768, TRANSCRIPT_SCHEMA);
+    } finally { deps.temperature = saved; }
     let turns = (Array.isArray(out.turns) ? out.turns : [])
-      .map((t) => ({ t: Math.max(0, Math.round(Number(t.t) || 0)), speaker: String(t.speaker || "Speaker 1").trim(), text: String(t.text || "").trim() }))
-      .filter((t) => t.text);
+      .map((t) => ({ t: clockToSeconds(t.ts ?? t.t), speaker: String(t.speaker || "Speaker 1").trim(), text: String(t.text || "").trim() }))
+      .filter((t) => t.text && Number.isFinite(t.t))
+      .map((t) => ({ ...t, t: Math.max(0, t.t) }));
     // Some responses give times relative to the clip. If every timestamp falls before the clip, shift them.
     if (turns.length && a > 0 && Math.max(...turns.map((t) => t.t)) < a) turns = turns.map((t) => ({ ...t, t: t.t + a }));
     turns = turns.filter((t) => t.t < b + 30).sort((x, y) => x.t - y.t);
     const visuals = (Array.isArray(out.visuals) ? out.visuals : [])
-      .map((v) => ({ t: Math.round(Number(v.t) || a), text: String(v.text || "").trim() })).filter((v) => v.text);
+      .map((v) => { const t = clockToSeconds(v.ts ?? v.t); return { t: Number.isFinite(t) ? t : a, text: String(v.text || "").trim() }; }).filter((v) => v.text);
+    // A clip boundary can cut a sentence in two. Join it back onto the previous turn when the same person is still talking.
+    const prev = work.turns[work.turns.length - 1];
+    if (prev && turns.length && turns[0].speaker === prev.speaker && !/[.!?。！？…"”’)]$/.test(prev.text)) {
+      // "…impossible to con-" + "connect the dots…": drop the cut-off fragment only when the next clip repeats the word.
+      const frag = prev.text.match(/(\S+)-$/);
+      const head = frag && turns[0].text.toLowerCase().startsWith(frag[1].toLowerCase()) ? prev.text.slice(0, frag.index).trim() : prev.text;
+      prev.text = (head + " " + turns[0].text).trim();
+      turns = turns.slice(1);
+    }
     work.turns = work.turns.concat(turns);
     work.visuals = work.visuals.concat(visuals);
     work.next = i + 1;
-    const ended = out.reached_end === true || turns.length === 0 || work.next >= MAX_CHUNKS;
+    const lastT = turns.length ? turns[turns.length - 1].t : a;
+    const ended = work.length
+      ? b >= work.length                                              // exact length known
+      : (turns.length === 0 && !prev) || (turns.length === 0 && i > 0) || (out.reached_end === true && lastT < b - 60) || work.next >= MAX_CHUNKS;
     if (ended) {
       if (!work.turns.length) return { status: "error", error: "這支影片沒有偵測到任何語音內容。", work };
       work.phase = "outline";
-      work.duration = work.turns[work.turns.length - 1].t + 30;
+      work.duration = work.length || work.turns[work.turns.length - 1].t + 30;
     }
-    return { status: "processing", work, progress: { phase: ended ? "outline" : "transcribe", done: work.next, total: ended ? work.next : null } };
+    return { status: "processing", work, progress: { phase: ended ? "outline" : "transcribe", done: work.next, total: ended ? work.next : (work.length ? Math.ceil(work.length / CHUNK_SECONDS) : null) } };
   }
 
   if (work.phase === "outline") {
@@ -163,8 +221,8 @@ export async function ingestStep(row, deps) {
       `"host":"<訪問者或主持人的 speaker 標籤，沒有就寫空字串>","thesis":"<一句話講完整支影片的主張，60 字內>",` +
       `"tldr":["<重點 1>","<重點 2>","<重點 3>"],` +
       `"chapters":[{"t":<這一章開始的秒數，必須是逐字稿裡某一行的秒數>,"en":"<原文語言的短標題>","zh":"<10 字內的中文標題，具體講在談什麼>",` +
-      `"sum":"<兩句話，75 字內，講者實際說了或做了什麼，帶具體的數字、名稱、做法>","take":"<一句 40 字內可帶走的原則；純閒聊就留空字串>","worth":<1 到 3 的整數，3 是核心>}]}\n\n` +
-      `規則：\n- 依主題切章，一章只講一件事，長度大約 3 到 15 分鐘。第一章從第一行的秒數開始。\n- worth 要有鑑別度，3 分最多佔三分之一。\n- ${STYLE}\n\n逐字稿：\n${lines}${vis}`;
+      `"sum":"<兩句話，75 字內，講者實際說了或做了什麼，帶具體的數字、名稱、做法>","take":"<一句 40 字內可帶走的原則；純閒聊、或內容本身沒有可帶走的道理就留空字串，不要硬湊>","worth":<1 到 3 的整數，3 是核心>}]}\n\n` +
+      `規則：\n- 依主題切章，一章只講一件事。20 分鐘以內的影片切 3 到 6 章；更長的影片每章大約 3 到 15 分鐘。第一章從第一行的秒數開始。\n- worth 看的是「這一章對讀者有多少可以帶走的東西」：3 是核心論點或可以直接照做的方法，2 是有用的補充，1 是開場、閒聊、致謝這類可以跳過的。3 分最多佔三分之一，但整支影片最重要的那一章一定要是 3。\n- 講者是 "On screen" 的段落是畫面描述，照樣整理進章節。\n- ${STYLE}\n\n逐字稿：\n${lines}${vis}`;
     const out = await llmJSON(deps, prompt, 16000);
     const starts = work.turns.map((t) => t.t);
     const snap = (t) => starts.reduce((best, s) => (Math.abs(s - t) < Math.abs(best - t) ? s : best), starts[0]);
@@ -227,7 +285,7 @@ export async function deepenStep(row, k, deps) {
     `"chain":["<推理第 1 步：最基本的前提>","<第 2 步>","<第 3 步>","<第 4 步：結論>"],` +
     `"ask":"<一個把這個原理換到讀者自己身上的問題>","key":[<最能代表這一章的 1 到 2 個句子編號，要相鄰>],` +
     `"counter":"<站在反方，指出這個結論最弱的一個環節或不適用的情況，用一個問題結尾，100 字內>"}\n\n` +
-    `規則：\n- core 和 chain 要從前提一步步推到結論，每一步都能獨立成立，不要只是換句話重複摘要。\n- ${STYLE}\n\n這一章的主題：${seg.title}\n\n${numbered}`;
+    `規則：\n- core 和 chain 要從前提一步步推到結論，每一步都能獨立成立，不要只是換句話重複摘要。\n- 照內容本身的道理寫。如果這一章跟創業或做產品無關（例如故事、動畫、純示範），就講它本身的道理，ask 也問一般性的問題，不要硬套到創業上。\n- ${STYLE}\n\n這一章的主題：${seg.title}\n\n${numbered}`;
   const out = await llmJSON(deps, prompt, 6000);
   const keyIdx = (Array.isArray(out.key) ? out.key : []).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < total).slice(0, 2);
   const key = (keyIdx.length ? keyIdx : [0]).map((n) => [flat[n].ti, flat[n].si]);
