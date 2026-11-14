@@ -13,8 +13,12 @@ src = root / "src"
 app = (src / "app.html").read_text(encoding="utf-8")
 chapters = json.loads((src / "chapters.json").read_text(encoding="utf-8"))
 
+config = json.loads((src / "config.json").read_text(encoding="utf-8"))
+
 page = (
-    app.replace("/*__DATA__*/", (src / "data.js").read_text(encoding="utf-8"))
+    app.replace("/*__CSS__*/", (src / "style.css").read_text(encoding="utf-8"))
+    .replace("/*__CFG__*/{}", json.dumps(config))
+    .replace("/*__DATA__*/", (src / "data.js").read_text(encoding="utf-8"))
     .replace("/*__CH__*/[]", json.dumps(chapters, ensure_ascii=False))
     .replace("__THUMB__", (src / "thumb.txt").read_text().strip())
 )
