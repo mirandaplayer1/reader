@@ -1,0 +1,616 @@
+<title>Reader 概念試作</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: a home page that hands off to one full-height phone stage; each concept is a self-contained app inside it. */
+:root{
+  --bg:#F1F2F9; --surf:#FFFFFF; --surf2:#E8EAF5; --ink:#14152B; --mute:#62668A; --line:#DDE0EE;
+  --a:#2B50F5; --b:#F0431F; --c:#0A9A6E; --on-acc:#FFFFFF;
+  --hl-y:#FFE55E; --hl-p:#FFBBD8; --hl-g:#A6F0CB;
+  --shadow:0 1px 2px rgba(20,21,43,.06),0 14px 36px rgba(20,21,43,.09);
+  --f-d:"Bricolage Grotesque","Noto Sans TC",system-ui,sans-serif;
+  --f-b:"Noto Sans TC",system-ui,"PingFang TC","Microsoft JhengHei",sans-serif;
+  --f-en:"Newsreader",Georgia,"Times New Roman",serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0B0C19; --surf:#16182E; --surf2:#20233F; --ink:#EEF0FB; --mute:#989BBE; --line:#2B2E4E;
+  --a:#8198FF; --b:#FF7C5E; --c:#3FD8A5; --on-acc:#0B0C19;
+  --hl-y:rgba(255,229,94,.32); --hl-p:rgba(255,130,185,.32); --hl-g:rgba(100,235,178,.28);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 36px rgba(0,0,0,.45); color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0B0C19; --surf:#16182E; --surf2:#20233F; --ink:#EEF0FB; --mute:#989BBE; --line:#2B2E4E;
+  --a:#8198FF; --b:#FF7C5E; --c:#3FD8A5; --on-acc:#0B0C19;
+  --hl-y:rgba(255,229,94,.32); --hl-p:rgba(255,130,185,.32); --hl-g:rgba(100,235,178,.28);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 36px rgba(0,0,0,.45); color-scheme:dark }
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-b);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
+button,textarea,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--acc,var(--a));outline-offset:2px;border-radius:6px}
+textarea{width:100%;border:1.5px solid var(--line);background:var(--surf);border-radius:14px;padding:12px 14px;font-size:16px;line-height:1.6;resize:none;min-height:88px}
+textarea:focus{outline:none;border-color:var(--acc)}
+[data-c="a"]{--acc:var(--a)} [data-c="b"]{--acc:var(--b)} [data-c="c"]{--acc:var(--c)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:46px;padding:0 20px;border-radius:999px;font-weight:700;background:var(--acc);color:var(--on-acc);transition:transform .12s}
+.btn:active{transform:scale(.97)} .btn[disabled]{opacity:.35;pointer-events:none}
+.btn.ghost{background:var(--surf2);color:var(--ink)} .btn.line{background:none;border:1.5px solid var(--line);color:var(--ink)}
+.btn.sm{min-height:36px;padding:0 14px;font-size:13px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--mute);text-transform:uppercase}
+.ai-only{display:none!important} body.has-ai .ai-only{display:inline-flex!important}
+
+/* ---------- home ---------- */
+#home{max-width:1080px;margin:0 auto;padding-block:36px 64px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:36px}
+.hero h1{font-family:var(--f-d);font-weight:900;font-size:clamp(40px,9vw,84px);line-height:1.02;letter-spacing:-.02em;margin:10px 0 16px;text-wrap:balance}
+.hero h1 em{font-style:normal;background:linear-gradient(transparent 58%,var(--hl-y) 58%)}
+.hero p{max-width:34em;margin:0;color:var(--mute);font-size:16px}
+.vidstrip{display:flex;gap:14px;align-items:center;background:var(--surf);border-radius:20px;padding:12px;box-shadow:var(--shadow);text-decoration:none;max-width:560px}
+.vidstrip img{width:112px;aspect-ratio:16/9;object-fit:cover;border-radius:12px;flex:none}
+.vidstrip b{display:block;line-height:1.35} .vidstrip small{color:var(--mute)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px}
+.ccard{--acc:var(--a);text-align:left;background:var(--surf);border-radius:28px;padding:22px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:transform .18s}
+.ccard:hover{transform:translateY(-4px)}
+.ccard .art{height:132px;border-radius:18px;background:color-mix(in srgb,var(--acc) 12%,var(--surf));display:block;width:100%}
+.ccard h2{font-family:var(--f-d);font-size:30px;font-weight:900;margin:0;line-height:1.1;display:flex;align-items:baseline;gap:10px}
+.ccard h2 span{font-size:13px;font-weight:700;color:var(--acc);font-family:var(--f-b)}
+.ccard p{margin:0;color:var(--mute);font-size:14px}
+.ccard .bet{color:var(--ink);font-weight:500}
+.ccard .go{align-self:flex-start;margin-top:auto}
+.pipe h3,.pick h3{font-family:var(--f-d);font-size:22px;margin:0 0 4px}
+.pipe ol{list-style:none;margin:14px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;counter-reset:p}
+.pipe li{counter-increment:p;background:var(--surf);border-radius:16px;padding:14px 16px;font-size:13.5px;color:var(--mute)}
+.pipe li b{display:block;color:var(--ink);font-size:14.5px}
+.pipe li::before{content:counter(p);font-family:var(--f-d);font-weight:800;color:var(--a);font-size:13px}
+.pipe li.key{outline:1.5px dashed var(--b);outline-offset:-1.5px}
+
+/* ---------- stage ---------- */
+#stage{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
+.sbar{display:flex;align-items:center;gap:8px;padding:8px max(12px,env(safe-area-inset-right,0px)) 8px max(12px,env(safe-area-inset-left,0px));flex:none}
+.sbar .back{width:36px;height:36px;border-radius:50%;background:var(--surf);font-size:18px;flex:none}
+.pills{display:flex;background:var(--surf);border-radius:999px;padding:3px;margin:0 auto}
+.pills button{padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700;color:var(--mute)}
+.pills button[aria-pressed="true"]{background:var(--acc);color:var(--on-acc)}
+.swrap{flex:1;min-height:0;display:flex;justify-content:center;gap:40px;align-items:stretch}
+#side{display:none;width:300px;align-self:center}
+#side h2{font-family:var(--f-d);font-size:44px;font-weight:900;margin:0 0 6px;line-height:1}
+#side dl{margin:18px 0 0;display:grid;gap:14px} #side dt{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--acc)} #side dd{margin:2px 0 0;color:var(--mute);font-size:14px}
+.phone{position:relative;flex:1;min-width:0;max-width:520px;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+@media (min-width:900px){ #side{display:block} .phone{flex:none;width:400px;max-height:840px;align-self:center;height:100%;padding-top:16px;border-radius:40px;border:1px solid var(--line);box-shadow:var(--shadow)} .sbar{padding-bottom:14px} .swrap{padding-bottom:20px}}
+#app{flex:1;min-height:0;display:flex;flex-direction:column}
+.app{flex:1;min-height:0;display:flex;flex-direction:column}
+.scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+#scrim{position:absolute;inset:0;background:rgba(8,9,20,.45);z-index:20}
+#sheet{position:absolute;left:0;right:0;bottom:0;z-index:21;background:var(--surf);border-radius:26px 26px 0 0;padding:10px 18px 18px;max-height:82%;overflow-y:auto;box-shadow:0 -10px 40px rgba(0,0,0,.2);animation:up .22s ease-out;display:flex;flex-direction:column;gap:12px}
+#sheet::before{content:"";width:38px;height:4px;border-radius:2px;background:var(--line);align-self:center;flex:none}
+@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+#toast{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:13px;font-weight:700;z-index:30;white-space:nowrap}
+.q-zh{font-size:17px;font-weight:500;margin:0;line-height:1.6}
+.q-en{font-family:var(--f-en);font-size:16px;color:var(--mute);margin:0;line-height:1.5}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row .sp{flex:1}
+.ai-out{background:var(--surf2);border-radius:14px;padding:12px 14px;font-size:14px;white-space:pre-wrap}
+.ai-out::before{content:"Claude";display:block;font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--acc)}
+.tlink{font-size:12px;font-weight:700;color:var(--acc);text-decoration:none;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---------- A 伴讀 ---------- */
+.a-head{flex:none;padding:4px 14px 10px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line)}
+.vid{display:flex;gap:10px;align-items:center;text-decoration:none}
+.vid img{width:64px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;flex:none}
+.vid b{display:block;font-size:14px;line-height:1.3} .vid small{color:var(--mute);font-size:11.5px}
+.seg3{display:inline-flex;background:var(--surf2);border-radius:10px;padding:2px}
+.seg3 button{padding:4px 12px;border-radius:8px;font-size:12.5px;font-weight:700;color:var(--mute)}
+.seg3 button[aria-pressed="true"]{background:var(--surf);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.depth{font-size:12px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
+.a-read{padding:6px 18px 40px}
+.a-seg{padding-top:26px}
+.a-seg>header{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.a-seg>header h3{font-family:var(--f-d);font-size:26px;font-weight:900;margin:0;line-height:1.15;flex:1}
+.a-seg>header i{font-style:normal;font-family:var(--f-d);font-weight:800;color:var(--acc);font-size:14px}
+.turn{padding:12px 0;border-top:1px solid var(--line)}
+.who{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.who b{font-size:12px;letter-spacing:.06em} .sp-L .who b{color:var(--mute)}
+.turn p{margin:0} .turn .zh{font-size:16.5px;line-height:1.85}
+.turn .en{font-family:var(--f-en);font-size:15.5px;line-height:1.6;color:var(--mute);margin-top:8px}
+.sp-L .zh{font-size:15px;color:var(--mute)} .sp-L .en{font-style:italic}
+.m-zh .turn .en,.m-en .turn .zh{display:none} .m-en .turn .en{color:var(--ink);font-size:17px;margin-top:0}
+.s{cursor:pointer;border-radius:4px;padding:1px 0;-webkit-box-decoration-break:clone;box-decoration-break:clone;transition:background .2s}
+.s[data-hl="y"]{background:var(--hl-y)} .s[data-hl="p"]{background:var(--hl-p)} .s[data-hl="g"]{background:var(--hl-g)}
+.s.on{outline:2px solid var(--acc);outline-offset:1px} .s.has-note::after{content:"✎";font-size:11px;color:var(--acc);margin-left:2px;vertical-align:super}
+.gap{color:var(--mute);opacity:.6}
+.absorb{margin-top:10px;background:var(--surf);border-radius:22px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
+.absorb ul{margin:0;padding-left:1.1em;color:var(--mute);font-size:14px} .absorb li+li{margin-top:4px}
+.core{font-size:18px;font-weight:700;line-height:1.5;margin:0}
+.chain{list-style:none;margin:8px 0 0;padding:0;counter-reset:c;display:grid;gap:8px}
+.chain li{counter-increment:c;padding-left:30px;position:relative;font-size:14px}
+.chain li::before{content:counter(c);position:absolute;left:0;top:1px;width:20px;height:20px;border-radius:50%;background:var(--acc);color:var(--on-acc);font-size:11px;font-weight:800;display:grid;place-items:center}
+details summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--acc)}
+.ask{font-weight:700;margin:0}
+.hl-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.hl-row button{padding:9px 4px;border-radius:12px;background:var(--surf2);font-size:13px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:4px}
+.hl-row button i{width:22px;height:10px;border-radius:3px;border:1px solid var(--line)}
+.hl-row button[aria-pressed="true"]{outline:2px solid var(--ink)}
+.tabs{flex:none;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border-top:1px solid var(--line);background:var(--surf)}
+.tabs button{padding:11px 4px 12px;font-size:12.5px;font-weight:700;color:var(--mute)}
+.tabs button[aria-pressed="true"]{color:var(--acc)}
+.tabs button b{font-family:var(--f-d);font-variant-numeric:tabular-nums}
+.pad{padding:20px 18px 40px;display:flex;flex-direction:column;gap:14px}
+.pad h3{font-family:var(--f-d);font-size:28px;font-weight:900;margin:0;line-height:1.1}
+.ncard{background:var(--surf);border-radius:16px;padding:14px;border-left:6px solid var(--line);display:flex;flex-direction:column;gap:4px}
+.ncard[data-hl="y"]{border-left-color:#F2CF2A} .ncard[data-hl="p"]{border-left-color:#F08AB6} .ncard[data-hl="g"]{border-left-color:#49C891}
+.ncard .mine{font-weight:700} .ncard small{color:var(--mute)}
+.empty{border:1.5px dashed var(--line);border-radius:18px;padding:22px;color:var(--mute);text-align:center}
+textarea.big{min-height:260px}
+
+/* ---------- B 對練 ---------- */
+.b-top{flex:none;padding:6px 16px 10px;display:flex;flex-direction:column;gap:8px}
+.bars{display:flex;gap:4px} .bars button{flex:1;height:5px;border-radius:3px;background:var(--surf2);overflow:hidden;position:relative}
+.bars button::after{content:"";position:absolute;inset:0;background:var(--acc);transform-origin:left;transform:scaleX(var(--p,0));transition:transform .3s}
+.b-meta{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;color:var(--mute)}
+.xp{font-family:var(--f-d);color:var(--acc);font-size:15px;font-variant-numeric:tabular-nums}
+.b-card{padding:14px 20px 28px;display:flex;flex-direction:column;gap:16px;min-height:100%;animation:up .25s ease-out}
+.b-step{font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--acc)}
+.b-q{font-family:var(--f-d);font-weight:900;font-size:27px;line-height:1.3;margin:0;text-wrap:balance}
+.opts{display:grid;gap:8px}
+.opts button{text-align:left;padding:14px 16px;border-radius:16px;background:var(--surf);border:1.5px solid var(--line);font-weight:500;font-size:15.5px}
+.opts button[aria-pressed="true"]{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,var(--surf))}
+.opts button.right{border-color:var(--c)} .opts button.wrong{opacity:.55}
+.verdict{border-radius:18px;padding:14px 16px;background:var(--acc);color:var(--on-acc);font-weight:700}
+.verdict small{display:block;font-weight:500;opacity:.9}
+.quote{border-left:4px solid var(--acc);padding-left:14px;display:flex;flex-direction:column;gap:8px}
+.quote .q-en{font-size:19px;color:var(--ink)} .quote .q-zh{font-size:15px;color:var(--mute);font-weight:400}
+.b-card ul{margin:0;padding-left:1.1em;color:var(--mute)}
+.why{display:grid;gap:10px}
+.why div{background:var(--surf);border-radius:16px;padding:14px 16px;animation:up .3s ease-out;font-size:15px}
+.why div b{display:block;font-size:11px;letter-spacing:.12em;color:var(--acc)}
+.b-foot{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap;padding-top:8px}
+.b-foot .btn{flex:1}
+.vcard{background:var(--ink);color:var(--bg);border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:10px;position:relative}
+.vcard p{margin:0;font-size:18px;font-weight:700;line-height:1.5}
+.vcard small{opacity:.65;font-size:12px}
+.vcard .tag{align-self:flex-start;font-size:11px;font-weight:700;padding:2px 10px;border-radius:999px;background:var(--acc);color:var(--on-acc)}
+.vcard.mint{animation:mint .5s cubic-bezier(.2,1.4,.4,1)}
+@keyframes mint{from{transform:scale(.8) rotate(-4deg);opacity:0}to{transform:none;opacity:1}}
+.counter{background:var(--surf);border:1.5px solid var(--line);border-radius:18px;padding:14px 16px;font-size:15px}
+.counter b{display:block;font-size:11px;letter-spacing:.12em;color:var(--acc)}
+.skip{font-size:12.5px;color:var(--mute);text-decoration:underline;align-self:center}
+
+/* ---------- C 星圖 ---------- */
+.c-top{flex:none;padding:6px 16px 10px;display:flex;align-items:center;gap:10px}
+.c-top p{margin:0;flex:1;font-size:12.5px;color:var(--mute);line-height:1.4} .c-top p b{color:var(--ink);display:block;font-size:14px}
+.c-map{flex:1;min-height:0;overflow:auto;position:relative;background-image:radial-gradient(var(--line) 1.2px,transparent 1.2px);background-size:22px 22px;cursor:grab}
+.c-canvas{position:relative;width:580px;height:680px;margin:0 auto}
+.c-canvas svg{position:absolute;inset:0;pointer-events:none}
+.c-canvas line{stroke:var(--acc);stroke-width:1.6;opacity:.55} .c-canvas line.d{stroke-dasharray:4 5;stroke:var(--mute)}
+.node{position:absolute;transform:translate(-50%,-50%);max-width:150px;text-align:center;font-size:12.5px;line-height:1.4;font-weight:700;padding:9px 12px;border-radius:16px;transition:transform .15s,box-shadow .15s}
+.node:active{transform:translate(-50%,-50%) scale(.95)}
+.node.spark{background:var(--surf);border:1.5px solid var(--acc);box-shadow:var(--shadow)}
+.node.spark small{display:block;font-weight:700;color:var(--acc);font-size:10.5px;font-variant-numeric:tabular-nums}
+.node.ex{background:none;border:1.5px dashed var(--mute);color:var(--mute);font-weight:500}
+.node.ex small{display:block;font-size:10px;letter-spacing:.08em}
+.node.claim{background:var(--acc);color:var(--on-acc);border-radius:22px;padding:12px 14px;box-shadow:0 0 0 calc(var(--lv)*5px) color-mix(in srgb,var(--acc) 18%,transparent),var(--shadow);font-size:calc(12.5px + var(--lv)*1px)}
+.node.claim small{display:block;font-size:10px;opacity:.85;letter-spacing:.08em}
+.node.pick{outline:3px solid var(--ink);outline-offset:3px}
+.c-hint{position:absolute;top:70px;left:50%;transform:translateX(-50%);z-index:3;background:var(--ink);color:var(--bg);font-size:12.5px;font-weight:700;padding:7px 14px;border-radius:999px;white-space:nowrap}
+.linked{display:grid;gap:6px} .linked div{display:flex;gap:8px;align-items:center;background:var(--surf2);border-radius:12px;padding:8px 12px;font-size:13px}
+.linked div span{flex:1} .linked button{color:var(--mute);font-size:16px;width:24px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="home">
+  <header class="hero">
+    <div class="eyebrow">Reader · 三個手機試作</div>
+    <h1>看完，要<em>變成你的</em>。</h1>
+    <p>三個試作用同一支影片的真實逐字稿。它們的 AI 內容相同，差別在你用什麼動作把別人的話變成自己的觀點。每個都能實際操作，你寫的東西會留在這台裝置上。</p>
+  </header>
+  <a class="vidstrip" id="vidstrip" target="_blank" rel="noopener">
+    <img alt="" id="vthumb">
+    <span><b>Pieter Levels: Programming, Viral AI Startups, and Digital Nomad Life</b><small>Lex Fridman Podcast #440 · 全長 3 小時 44 分 · 這裡取 5 段</small></span>
+  </a>
+  <div class="cards" id="cards"></div>
+  <section class="pipe">
+    <h3>貼上連結之後，三個概念共用的底層</h3>
+    <p style="margin:0;color:var(--mute);max-width:44em">試作裡的內容是預先處理好的。正式版會在背景跑完這條流程，再通知你。</p>
+    <ol>
+      <li><b>存連結</b>手機分享選單直接丟進來，離線也能先排隊。</li>
+      <li><b>取字幕</b>有官方或自動字幕就用，保留每句的時間戳。</li>
+      <li class="key"><b>沒有字幕時</b>轉寫音訊，並每隔幾秒抽一張畫面，讀出投影片、白板、程式碼，和語音對齊。</li>
+      <li><b>依主題切段</b>按論點切，不按固定分鐘數，一段只講一件事。</li>
+      <li><b>逐句對照翻譯</b>譯文和原文一句對一句，原文永遠在。</li>
+      <li><b>摘要與推理鏈</b>每段給結論，也給從前提到結論的每一步。</li>
+      <li><b>失敗自己重試</b>每一步各自存檔，壞在哪一步就從那一步重跑。</li>
+      <li><b>之後的 PDF、網頁</b>走同一條流程，只換第二步的來源。</li>
+    </ol>
+  </section>
+</div>
+
+<div id="stage" hidden>
+  <div class="sbar">
+    <button class="back" id="back" aria-label="回到概念列表">←</button>
+    <div class="pills" id="pills"></div>
+    <span style="width:36px"></span>
+  </div>
+  <div class="swrap">
+    <aside id="side"></aside>
+    <div class="phone">
+      <div id="app"></div>
+      <div id="scrim" hidden></div>
+      <div id="sheet" hidden></div>
+      <div id="toast" hidden></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const VID="oFtjKbXKqbg";
+const THUMB="data:image/jpeg;base64,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";
+const SEGS=[
+{id:"s1",t:123,title:"先收錢，再相信",spark:"有人掏信用卡，才算驗證",
+ turns:[
+ {sp:"L",t:123,s:[["You’ve launched a lot of companies and built a lot of products.","你推出過很多公司、做過很多產品。"],["As you say, most failed, but some succeeded.","就像你說的，大部分失敗了，但有些成功。"],["What’s your philosophy behind building the startups that you did?","你做這些新創，背後的哲學是什麼？"]]},
+ {sp:"P",t:134,s:[["I think my philosophy is very different than most people in startups, because most people in startups, they build a company and they raise money and they hire people and then they build a product and they find something that makes money.","我的哲學跟大多數做新創的人很不一樣。多數人是先開公司、募資、請人，然後做產品，再去找能賺錢的東西。"],["And I don’t really raise money. I don’t use VC funding, I do everything myself.","我不募資，不拿創投的錢，所有事都自己來。"],["I’m a designer, I’m the developer, I make everything, I make the logo.","我是設計師、也是工程師，什麼都自己做，連 logo 也是。"],["So for me, I’m much more scrappy. And because I don’t have funding, I need to go fast. I need to make things fast to see if an idea works.","所以我的做法土砲得多。因為沒有資金，我必須快，必須很快把東西做出來，才知道點子行不行。"],["I have an idea in my mind and I build it like a mini startup, and I launch it very quickly, within two weeks or something, of building it.","我腦中有個點子，就把它當成迷你新創來做，大概兩週內就上線。"],["And I check if there’s demand and if people actually sign up and not just sign up, but if people actually pay money.","然後我看有沒有需求：有沒有人真的註冊。而且不只是註冊，是有沒有人真的付錢。"],["They need to take out their credit cards, pay me money, and then I can see if the idea is validated.","他們得掏出信用卡、付錢給我，我才算驗證了這個點子。"],["And most ideas don’t work, as you say, most fail.","而大多數點子行不通。就像你說的，多數會失敗。"]]},
+ {sp:"P",t:202,s:[["Yeah. I think it’s very rapid.","對，我覺得非常快。"],["If I compare it to, for example, Google or big tech companies, especially Google right now is struggling.","拿 Google 這類大公司來比，尤其 Google 現在很掙扎。"],["They made transformers, they invented all the AI stuff years ago and they never really shipped.","Transformer 是他們做的，那些 AI 技術他們好幾年前就發明了，卻一直沒真正推出。"],["They could have shipped ChatGPT for example, I heard, in 2019. And they never shipped it because they were so stuck in bureaucracy.","我聽說他們 2019 年就能推出 ChatGPT 那樣的東西，卻始終沒推，因為深陷官僚流程。"],["But they had everything. They had the data, they had the tech, they had the engineers and they didn’t do it.","他們什麼都有：資料、技術、工程師，卻沒做。"],["And it’s because these big organizations, it can make you very slow.","原因是大組織會讓你變得很慢。"],["So being alone by myself on my laptop, in my underwear in a hotel room or something, I can ship very fast and I don’t need to ask legal for, “Oh, can you vouch for this?” I can just go and ship.","我一個人、一台筆電，穿著內褲待在飯店房間，就能很快出貨，不必去問法務「這個你能背書嗎？」。我直接上線就好。"]]}],
+ sum:["他把「開公司」整件事拆掉，只留一個實驗：兩週內做出能收錢的東西。","判斷標準是有人付錢。註冊和稱讚都不算。","速度來自沒有資金、沒有人要請示。他把限制當成方法在用。"],
+ core:"點子的價值在做出來之前無法得知，所以真正能經營的資產是「每次實驗的成本」。",
+ chain:["沒有人能事先知道哪個點子會成。他自己也說多數失敗。","命中率不可控，可控的只剩兩件事：試幾次，每次花多少。","註冊和稱讚不花對方任何成本，所以幾乎不帶資訊。付錢要花成本，所以是誠實的訊號。","把每次實驗壓到「兩週加一個付款按鈕」，等於用最低的價格買到真話。"],
+ ask:"你手上哪個點子，其實兩週內就能放上一個付款按鈕？你一直沒放，是在保護什麼？",
+ q:"Pieter 不募資、一個人做。你猜他用什麼標準判斷一個點子「成立」？",opts:["很多人註冊試用","朋友和同行都說讚","陌生人掏錢付費","被科技媒體報導"],ans:2,key:[[1,5],[1,6]],
+ counter:"「付錢才算驗證」對低單價工具成立。如果你的產品要靠信任累積才賣得動（顧問、社群、高單價），兩週內沒人付錢，可能只代表信任還沒到。你要怎麼分辨這兩種「沒人買」？"},
+{id:"s2",t:325,title:"鏟沙",spark:"低潮時先去搬沙",
+ turns:[
+ {sp:"P",t:325,s:[null,["And he taught me, when I’m depressed for something, he says, “Get a big mountain of sand or something from construction, and just get a shovel and bring it to the other side and just do physical labor, do hard work, and do something, Set a goal, do something.”","我爸教我，心情低落的時候，他說：「去弄一大堆沙，工地那種，拿把鏟子把它鏟到另一邊。做體力活、做苦工、做點什麼。訂個目標，做點什麼。」"],["And I did that with startups too.","我做新創也是這樣。"]]},
+ {sp:"P",t:374,s:[null,["But I think it’s very metaphorical for work, because I also … I never stop work.","我覺得這很像工作的隱喻，因為我也從不停工。"],["I go to the next website or I make a new one or I make a new startup.","我會去做下一個網站，或開一個新的，或再做一個新創。"],["It gives you something to wake up in the morning and have coffee and kiss your girlfriend and then you have a goal, “Today I’m going to fix this feature,” or “Today I’m going to fix this bug,” or something.","它讓你早上有理由起床：喝杯咖啡、親一下女友，然後你有個目標，「今天我要修好這個功能」或「今天我要解掉這個 bug」。"],["“I’m going to do something.” You have something to wake up to.","「我要做點什麼。」你有個值得醒來的東西。"],null]},
+ {sp:"L",t:412,s:[["How much of the building that you do is about money? How much is it about just a deep internal happiness?","你做這些東西，有多少是為了錢？又有多少純粹是為了內心深處的快樂？"]]},
+ {sp:"P",t:419,s:[["It’s really about fun, because I was doing it when I didn’t make money. That’s the point.","真的就是為了好玩，因為沒賺錢的時候我也在做。這才是重點。"],null,["So I think creative expression is a meaningful work that’s so important, it’s so fun.","我覺得創造性的表達是有意義的工作，非常重要，也非常好玩。"],["It’s so fun to have a daily challenge where you try to figure stuff out.","每天有個挑戰讓你去想辦法解開，真的很好玩。"]]}],
+ sum:["父親的處方是低潮時別想，去搬沙。先動，情緒之後才跟上。","他把做產品當成同一件事：每天一個解得掉的小問題，就是起床的理由。","沒賺錢的時候他也在做。錢是後來的結果，當時推著他的是好玩。"],
+ core:"動機是行動的副產品。等有動機才行動，順序反了。",
+ chain:["低潮時腦袋想要一個有意義的大答案，而那正是低潮時給不出來的東西。","具體、做得完的任務不需要答案就能開始，做完還會回饋一點進度感。","進度感會生出下一步的動機，形成迴路。等動機來才動，迴路永遠不會啟動。","所以該設計的是「今天那堆沙」。人生方向可以晚點再說。"],
+ ask:"你今天的「那堆沙」是什麼？小到不必想清楚就能開始的那一件。",
+ q:"27 歲的 Pieter 月收 500 美元，躺在飯店看天花板，覺得自己是魯蛇。他爸給了什麼建議？",opts:["找個人好好聊一聊","回家休息一陣子","拿鏟子去搬沙，做體力活","先訂一個五年計畫"],ans:2,key:[[0,1]],
+ counter:"「先動再說」對卡住的人有效。但對本來就動太多的人，它可能變成逃避：一直搬沙，就不必決定該搬哪一堆。你的問題是動不了，還是停不下來選？"},
+{id:"s3",t:440,title:"不想當 CEO",spark:"募到幾億的人想學他",
+ turns:[
+ {sp:"L",t:440,s:[["But the interesting thing is you built a lot of successful products and you never really wanted to take it to that level where you scale real big and sell it to a company or something like this.","有趣的是，你做出很多成功的產品，卻從沒想把它推到那個層級：做到超大，再賣給某家公司之類的。"]]},
+ {sp:"P",t:452,s:[null,["But I never raised funding for it. And I think because I don’t like the stressful life that comes with it.","我從沒為它募過資。我想是因為我不喜歡隨之而來的高壓生活。"],["I have a lot of founder friends and they tell me secretly, with hundreds of millions of dollars in funding and stuff, and they tell me, “Next time, if I’m going to do it, I’m going to do it like you, because it’s more fun, it’s more indie, it’s more chill, it’s more creative.”","我有很多創辦人朋友，募了幾億美元那種，他們私下跟我說：「下次如果再做，我要像你那樣做，因為更好玩、更獨立、更自在、更有創造力。」"],["They don’t like this. They don’t like to be manager, where you become a CEO, you become a manager.","他們不喜歡現在這樣。他們不喜歡當管理者。你當上 CEO，就變成了管理者。"],["And I think a lot of people that start startups, when they become a CEO, they don’t like that job actually, but they can’t really exit it, but they like to do the groundwork, the coding.","我覺得很多創業的人當上 CEO 之後，其實不喜歡那份工作，卻又抽不了身。他們喜歡的是第一線的活，是寫程式。"],["So I think that keeps you happy, doing something creative.","所以我想，讓你快樂的是持續做有創造性的事。"]]}],
+ sum:["他不排斥用戶變多。他不要的是募資附帶的那種生活。","募到幾億的朋友私下說，下次想照他的方式做。","很多創辦人愛的是動手做，卻被升成管理者，而且退不出來。"],
+ core:"規模是手段。你真正在最佳化的，是自己每天做什麼事。",
+ chain:["公司變大，創辦人的工作內容會從創造變成管理。這是結構造成的，跟個人意願無關。","多數人創業的原始動機是創造。","所以「成功」會自動把人推離他開始的理由，除非事先選一個不需要那種規模的形態。","一人公司是對工作內容的選擇。營收多大是另一個變數。"],
+ ask:"如果你的產品明年大成功，你每天的行事曆會長什麼樣子？你想要那份行事曆嗎？",
+ q:"募到上億美元的創辦人朋友，私下對 Pieter 說了什麼？",opts:["你該募資把它做大","下次我想照你的方式做","你這樣賺不到大錢","一個人撐不了多久"],ans:1,key:[[1,2]],
+ counter:"這是倖存者的視角。Pieter 能不募資，是因為他的產品邊際成本接近零，一個人寫得完。如果你的想法需要硬體、庫存或業務團隊，「保持小」可能等於做不成。你的點子屬於哪一種？"},
+{id:"s4",t:920,title:"一個月的牆",spark:"難的是決定不做什麼",
+ turns:[
+ {sp:"P",t:920,s:[null,["It was a good idea to … every month launch a startup, so I could learn to code, learn basic stuff.","每個月推出一個新創是個好主意，這樣我可以學寫程式、學基本功。"],["But it was still very scrappy, which is on purpose, because I didn’t have time to spend a lot of … I had a month to do something, so I couldn’t spend more than a month and I was pretty strict about that.","但東西還是很粗糙，這是故意的。我只有一個月做一件事，所以不能超過一個月，這點我守得很嚴。"],["And I published it as a blog post. I think I put it on Hacker News and people would check, “Oh, did you actually …”","我把這個計畫寫成部落格文章發出去，好像還貼上了 Hacker News，大家會來看「欸，你真的有做嗎…」"],["I felt accountability because I put it public, that I actually had to do it.","因為公開了，我感受到責任，我真的得做到。"]]},
+ {sp:"L",t:1104,s:[null,["What’s it take to build a thing in 30 days? At that time, how hard was that?","要在 30 天內做出一個東西，需要什麼？在當時，這有多難？"]]},
+ {sp:"P",t:1117,s:[["I think the hard part is figuring out what you shouldn’t add, what you shouldn’t build, because you don’t have time.","我覺得難的是搞清楚什麼不該加、什麼不該做，因為你沒有時間。"],["So you need to build a landing page. Well, you need to build the product, actually, because there needs to be something they pay for.","你需要做一個到達頁。嗯，其實你得把產品做出來，因為總得有個東西讓人付錢。"],["Do you need to build a login system? Maybe no. Maybe you can build some scrappy login system.","你需要做登入系統嗎？也許不用。也許做個陽春的就好。"],["For photo AI, you sign up, you pay with Stripe Checkout and you get a login link.","像 Photo AI，你註冊、用 Stripe Checkout 付款，然後收到一個登入連結。"],null,["And now I have real Google login, but that took a year.","現在我有正式的 Google 登入了，但那是一年之後的事。"],["So keeping it very scrappy is very important to … because you don’t have time. You need to focus on what you can build fast.","所以保持粗糙非常重要，因為你沒有時間。你得專注在能快速做出來的東西上。"]]},
+ {sp:"P",t:1157,s:[["So money, Stripe, build a product, build a landing page.","所以：金流、Stripe、做產品、做到達頁。"],["You need to think about, “How are people going to find this?”","你得想：「大家要怎麼找到這個東西？」"],null,["Maybe if you find a problem that a lot of people on Reddit already have, on a subreddit and you solve that problem, say, “What’s up, people. I made this thing that might solve your problem,” and maybe, “It’s free for now.” That could work.","如果你找到某個 subreddit 上很多人本來就有的問題，把它解決，然後說：「嗨各位，我做了個東西，也許能解決你們的問題」，再加一句「目前免費」。那可能行得通。"],["But you need to be very … Narrow it down, what you’re building.","但你得非常……把你要做的東西縮小、再縮小。"]]}],
+ sum:["12 個月 12 個產品。期限是硬的，完成度可以讓步。","他把計畫公開發表，被人盯著，所以非做不可。","難的是決定不做什麼。正式的登入系統可以晚一年才補。"],
+ core:"期限釘死之後，被犧牲的只能是範圍。砍範圍的過程會逼你找出產品的核心。",
+ chain:["時間、範圍、完成度，三者只能固定兩個。","多數人固定範圍（「功能要完整才能上」），結果時間無限延長，永遠不上線。","把時間釘死，每個功能都得回答：沒有它，別人還會付錢嗎？","答案是「會」的功能都可以晚點做。剩下那一兩樣才是產品本體。"],
+ ask:"你正在做的東西，哪個部分是你的「登入系統」：感覺一定要有，拿掉卻不影響別人付錢？",
+ q:"30 天做出一個產品。Pieter 說最難的部分是什麼？",opts:["學會需要的技術","想到一個好點子","決定什麼不要做","找到第一批用戶"],ans:2,key:[[2,0]],
+ counter:"一直砍，會不會砍出一堆半成品？12 個產品裡活下來的是少數。快的代價是，你可能在第 3 週放棄一個第 8 週才看得出價值的東西。哪一類點子不適合 30 天？"},
+{id:"s5",t:9424,title:"兩分鐘修好",spark:"有人回報 bug，他按碼表",
+ turns:[
+ {sp:"L",t:9424,s:[["You often deploy it to production? You don’t have a testing ground?","你常常直接部署到正式環境？沒有測試環境？"]]},
+ {sp:"P",t:9428,s:[["No. So, I’m famous for this because I’m too lazy to set up a staging server on my laptop every time.","沒有。我就是以這個出名的，因為我懶得每次都在筆電上架測試伺服器。"],["So, nowadays, I just deploy to production and man, I’m going to be canceled for this. But it works very well for me.","所以現在我就是直接部署到正式環境。天啊，講這個我會被罵翻。但這對我非常有效。"],null,["So, I don’t deploy, but literally, I have like 37,000 Git commits in the last 12 months or something.","說真的，過去 12 個月我大概有 37,000 次 Git commit。"],null]},
+ {sp:"P",t:9473,s:[null,["But look, it’s idiotic in any big company. But for me it works because it makes me so fast.","你看，這在任何大公司都是白痴做法。但對我有效，因為它讓我非常快。"],["Somebody will report a bug on Twitter and I do a stopwatch.","有人在 Twitter 上回報 bug，我就按下碼表。"],["How fast can I fix this bug? And then, two minutes later, for example, it’s fixed.","我能多快修好這個 bug？然後，比方說兩分鐘後，修好了。"],["And it’s fun because it’s annoying for me to work with companies where you report a bug and it takes six months. It’s horrible.","這很好玩，因為我受不了跟那種回報 bug 要等六個月的公司合作。太可怕了。"],["And it makes people really happy when you can really quickly solve their problems. But it’s crazy.","當你能很快解決大家的問題，他們真的會很開心。但這很瘋。"]]},
+ {sp:"P",t:9740,s:[["And the law can change.","而且法律是會變的。"],null,["So, just by shipping it, you change society, you change the legal framework.","光是把東西推出去，你就改變了社會、改變了法律框架。"],["By not shipping, being scared of the legal framework all the time, you’re not changing things.","不推出去、成天害怕法律框架，你什麼也改變不了。"]]}],
+ sum:["沒有測試環境，改完直接上線，一年約 37,000 次 commit。","他承認這在大公司是白痴做法。對一個人來說，它換到的是速度。","用戶回報 bug，兩分鐘後修好。用戶直接感受到這個速度。"],
+ core:"流程存在的理由是降低出錯的代價。出錯的代價本來就低的時候，流程只剩下成本。",
+ chain:["測試環境、審核、法務，都是在買保險，防止一次錯誤造成大損失。","保險值多少錢，取決於損失有多大。大公司一次事故影響百萬人，一個人的產品壞兩分鐘，影響很小。","所以同一套流程，對大公司划算，對個人是純負擔。","小的優勢就在這裡：你可以用「很快修好」取代「事前預防」，而用戶感受得到前者。"],
+ ask:"你現在哪個謹慎的流程，其實是從大公司搬來的習慣？它在保護你什麼損失？",
+ q:"用戶在 Twitter 上回報 bug。Pieter 接下來會做什麼？",opts:["排進下週的待辦清單","按下碼表，看多快能修好","先在測試環境重現問題","回覆感謝，之後再處理"],ans:1,key:[[2,2],[2,3]],
+ counter:"「壞了再修」只在錯誤可逆時成立。金流算錯、資料外洩、寄錯信給所有用戶，這些兩分鐘修不回來。你的產品裡，哪些地方不可逆，值得慢下來？"}
+];
+const CON={
+ a:{n:"伴讀",tag:"主角是逐字稿",desc:"中英對照的逐字稿。點任何一句就能畫線、寫筆記、看原文對應句。每段結尾有摘要、第一性原理和一個丟給你的問題。",bet:"賭注：你讀得夠細，觀點自然會長出來。",act:"點句子畫三種顏色（洞見、疑問、行動），回答每段一題，最後在「成稿」把這些組起來。",risk:"容易變成只畫線不思考。畫了很多，自己的話卻很少。"},
+ b:{n:"對練",tag:"主角是你的預測",desc:"每段先猜答案，再看他怎麼說，往下挖三層為什麼，最後用一句自己的話講。AI 當反方，你決定堅持或修正。",bet:"賭注：猜錯和被反駁，比畫線更能留下東西。",act:"一段四步：猜、看、挖、說。每過一關得到一張寫著你自己句子的觀點卡，五張可以直接組成貼文。",risk:"每段都要你出力。很累或只想瀏覽的時候，你可能不會打開它。"},
+ c:{n:"星圖",tag:"主角是你的主張",desc:"影片只提供火花。你在火花旁種下自己的主張，把它連到其他火花和其他影片。連得越多，那個主張長得越大。",bet:"賭注：你缺的是讓看過的東西互相連起來。",act:"點火花看原話，寫一句主張種下去，再連線。長最大的幾棵就是你該寫的文章，「收成」會給你大綱。",risk:"單支影片的理解深度靠你自律。地圖在前幾支影片時看起來會很空。"}
+};
+const ART={
+ a:'<svg class="art" viewBox="0 0 300 132"><g fill="none" stroke-linecap="round" stroke-width="7"><path stroke="var(--line)" d="M28 30h170M28 54h244M28 78h120M28 102h200"/><path stroke="var(--hl-y)" stroke-width="15" d="M82 54h132"/><path stroke="var(--acc)" d="M82 54h132"/><path stroke="var(--hl-g)" stroke-width="15" d="M28 102h86"/></g></svg>',
+ b:'<svg class="art" viewBox="0 0 300 132"><rect x="92" y="26" width="118" height="84" rx="14" fill="var(--line)" transform="rotate(-9 150 66)"/><rect x="92" y="24" width="118" height="84" rx="14" fill="var(--surf)" stroke="var(--acc)" stroke-width="2.5" transform="rotate(5 150 66)"/><text x="151" y="84" text-anchor="middle" font-family="Bricolage Grotesque,sans-serif" font-weight="800" font-size="52" fill="var(--acc)" transform="rotate(5 150 66)">?</text></svg>',
+ c:'<svg class="art" viewBox="0 0 300 132"><g stroke="var(--acc)" stroke-width="2" opacity=".6"><path d="M70 40L150 70M150 70L236 36M150 70L110 104M150 70L214 100"/></g><circle cx="150" cy="70" r="20" fill="var(--acc)"/><g fill="var(--surf)" stroke="var(--acc)" stroke-width="2.5"><circle cx="70" cy="40" r="9"/><circle cx="236" cy="36" r="9"/><circle cx="110" cy="104" r="9"/><circle cx="214" cy="100" r="9"/></g></svg>'
+};
+
+/* ---------- helpers ---------- */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const store={get(k,d){try{const v=localStorage.getItem("rd3:"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("rd3:"+k,JSON.stringify(v))}catch(e){}}};
+const fmt=t=>{const h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=String(t%60).padStart(2,"0");return h?`${h}:${String(m).padStart(2,"0")}:${s}`:`${m}:${s}`};
+const yt=t=>`https://www.youtube.com/watch?v=${VID}&t=${t}s`;
+const tlink=(t,label)=>`<a class="tlink" href="${yt(t)}" target="_blank" rel="noopener">${label||fmt(t)} ↗</a>`;
+const SENT={};
+SEGS.forEach(g=>g.turns.forEach((tu,ti)=>tu.s.forEach((p,si)=>{if(p)SENT[`${g.id}-${ti}-${si}`]={en:p[0],zh:p[1],t:tu.t,seg:g,turn:tu}})));
+const keyIds=g=>g.key.map(([a,b])=>`${g.id}-${a}-${b}`);
+const appEl=$("#app"),sheetEl=$("#sheet"),scrimEl=$("#scrim"),toastEl=$("#toast");
+let onSheetClose=null;
+function openSheet(html,onClose){sheetEl.innerHTML=html;sheetEl.hidden=false;scrimEl.hidden=false;sheetEl.scrollTop=0;onSheetClose=onClose||null;return sheetEl}
+function closeSheet(){if(sheetEl.hidden)return;sheetEl.hidden=true;scrimEl.hidden=true;const f=onSheetClose;onSheetClose=null;f&&f()}
+scrimEl.onclick=closeSheet;
+let toastT;function toast(m){toastEl.textContent=m;toastEl.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>toastEl.hidden=true,1800)}
+async function copyText(ta){try{await navigator.clipboard.writeText(ta.value);toast("已複製")}catch(e){ta.focus();ta.select();toast("已全選，請手動複製")}}
+
+/* live Claude (optional): every use has a prewritten fallback already on screen */
+let ask=null;
+(async()=>{try{ask=await window.claude?.use?.("sample")}catch(e){} if(ask)document.body.classList.add("has-ai")})();
+const AI_ERR={not_granted:"這個頁面沒有取得呼叫 Claude 的許可，這項功能先關閉。",rate_limited:"呼叫太頻繁，等一分鐘再試。",cancelled:""};
+async function askAI(prompt,out,btn){
+  if(!ask)return; out.hidden=false; out.textContent="思考中…"; if(btn)btn.disabled=true;
+  try{await ask(prompt,{modelTier:"quick",onText:({text})=>{out.textContent=text}})}
+  catch(e){out.textContent=(e&&e.text)||AI_ERR[e&&e.code]||"這次沒有成功。上面的內容不受影響，可以稍後再試。"}
+  finally{if(btn)btn.disabled=false}
+}
+
+/* ---------- A 伴讀 ---------- */
+const mount={};
+mount.a=function(){
+  const st={hl:store.get("a.hl",{}),notes:store.get("a.notes",{}),refl:store.get("a.refl",{}),mode:store.get("a.mode","both"),tab:"read"};
+  const save=()=>{store.set("a.hl",st.hl);store.set("a.notes",st.notes);store.set("a.refl",st.refl);store.set("a.mode",st.mode)};
+  const counts=()=>({h:Object.keys(st.hl).length,n:Object.values(st.notes).filter(Boolean).length,r:Object.values(st.refl).filter(v=>v&&v.trim()).length});
+  const depth=()=>{const c=counts();return Math.min(100,c.h*6+c.n*8+c.r*14)};
+  appEl.innerHTML=`<div class="app" data-c="a">
+    <header class="a-head">
+      <a class="vid" href="${yt(SEGS[0].t)}" target="_blank" rel="noopener"><img src="${THUMB}" alt=""><span><b>Pieter Levels：一個人做產品</b><small>Lex Fridman #440 · 在 YouTube 開啟 ↗</small></span></a>
+      <div class="row"><div class="seg3" role="group" aria-label="顯示語言">${[["zh","中"],["both","中英"],["en","EN"]].map(([k,l])=>`<button data-mode="${k}">${l}</button>`).join("")}</div><span class="sp"></span><span class="depth" id="a-depth"></span></div>
+    </header>
+    <div class="scroll" id="a-view"></div>
+    <nav class="tabs"><button data-tab="read">閱讀</button><button data-tab="notes">我的筆記 <b id="a-nc"></b></button><button data-tab="draft">成稿</button></nav>
+  </div>`;
+  const view=$("#a-view");
+  const refreshMeta=()=>{const c=counts();$("#a-depth").textContent=`內化 ${depth()}%`;$("#a-nc").textContent=c.h+c.r||"";$$("[data-mode]",appEl).forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===st.mode));$$("[data-tab]",appEl).forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===st.tab))};
+  const span=(id,lang)=>{const s=SENT[id];return `<span class="s${st.notes[id]?" has-note":""}" data-id="${id}" data-hl="${st.hl[id]||""}" role="button" tabindex="0">${esc(s[lang])}</span>`};
+  function renderRead(){
+    view.className="scroll m-"+st.mode;
+    view.innerHTML=`<div class="a-read">`+SEGS.map((g,gi)=>`<section class="a-seg" id="seg-${g.id}">
+      <header><i>${gi+1}/5</i><h3>${g.title}</h3>${tlink(g.t)}</header>
+      ${g.turns.map((tu,ti)=>{const ids=tu.s.map((p,si)=>p?`${g.id}-${ti}-${si}`:null);const line=l=>ids.map(id=>id?span(id,l):`<span class="gap">[…]</span>`).join(l==="en"?" ":"");
+        return `<div class="turn sp-${tu.sp}"><div class="who"><b>${tu.sp==="L"?"LEX FRIDMAN":"PIETER LEVELS"}</b>${tlink(tu.t)}</div><p class="zh">${line("zh")}</p><p class="en" lang="en">${line("en")}</p></div>`}).join("")}
+      <div class="absorb">
+        <div class="eyebrow">這一段在說什麼</div><ul>${g.sum.map(x=>`<li>${x}</li>`).join("")}</ul>
+        <div class="eyebrow">第一性原理</div><p class="core">${g.core}</p>
+        <details><summary>展開推理鏈（${g.chain.length} 步）</summary><ol class="chain">${g.chain.map(x=>`<li>${x}</li>`).join("")}</ol></details>
+        <div class="eyebrow">換到你身上</div><p class="ask">${g.ask}</p>
+        <textarea id="refl-${g.id}" data-refl="${g.id}" placeholder="寫一兩句就好，會存到「我的筆記」">${esc(st.refl[g.id]||"")}</textarea>
+      </div></section>`).join("")+`</div>`;
+  }
+  function sentSheet(id){
+    const s=SENT[id];$$(".s.on",view).forEach(e=>e.classList.remove("on"));$$(`.s[data-id="${id}"]`,view).forEach(e=>e.classList.add("on"));
+    openSheet(`<p class="q-zh">${esc(s.zh)}</p><p class="q-en" lang="en">${esc(s.en)}</p>
+      <div class="hl-row">${[["y","洞見","var(--hl-y)"],["p","疑問","var(--hl-p)"],["g","要去做","var(--hl-g)"],["","不畫","transparent"]].map(([k,l,c])=>`<button data-hl="${k}" aria-pressed="${(st.hl[id]||"")===k}"><i style="background:${c}"></i>${l}</button>`).join("")}</div>
+      <textarea id="a-note" placeholder="這句讓你想到什麼？">${esc(st.notes[id]||"")}</textarea>
+      <div class="ai-out" id="a-aiout" hidden></div>
+      <div class="row">${tlink(s.t,"從這裡看 "+fmt(s.t))}<span class="sp"></span><button class="btn sm ghost ai-only" id="a-ask">請 AI 解釋這句</button><button class="btn sm" id="a-done">完成</button></div>`,
+      ()=>$$(".s.on",view).forEach(e=>e.classList.remove("on")));
+    $$("[data-hl]",sheetEl).forEach(b=>b.onclick=()=>{const k=b.dataset.hl;if(k)st.hl[id]=k;else delete st.hl[id];save();$$(`.s[data-id="${id}"]`,view).forEach(e=>e.dataset.hl=k);$$("[data-hl]",sheetEl).forEach(x=>x.setAttribute("aria-pressed",x===b));refreshMeta()});
+    $("#a-note").oninput=e=>{const v=e.target.value;if(v.trim()){st.notes[id]=v;if(!st.hl[id]){st.hl[id]="y";$$(`.s[data-id="${id}"]`,view).forEach(x=>x.dataset.hl="y")}}else delete st.notes[id];save();$$(`.s[data-id="${id}"]`,view).forEach(x=>x.classList.toggle("has-note",!!st.notes[id]));refreshMeta()};
+    $("#a-done").onclick=closeSheet;
+    $("#a-ask").onclick=e=>askAI(`你是陪讀夥伴。讀者的母語是繁體中文，是一位創業者，正在讀一段英文訪談逐字稿。請用繁體中文、最多 90 個字，解釋下面這句話在上下文中的意思，並點出它背後的一個假設。直接講，不要開場白，不要條列。\n\n這段的主題：${s.seg.title}\n上下文：${s.turn.s.filter(Boolean).map(p=>p[0]).join(" ")}\n要解釋的句子：${s.en}`,$("#a-aiout"),e.currentTarget);
+  }
+  function renderNotes(){
+    const ids=Object.keys(st.hl).sort((a,b)=>SENT[a].t-SENT[b].t||a.localeCompare(b)),names={y:"洞見",p:"疑問",g:"要去做"};
+    const refl=SEGS.filter(g=>(st.refl[g.id]||"").trim());
+    view.className="scroll";
+    view.innerHTML=`<div class="pad"><h3>我的筆記</h3>`+(ids.length+refl.length?"":`<div class="empty">還沒有東西。回到「閱讀」，點一句你有感覺的話。</div>`)+
+      refl.map(g=>`<div class="ncard"><small>我對「${g.title}」的回答</small><span class="mine">${esc(st.refl[g.id])}</span></div>`).join("")+
+      ids.map(id=>{const s=SENT[id];return `<div class="ncard" data-hl="${st.hl[id]}"><small>${names[st.hl[id]]} · ${tlink(s.t)}</small><span>${esc(s.zh)}</span><span class="q-en" style="font-size:14px" lang="en">${esc(s.en)}</span>${st.notes[id]?`<span class="mine">✎ ${esc(st.notes[id])}</span>`:""}</div>`}).join("")+`</div>`;
+  }
+  function buildDraft(){
+    const refl=SEGS.filter(g=>(st.refl[g.id]||"").trim()),by=k=>Object.keys(st.hl).filter(id=>st.hl[id]===k).sort((a,b)=>SENT[a].t-SENT[b].t);
+    let out=[];
+    if(refl.length)out.push("我的想法\n"+refl.map(g=>`・${st.refl[g.id].trim()}`).join("\n"));
+    const n=Object.keys(st.notes).filter(id=>st.notes[id]);if(n.length)out.push("我在句子旁寫下的\n"+n.map(id=>`・${st.notes[id].trim()}`).join("\n"));
+    if(by("y").length)out.push("打到我的原話（Pieter Levels）\n"+by("y").map(id=>`「${SENT[id].zh}」`).join("\n"));
+    if(by("g").length)out.push("我要去做的\n"+by("g").map(id=>`・${SENT[id].zh}`).join("\n"));
+    if(by("p").length)out.push("我還沒想通的\n"+by("p").map(id=>`・${SENT[id].zh}`).join("\n"));
+    return out.join("\n\n");
+  }
+  function renderDraft(){
+    const c=counts(),ready=c.r>=1&&c.h>=3;view.className="scroll";
+    view.innerHTML=`<div class="pad"><h3>成稿</h3>`+(ready?`<p style="margin:0;color:var(--mute)">下面全部來自你畫的線和你寫的字，可以直接改。</p><textarea class="big" id="a-draft">${esc(buildDraft())}</textarea>
+      <div class="ai-out" id="a-polish" hidden></div>
+      <div class="row"><button class="btn" id="a-copy">複製</button><button class="btn ghost ai-only" id="a-ai">請 AI 順成一篇貼文</button></div>`
+      :`<div class="empty">畫 3 句、回答 1 題，這裡就會長出草稿。<br><b style="color:var(--ink)">目前：畫了 ${c.h} 句，回答了 ${c.r} 題</b></div>`)+`</div>`;
+    if(!ready)return;
+    $("#a-copy").onclick=()=>copyText($("#a-draft"));
+    $("#a-ai").onclick=e=>askAI(`把下面這位讀者自己寫的筆記整理成一篇繁體中文社群貼文，250 字以內。規則：只能使用他寫的觀點，不能加入新論點；保留他的口吻；講者原話最多引用一句；不要勵志結尾，不要 hashtag，不要 emoji。\n\n${$("#a-draft").value}`,$("#a-polish"),e.currentTarget);
+  }
+  function render(){({read:renderRead,notes:renderNotes,draft:renderDraft})[st.tab]();view.scrollTop=0;refreshMeta()}
+  appEl.firstElementChild.onclick=e=>{
+    const m=e.target.closest("[data-mode]"),t=e.target.closest("[data-tab]"),s=e.target.closest(".s");
+    if(m){st.mode=m.dataset.mode;save();view.className="scroll m-"+st.mode;if(st.tab!=="read"){st.tab="read";render()}refreshMeta()}
+    else if(t){st.tab=t.dataset.tab;render()}
+    else if(s)sentSheet(s.dataset.id);
+  };
+  view.addEventListener("input",e=>{const k=e.target.dataset&&e.target.dataset.refl;if(k){st.refl[k]=e.target.value;save();refreshMeta()}});
+  view.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.classList.contains("s"))sentSheet(e.target.dataset.id)});
+  render();
+};
+
+/* ---------- B 對練 ---------- */
+mount.b=function(){
+  const st=store.get("b",{round:0,step:0,r:{}});let shown=0,fresh=false;
+  const save=()=>store.set("b",st);
+  const rec=g=>st.r[g.id]||(st.r[g.id]={});
+  const xp=()=>SEGS.reduce((a,g)=>{const r=st.r[g.id]||{};return a+(r.guess!=null?(r.guess===g.ans?20:10):0)+(r.done?30:0)},0);
+  const doneN=()=>SEGS.filter(g=>(st.r[g.id]||{}).done).length;
+  appEl.innerHTML=`<div class="app" data-c="b"><div class="b-top"><div class="bars" id="b-bars"></div><div class="b-meta"><span id="b-where"></span><span><span class="xp" id="b-xp"></span> XP · <button id="b-deck" style="text-decoration:underline">我的觀點卡 <b id="b-dn"></b></button></span></div></div><div class="scroll" id="b-view"></div></div>`;
+  const view=$("#b-view");
+  function top(){
+    $("#b-bars").innerHTML=SEGS.map((g,i)=>{const r=st.r[g.id]||{};const p=r.done?1:(i===st.round&&st.round<5?st.step/4:0);return `<button data-round="${i}" style="--p:${p}" aria-label="第 ${i+1} 關"></button>`}).join("");
+    $("#b-where").textContent=st.round<5?`第 ${st.round+1} 關 · ${SEGS[st.round].title}`:"全部完成";
+    $("#b-xp").textContent=xp();$("#b-dn").textContent=doneN()+"/5";
+  }
+  function go(round,step){st.round=round;st.step=step;shown=0;save();render()}
+  function render(){
+    top();view.scrollTop=0;
+    if(st.round>=5)return deck();
+    const g=SEGS[st.round],r=rec(g),quote=keyIds(g).map(id=>SENT[id]);
+    const qHtml=`<div class="quote"><p class="q-en" lang="en">${quote.map(s=>esc(s.en)).join(" ")}</p><p class="q-zh">${quote.map(s=>esc(s.zh)).join("")}</p>${tlink(quote[0].t,"看這一段 "+fmt(quote[0].t))}</div>`;
+    let h="";
+    if(st.step===0){
+      h=`<div class="b-step">1 / 4　先猜</div><h3 class="b-q">${g.q}</h3><div class="opts">${g.opts.map((o,i)=>`<button data-opt="${i}" aria-pressed="${r.guess===i}">${o}</button>`).join("")}</div>
+      <div class="b-foot"><button class="btn" id="b-lock" ${r.guess==null?"disabled":""}>鎖定答案</button></div><button class="skip" id="b-skip">這關先跳過</button>`;
+    }else if(st.step===1){
+      const ok=r.guess===g.ans;
+      h=`<div class="b-step">2 / 4　他怎麼說</div><div class="verdict">${ok?"猜中了　+20 XP":"沒猜中　+10 XP"}<small>${ok?"你的直覺和他一致。接下來看你說不說得出為什麼。":"你猜「"+g.opts[r.guess]+"」。預期和事實的落差，是這段最容易記住的地方。"}</small></div>
+      ${qHtml}<ul>${g.sum.map(x=>`<li>${x}</li>`).join("")}</ul><div class="b-foot"><button class="btn" data-next>往下挖：為什麼</button></div>`;
+    }else if(st.step===2){
+      const all=shown>=g.chain.length;
+      h=`<div class="b-step">3 / 4　挖到底</div><h3 class="b-q">${all?g.core:"這個做法為什麼成立？"}</h3><div class="why">${g.chain.slice(0,shown).map((x,i)=>`<div><b>第 ${i+1} 層</b>${x}</div>`).join("")}</div>
+      <div class="b-foot">${all?`<button class="btn" data-next>換我說</button>`:`<button class="btn line" id="b-why">${shown?"再問一次為什麼":"為什麼？"}　${shown}/${g.chain.length}</button>`}</div>`;
+    }else{
+      if(!r.sent){
+        h=`<div class="b-step">4 / 4　換你說</div><h3 class="b-q">用一句你自己的話，說這段對你有用的地方。</h3><p style="margin:0;color:var(--mute)">照抄不算。寫完之後有人會反駁你。</p>
+        <textarea id="b-own" placeholder="例如：我一直在等產品夠好才敢收錢，但…">${esc(r.own||"")}</textarea><div class="b-foot"><button class="btn" id="b-send" ${(r.own||"").trim().length<8?"disabled":""}>送出</button></div>`;
+      }else{
+        h=`<div class="b-step">4 / 4　反方</div><div class="vcard"><small>你說</small><p>${esc(r.own)}</p></div>
+        <div class="counter"><b>反方</b>${g.counter}</div><div class="ai-out" id="b-ai" hidden></div>
+        <button class="btn sm ghost ai-only" id="b-live" style="align-self:flex-start">針對我這句話再反駁一次</button>
+        <div class="b-foot"><button class="btn line" id="b-revise">我要修正</button><button class="btn" id="b-hold">我堅持，收成卡片</button></div>`;
+      }
+    }
+    view.innerHTML=`<div class="b-card">${h}</div>`;
+    const own=$("#b-own");if(own)own.oninput=()=>{r.own=own.value;save();$("#b-send").disabled=own.value.trim().length<8};
+  }
+  function deck(){
+    const done=SEGS.filter(g=>(st.r[g.id]||{}).done);
+    const text=done.length?`看完 Lex Fridman 訪 Pieter Levels，我留下 ${done.length} 個自己的結論：\n\n`+done.map((g,i)=>`${i+1}. ${st.r[g.id].own.trim()}`).join("\n\n"):"";
+    view.innerHTML=`<div class="b-card"><div class="b-step">我的觀點卡　${done.length} / 5</div><h3 class="b-q">${done.length?"這些句子是你寫的。":"還沒有卡片。"}</h3>
+      ${done.map((g,i)=>`<div class="vcard${fresh&&i===done.length-1?" mint":""}"><span class="tag">${st.r[g.id].revised?"修正過":"堅持原句"}</span><p>${esc(st.r[g.id].own)}</p><small>來自「${g.title}」 · ${fmt(g.t)}</small></div>`).join("")}
+      ${done.length?`<div class="eyebrow">組成貼文</div><textarea class="big" id="b-post" style="min-height:200px">${esc(text)}</textarea><div class="b-foot"><button class="btn" id="b-copy">複製</button>${done.length<5?`<button class="btn line" id="b-cont">繼續下一關</button>`:""}</div>`:`<div class="b-foot"><button class="btn" id="b-cont">開始第一關</button></div>`}
+      <button class="skip" id="b-reset">全部重來</button></div>`;
+    fresh=false;
+  }
+  appEl.firstElementChild.onclick=e=>{
+    const t=e.target.closest("button");if(!t)return;
+    const g=SEGS[Math.min(st.round,4)],r=rec(g);
+    if(t.dataset.round!=null){const i=+t.dataset.round,rr=st.r[SEGS[i].id]||{};go(i,rr.done?3:rr.guess!=null&&rr.locked?1:0)}
+    else if(t.dataset.opt!=null){r.guess=+t.dataset.opt;save();render()}
+    else if(t.id==="b-lock"){r.locked=true;go(st.round,1)}
+    else if(t.id==="b-skip"){go(Math.min(st.round+1,5),0)}
+    else if(t.hasAttribute("data-next")){go(st.round,st.step+1)}
+    else if(t.id==="b-why"){shown++;render();view.scrollTop=view.scrollHeight}
+    else if(t.id==="b-send"){r.sent=true;save();render()}
+    else if(t.id==="b-revise"){r.sent=false;r.revised=true;save();render();$("#b-own")&&$("#b-own").focus()}
+    else if(t.id==="b-hold"){r.done=true;save();fresh=true;toast("+30 XP　得到一張觀點卡");const nx=SEGS.findIndex((x,i)=>i>st.round&&!(st.r[x.id]||{}).done);st.round=5;st.step=0;st.next=nx;save();render()}
+    else if(t.id==="b-live"){const q=keyIds(g).map(id=>SENT[id].en).join(" ");askAI(`你是嚴格但友善的辯論對手。讀者剛看完一段訪談，並用自己的話寫下結論。請用繁體中文、最多 100 個字，指出這個結論最弱的一個環節（一個具體反例，或一個沒說出口的假設），最後用一個問題結尾。不要稱讚，不要重述他的話，不要條列。\n\n訪談重點：${g.sum.join(" ")}\n講者原話：${q}\n讀者的結論：${r.own}`,$("#b-ai"),t)}
+    else if(t.id==="b-deck"){st.round=5;save();render()}
+    else if(t.id==="b-cont"){const nx=SEGS.findIndex(x=>!(st.r[x.id]||{}).done);go(nx<0?0:nx,0)}
+    else if(t.id==="b-copy"){copyText($("#b-post"))}
+    else if(t.id==="b-reset"){st.round=0;st.step=0;st.r={};save();render()}
+  };
+  render();
+};
+
+/* ---------- C 星圖 ---------- */
+mount.c=function(){
+  const POS={s1:[270,80],s2:[105,270],s3:[470,285],s4:[140,540],s5:[430,560]};
+  const base=[...SEGS.map(g=>({id:g.id,type:"spark",x:POS[g.id][0],y:POS[g.id][1],text:g.spark,seg:g.id})),
+    {id:"x1",type:"ex",x:480,y:120,text:"做那些無法規模化的事",src:"Paul Graham 的文章"},
+    {id:"x2",type:"ex",x:95,y:410,text:"學不來的才是你的專長",src:"Naval Ravikant 的訪談"}];
+  const st=store.get("c",{claims:[{id:"k0",type:"claim",x:285,y:200,text:"付錢是少數不會說客套話的回饋",demo:true}],links:[["k0","s1"],["k0","x1"]]});
+  const save=()=>store.set("c",st);let linkFrom=null;
+  const nodes=()=>[...base,...st.claims],byId=id=>nodes().find(n=>n.id===id);
+  const deg=id=>st.links.filter(l=>l.includes(id)).length;
+  const lvName=d=>d>=3?"樹":d===2?"芽":"種子";
+  const neigh=id=>st.links.filter(l=>l.includes(id)).map(l=>byId(l[0]===id?l[1]:l[0])).filter(Boolean);
+  appEl.innerHTML=`<div class="app" data-c="c"><div class="c-top"><p><b id="c-stat"></b><span id="c-sub"></span></p><button class="btn sm" id="c-harvest">收成</button></div>
+    <div class="c-map" id="c-map"><div class="c-canvas" id="c-canvas"></div></div><div class="c-hint" id="c-hint" hidden></div></div>`;
+  const map=$("#c-map"),canvas=$("#c-canvas"),hint=$("#c-hint");
+  map.parentElement.style.position="relative";
+  function render(){
+    const big=[...st.claims].sort((a,b)=>deg(b.id)-deg(a.id))[0];
+    $("#c-stat").textContent=`${st.claims.length} 個主張 · ${st.links.length} 條連線`;
+    $("#c-sub").textContent=big?`最大的一棵：${big.text}`:"點一個火花，種下第一個主張";
+    canvas.innerHTML=`<svg width="580" height="680">${st.links.map(([a,b])=>{const A=byId(a),B=byId(b);if(!A||!B)return"";return `<line class="${A.type==="ex"||B.type==="ex"?"d":""}" x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}"/>`}).join("")}</svg>`+
+      nodes().map(n=>{const d=deg(n.id),lv=Math.min(3,Math.max(1,d));
+        const inner=n.type==="spark"?`<small>${fmt(SEGS.find(g=>g.id===n.seg).t)} · 火花</small>${esc(n.text)}`:n.type==="ex"?`<small>範例 · 另一個來源</small>${esc(n.text)}`:`<small>${n.demo?"範例 · ":""}我的主張 · ${lvName(d)}</small>${esc(n.text)}`;
+        return `<button class="node ${n.type}${linkFrom===n.id?" pick":""}" data-node="${n.id}" style="left:${n.x}px;top:${n.y}px;--lv:${lv}">${inner}</button>`}).join("");
+    hint.hidden=!linkFrom;if(linkFrom)hint.innerHTML=`點另一個節點來連線　<button id="c-cancel" style="text-decoration:underline;color:inherit">取消</button>`;
+  }
+  function plant(parent,text){
+    let best=null,x=0,y=0;
+    for(let r=115;r<=175;r+=30)for(let k=0;k<12;k++){const a=k*Math.PI/6,px=parent.x+Math.cos(a)*r*1.25,py=parent.y+Math.sin(a)*r*.8;
+      if(px<90||px>490||py<60||py>620)continue;
+      const d=Math.min(...nodes().map(m=>Math.hypot((m.x-px)/1.9,m.y-py)));
+      if(!best||d>best){best=d;x=px;y=py}}
+    if(!best){x=290;y=360}
+    const c={id:"k"+Date.now().toString(36),type:"claim",x,y,text};st.claims.push(c);st.links.push([c.id,parent.id]);save();return c;
+  }
+  function sparkSheet(n){
+    const g=SEGS.find(x=>x.id===n.seg),q=keyIds(g).map(id=>SENT[id]),grown=neigh(n.id).filter(x=>x.type==="claim");
+    openSheet(`<div class="eyebrow">火花 · ${g.title}</div><p class="q-en" lang="en" style="color:var(--ink);font-size:18px">${q.map(s=>esc(s.en)).join(" ")}</p><p class="q-zh" style="font-size:15px;font-weight:400;color:var(--mute)">${q.map(s=>esc(s.zh)).join("")}</p>
+      <div class="row">${tlink(q[0].t,"看這一段 "+fmt(q[0].t))}</div>
+      <details><summary>AI 讀到的第一性原理</summary><p style="margin:8px 0 0">${g.core}</p></details>
+      ${grown.length?`<div class="linked">${grown.map(x=>`<div><span>${esc(x.text)}</span></div>`).join("")}</div>`:""}
+      <div class="eyebrow">這讓你想主張什麼？</div><textarea id="c-new" placeholder="用你會對朋友講的方式寫一句"></textarea>
+      <div class="row"><button class="btn line sm" id="c-link">只連線，不寫</button><span class="sp"></span><button class="btn" id="c-plant" disabled>種下去</button></div>`);
+    const ta=$("#c-new");ta.oninput=()=>$("#c-plant").disabled=ta.value.trim().length<4;
+    $("#c-plant").onclick=()=>{const c=plant(n,ta.value.trim());closeSheet();render();toast("種下了一顆種子");const el=$(`[data-node="${c.id}"]`);el&&el.scrollIntoView({block:"center",inline:"center",behavior:"smooth"})};
+    $("#c-link").onclick=()=>{linkFrom=n.id;closeSheet();render()};
+  }
+  function claimSheet(n){
+    const ns=neigh(n.id);
+    openSheet(`<div class="eyebrow">${n.demo?"範例主張（可以刪掉）":"我的主張"} · ${lvName(deg(n.id))} · ${deg(n.id)} 條連線</div>
+      <textarea id="c-edit">${esc(n.text)}</textarea>
+      <div class="eyebrow">連到</div><div class="linked">${ns.map(x=>`<div><span>${esc(x.text)}</span><button data-unlink="${x.id}" aria-label="移除連線">×</button></div>`).join("")||`<div><span style="color:var(--mute)">還沒有連線</span></div>`}</div>
+      <p style="margin:0;font-size:13px;color:var(--mute)">連到 2 個節點會發芽，3 個長成樹。樹會出現在「收成」的最前面。</p>
+      <div class="row"><button class="btn line sm" id="c-del">刪除</button><span class="sp"></span><button class="btn" id="c-link">連到另一個節點</button></div>`,render);
+    $("#c-edit").oninput=e=>{n.text=e.target.value;delete n.demo;save()};
+    $("#c-link").onclick=()=>{linkFrom=n.id;closeSheet()};
+    $("#c-del").onclick=()=>{st.claims=st.claims.filter(x=>x.id!==n.id);st.links=st.links.filter(l=>!l.includes(n.id));save();closeSheet()};
+    $$("[data-unlink]",sheetEl).forEach(b=>b.onclick=()=>{st.links=st.links.filter(l=>!(l.includes(n.id)&&l.includes(b.dataset.unlink)));save();render();claimSheet(n)});
+  }
+  function exSheet(n){
+    openSheet(`<div class="eyebrow">範例節點</div><p class="q-zh">${esc(n.text)}</p><p style="margin:0;color:var(--mute)">出自 ${n.src}。這是示意用的節點，用來表現你存了第二、第三個來源之後，主張可以跨來源連起來。正式版裡這些會是你自己看過的內容。</p>
+      <div class="row"><span class="sp"></span><button class="btn" id="c-link">連到另一個節點</button></div>`);
+    $("#c-link").onclick=()=>{linkFrom=n.id;closeSheet();render()};
+  }
+  function harvest(){
+    const cs=[...st.claims].sort((a,b)=>deg(b.id)-deg(a.id));
+    const text=cs.map((c,i)=>{const ev=neigh(c.id);return `${i===0?"主論點":"支線 "+i}：${c.text}\n`+ev.map(e=>e.type==="spark"?`　依據：Pieter Levels 在 ${fmt(SEGS.find(g=>g.id===e.seg).t)} 說的「${e.text}」`:e.type==="ex"?`　呼應：${e.text}（${e.src}）`:`　相關主張：${e.text}`).join("\n")}).join("\n\n");
+    openSheet(`<div class="eyebrow">收成</div><p class="q-zh">${cs.length?"連線最多的主張排最前面，它最可能是你的文章主軸。":"還沒有主張可以收成。"}</p>
+      ${cs.length?`<textarea class="big" id="c-out" style="min-height:220px">${esc(text)}</textarea><div class="row"><span class="sp"></span><button class="btn" id="c-copy">複製大綱</button></div>`:""}`);
+    const b=$("#c-copy");if(b)b.onclick=()=>copyText($("#c-out"));
+  }
+  appEl.firstElementChild.onclick=e=>{
+    if(e.target.id==="c-cancel"){linkFrom=null;return render()}
+    if(e.target.closest("#c-harvest"))return harvest();
+    const nb=e.target.closest("[data-node]");if(!nb)return;
+    const n=byId(nb.dataset.node);
+    if(linkFrom){
+      if(linkFrom!==n.id){const has=st.links.some(l=>l.includes(linkFrom)&&l.includes(n.id));if(!has){st.links.push([linkFrom,n.id]);toast("連上了")}save()}
+      linkFrom=null;return render();
+    }
+    ({spark:sparkSheet,claim:claimSheet,ex:exSheet})[n.type](n);
+  };
+  /* mouse drag to pan; touch uses native scrolling */
+  let drag=null;
+  map.addEventListener("pointerdown",e=>{if(e.pointerType!=="mouse"||e.target.closest(".node"))return;drag={x:e.clientX,y:e.clientY,l:map.scrollLeft,t:map.scrollTop}});
+  window.addEventListener("pointermove",e=>{if(!drag)return;map.scrollLeft=drag.l-(e.clientX-drag.x);map.scrollTop=drag.t-(e.clientY-drag.y)});
+  window.addEventListener("pointerup",()=>drag=null);
+  render();
+  requestAnimationFrame(()=>{map.scrollLeft=Math.max(0,(580-map.clientWidth)/2);map.scrollTop=0});
+};
+
+/* ---------- shell ---------- */
+const home=$("#home"),stage=$("#stage");
+$("#vthumb").src=THUMB;$("#vidstrip").href=yt(0);
+$("#cards").innerHTML=Object.entries(CON).map(([k,c])=>`<button class="ccard" data-go="${k}" style="--acc:var(--${k})">${ART[k]}<h2>${c.n}<span>${c.tag}</span></h2><p>${c.desc}</p><p class="bet">${c.bet}</p><span class="btn go">打開試作</span></button>`).join("");
+$("#pills").innerHTML=Object.entries(CON).map(([k,c])=>`<button data-go="${k}">${c.n}</button>`).join("");
+function show(k){
+  closeSheet();
+  if(!CON[k]){stage.hidden=true;home.hidden=false;return}
+  home.hidden=true;stage.hidden=false;stage.dataset.c=k;
+  $$("#pills button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.go===k));
+  const c=CON[k];$("#side").innerHTML=`<div class="eyebrow">概念 ${k.toUpperCase()}</div><h2>${c.n}</h2><p style="margin:0;color:var(--mute)">${c.tag}</p><dl><div><dt>賭注</dt><dd>${c.bet.replace("賭注：","")}</dd></div><div><dt>你會做的事</dt><dd>${c.act}</dd></div><div><dt>風險</dt><dd>${c.risk}</dd></div></dl>`;
+  mount[k]();
+}
+function go(k){try{if(location.hash.slice(1)!==k)history.replaceState(null,"","#"+k)}catch(e){} show(k)}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(b)go(b.dataset.go)});
+$("#back").onclick=()=>go("");
+window.addEventListener("hashchange",()=>show(location.hash.slice(1)));
+show(location.hash.slice(1));
+</script>
