@@ -201,10 +201,10 @@ details summary:hover{color:var(--ink)}
   --hl-y:#4C431C; --hl-p:#4E2A3C; --hl-g:#1F4031; --tag-y:#4C431C }
 
 /* header = a strip of track: lavender with white lane lines */
-.top{border-bottom:0;background:#6B4F2A;color:#fff;padding-bottom:16px;position:relative}
-.top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:9px;background:repeating-linear-gradient(180deg,rgba(255,255,255,.9) 0 1px,transparent 1px 4px)}
-.top .vt{color:rgba(255,255,255,.88)} .top .sync,.top .sync.link,.top .sync.warn{color:#fff}
-.pips i{background:rgba(255,255,255,.4)} .pips i.on{background:#fff}
+.top{border-bottom:0;background:#C0A169;color:#2E2412;padding-bottom:16px;position:relative}
+.top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:9px;background:repeating-linear-gradient(180deg,rgba(255,248,225,.75) 0 1px,transparent 1px 4px)}
+.top .vt{color:rgba(46,36,18,.78)} .top .sync,.top .sync.link,.top .sync.warn{color:#2E2412}
+.pips i{background:rgba(46,36,18,.22)} .pips i.on{background:#2E2412}
 
 /* each segment gets a lane-marker number */
 .rin{counter-reset:seg}
