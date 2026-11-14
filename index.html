@@ -187,61 +187,64 @@ details summary:hover{color:var(--ink)}
 .ncard .mine{font-weight:700} .ncard small{color:var(--mute);font-size:13.5px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-/* ---------- Paris 2024 colour layer, sampled from the reference photos:
-   lavender track #A4ADE6 / #9390D7, indigo ground #3A4083, lane-marker orange #EFAA59,
-   baton yellow, raspberry, pink, green, teal. Lavender is the ground; the vivid colours stay small, like objects on the track. ---------- */
+/* ---------- Colour system (60 / 30 / 10) ----------
+   60  neutral page: off-white and warm greys tinted toward the sand hue, so nothing is pure white or pure grey
+   30  one material: sand-oak #C0A169 (header, callouts, markers) and its light tint
+   10  one accent: indigo #3A4083 for anything you act on, with lavender #9390D7 for lines and selection.
+       Sand (~40deg) and indigo (~235deg) sit almost opposite on the wheel, so each makes the other look cleaner.
+   Highlights are a separate three-step scale at one lightness; they mean "you marked this" and are used for nothing else. */
 :root{
-  --lav:#9390D7; --lav-2:#A4ADE6; --lav-l:#ECEDFA; --indigo:#3A4083; --navy:#202762; --cone:#F09A3E;
-  --b-yellow:#E3C234; --b-rasp:#CF4A6E; --b-pink:#F1ABC9; --b-green:#4FA574; --b-teal:#49B3B3;
-  --acc:var(--indigo); --grow:var(--lav); --link:#5A5CC4; --warn:var(--b-rasp); --on-acc:#FFFFFF;
-  --hl-y:#F8EDB4; --hl-p:#FADCE9; --hl-g:#CFEBDD; --edge-y:var(--b-yellow); --edge-p:var(--b-pink); --edge-g:var(--b-green); --tag-y:#F8EDB4;
+  --bg:#FBFAF7; --surf:#FFFFFF; --surf2:#F4F1EA; --hover:rgba(70,55,25,.07); --ink:#2B2A27; --mute:#75726B; --line:rgba(70,55,25,.14);
+  --sand:#C0A169; --sand-d:#8A6E3C; --sand-l:#F3ECDC; --sand-ink:#2E2412;
+  --indigo:#3A4083; --lav:#9390D7; --lav-l:#ECEDFA;
+  --acc:var(--indigo); --grow:var(--indigo); --link:#4A4FB0; --warn:#A8552F; --on-acc:#FFFFFF;
+  --hl-y:#F6E9B8; --hl-p:#F6D9E4; --hl-g:#D3E9DB; --edge-y:#D9B93A; --edge-p:#DE8FB1; --edge-g:#62B287; --tag-y:var(--sand-l);
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --lav-l:#26284A; --acc:var(--lav-2); --link:#A4ADE6; --on-acc:#14163A;
-  --hl-y:#4C431C; --hl-p:#4E2A3C; --hl-g:#1F4031; --tag-y:#4C431C } }
+  --bg:#1C1B19; --surf:#232220; --surf2:#292724; --hover:rgba(255,240,210,.06); --ink:#ECE8DF; --mute:#A09B90; --line:rgba(255,240,210,.12);
+  --sand-l:#3A3222; --sand-d:#D8BC86; --lav-l:#2A2C4D;
+  --acc:#A4ADE6; --grow:#A4ADE6; --link:#A4ADE6; --warn:#E0926C; --on-acc:#15173A;
+  --hl-y:#4A411E; --hl-p:#4C2B3A; --hl-g:#21402F } }
 :root[data-theme="dark"]{
-  --lav-l:#26284A; --acc:var(--lav-2); --link:#A4ADE6; --on-acc:#14163A;
-  --hl-y:#4C431C; --hl-p:#4E2A3C; --hl-g:#1F4031; --tag-y:#4C431C }
+  --bg:#1C1B19; --surf:#232220; --surf2:#292724; --hover:rgba(255,240,210,.06); --ink:#ECE8DF; --mute:#A09B90; --line:rgba(255,240,210,.12);
+  --sand-l:#3A3222; --sand-d:#D8BC86; --lav-l:#2A2C4D;
+  --acc:#A4ADE6; --grow:#A4ADE6; --link:#A4ADE6; --warn:#E0926C; --on-acc:#15173A;
+  --hl-y:#4A411E; --hl-p:#4C2B3A; --hl-g:#21402F }
 
-/* header = a strip of track: lavender with white lane lines */
-.top{border-bottom:0;background:#C0A169;color:#2E2412;padding-bottom:16px;position:relative}
+/* 30: sand */
+.top{border-bottom:0;background:var(--sand);color:var(--sand-ink);padding-bottom:16px;position:relative}
 .top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:9px;background:repeating-linear-gradient(180deg,rgba(255,248,225,.75) 0 1px,transparent 1px 4px)}
-.top .vt{color:rgba(46,36,18,.78)} .top .sync,.top .sync.link,.top .sync.warn{color:#2E2412}
-.pips i{background:rgba(46,36,18,.22)} .pips i.on{background:#2E2412}
-
-/* each segment gets a lane-marker number */
+.top .vt{color:rgba(46,36,18,.78)} .top .sync,.top .sync.link,.top .sync.warn{color:var(--sand-ink)}
+.pips i{background:rgba(46,36,18,.22)} .pips i.on{background:var(--sand-ink)}
 .rin{counter-reset:seg}
 .a-seg{counter-increment:seg}
 .a-seg>header i{display:flex;align-items:center;gap:8px}
-.a-seg>header i::before{content:counter(seg);display:grid;place-items:center;width:26px;height:26px;border-radius:5px 5px 2px 2px;background:var(--cone);color:#fff;font-weight:700;font-size:15px}
-.a-seg .turn.now{border-left-color:var(--cone)}
-.a-seg .absorb{background:var(--lav-l)}
-.a-seg .chain li::before{color:var(--link);font-weight:700}
-.thesis{border-left:5px solid var(--cone);padding-left:16px}
+.a-seg>header i::before{content:counter(seg);display:grid;place-items:center;width:26px;height:26px;border-radius:5px;background:var(--sand);color:var(--sand-ink);font-weight:700;font-size:15px}
+.a-seg .absorb{background:var(--sand-l)}
+.a-seg .chain li::before{color:var(--sand-d);font-weight:700}
+.thesis{border-left:5px solid var(--sand);padding-left:16px}
+.w.w3{background:var(--sand-l)}
+.vcard .tag{background:var(--sand);color:var(--sand-ink)}
+
+/* 10: indigo and lavender */
+.a-seg .turn.now{border-left-color:var(--lav)}
 .tlink:hover,details summary:hover{color:var(--link)}
 .s.on{box-shadow:0 2px 0 var(--lav)} .s.has-note::after{color:var(--link)}
-.tabs button[aria-pressed="true"]{color:var(--acc);box-shadow:inset 0 3px 0 var(--lav)}
+.tabs button[aria-pressed="true"]{color:var(--acc);box-shadow:inset 0 3px 0 var(--acc)}
 .steps span.on{color:var(--acc)}
-.hl-row button[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--lav)}
+.hl-row button[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--acc)}
 textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mix(in srgb,var(--lav) 28%,transparent)}
-
-/* distill */
 .dmap path{stroke:var(--lav);opacity:.9}
-.claim{box-shadow:inset 0 0 0 1px var(--lav)} .claim.lv2{box-shadow:inset 0 0 0 2px var(--lav)} .claim.lv3{background:var(--lav);color:#fff}
+.claim{box-shadow:inset 0 0 0 1px var(--lav)} .claim.lv2{box-shadow:inset 0 0 0 2px var(--lav)} .claim.lv3{background:var(--lav-l);box-shadow:inset 0 0 0 2px var(--indigo);color:var(--ink)}
 .claim.carded{background:var(--indigo);color:#fff;box-shadow:none}
 .spark.used{box-shadow:inset 0 0 0 1px var(--lav)}
 .spark:not([data-hl="y"]):not([data-hl="p"]):not([data-hl="g"]){border-left-color:var(--lav)}
 .spark.pick,.linked [aria-pressed="true"]{background:var(--lav-l)}
-
-/* viewpoint cards = batons on the indigo ground */
-.vcard{background:var(--indigo);color:#fff;box-shadow:none;border-left:8px solid var(--b-yellow)}
-.vcard:nth-of-type(3n+2){border-left-color:var(--b-rasp)} .vcard:nth-of-type(3n+3){border-left-color:var(--b-teal)}
-.vcard .ev{color:rgba(255,255,255,.82);border-left-color:var(--lav-2)}
-.vcard .tlink{color:rgba(255,255,255,.82);text-decoration-color:rgba(255,255,255,.4)} .vcard .tlink:hover{color:#fff}
-.vcard .tag{background:var(--cone);color:#fff}
+.vcard{background:var(--indigo);color:#fff;box-shadow:none}
+.vcard .ev{color:rgba(255,255,255,.84);border-left-color:var(--sand)}
+.vcard .tlink{color:rgba(255,255,255,.84);text-decoration-color:rgba(255,255,255,.4)} .vcard .tlink:hover{color:#fff}
 .vcard button{color:rgba(255,255,255,.75)} .vcard button:hover{color:#fff}
-.banner{background:var(--indigo)}
-#toast{background:var(--indigo)}
+.banner,#toast{background:var(--indigo);color:#fff}
 
 </style>
 
