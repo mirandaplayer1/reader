@@ -1,0 +1,455 @@
+<title>Reader</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/*__CSS__*/
+</style>
+
+<div id="root" data-m="side" data-view="home">
+  <header class="top">
+    <h1><button id="gohome" aria-label="回到我的影片">Reader</button></h1>
+    <span class="vt" id="vt"></span>
+    <span class="pips" id="pips" title="內化進度"></span>
+    <button class="sync" id="sync">僅存在這台裝置</button>
+  </header>
+  <div class="scroll" id="home"></div>
+  <div class="panes">
+    <section class="pane read">
+      <div class="player"><div id="yt"></div>
+        <a class="pfall" id="pfall" target="_blank" rel="noopener"><img alt="" id="pthumb" onerror="this.hidden=true"><span><b>在 YouTube 開啟影片 ↗</b><small id="pfmsg">影片載入中…</small></span></a>
+      </div>
+      <div class="rbar"><div class="seg3" role="group" aria-label="顯示語言"><button data-mode="zh">中</button><button data-mode="both">中英</button><button data-mode="en">EN</button></div><span class="sp" style="flex:1"></span><button class="mini" id="pmin">收起影片</button></div>
+      <div class="scroll" id="rscroll"></div>
+    </section>
+    <section class="pane side"><div class="steps" id="steps" hidden></div><div class="scroll" id="side"></div></section>
+  </div>
+  <nav class="tabs" id="tabs"><button data-tab="overview">總覽</button><button data-tab="read">閱讀</button><button data-tab="distill">淬煉 <b id="n-d"></b></button><button data-tab="cards">觀點卡 <b id="n-c"></b></button></nav>
+</div>
+<div id="scrim" hidden></div><div id="sheet" hidden></div><div id="toast" hidden></div>
+
+<script>
+let VID="";
+const THUMB="__THUMB__";
+/*__DATA__*/
+const CFG=/*__CFG__*/{};
+/* The built-in sample. Videos you add are stored in the same shape. */
+const DEMO={vid:"oFtjKbXKqbg",demo:true,lang:"en",title:"Pieter Levels: Programming, Viral AI Startups, and Digital Nomad Life",channel:"Lex Fridman Podcast #440",duration:13440,host:"L",speakers:{L:"Lex Fridman",P:"Pieter Levels"},
+  thesis:"一個人不募資，靠很多次兩週就上線的小實驗，找出有人願意付錢的那一個，再用自動化讓它不必變成一家公司。",
+  tldr:["驗證的標準是陌生人付錢。他的流程是 idea、build、launch、grow、monetize、automate、exit，每一步都求最短。","多數點子會失敗，所以他提高嘗試次數：一年做 12 個產品，每個限期一個月，而且公開做。","技術選自己最熟、最簡單的（PHP、jQuery、SQLite），重複的工作交給自動化，維持一個人做得完的規模。"],
+  chapters:/*__CH__*/[],segs:DEMO_SEGS};
+let V=null,SEGS=[],CH=[],THESIS="",TLDR=[];
+const MAXC=3;
+
+/* ---------- helpers ---------- */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=t=>{const h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=String(Math.floor(t%60)).padStart(2,"0");return h?`${h}:${String(m).padStart(2,"0")}:${s}`:`${m}:${s}`};
+const yt=t=>`https://www.youtube.com/watch?v=${VID}&t=${t}s`;
+const fmtDur=t=>{const h=Math.floor(t/3600),m=Math.round(t%3600/60);return (h?h+" 小時 ":"")+m+" 分"};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const tlink=(t,label)=>`<a class="tlink" data-t="${t}" href="${yt(t)}" target="_blank" rel="noopener">${label||fmt(t)}</a>`;
+let SENT={},TURNS=[];
+function indexContent(){SENT={};TURNS=[];
+  SEGS.forEach(g=>g.turns.forEach((tu,ti)=>{TURNS.push({t:tu.t,id:`${g.id}-${ti}`});tu.s.forEach((p,si)=>{if(p)SENT[`${g.id}-${ti}-${si}`]={en:p[0],zh:p[1]||p[0],t:tu.t,seg:g,turn:tu}})}));
+  TURNS.sort((a,b)=>a.t-b.t)}
+const isDeep=g=>g.deep!==false;
+const keyIds=g=>(g.key||[]).map(([a,b])=>`${g.id}-${a}-${b}`).filter(id=>SENT[id]);
+const who=tu=>(V.speakers&&V.speakers[tu.sp])||tu.sp;
+const root=$("#root"),homeEl=$("#home"),sheetEl=$("#sheet"),scrimEl=$("#scrim"),toastEl=$("#toast"),side=$("#side"),rscroll=$("#rscroll");
+let onSheetClose=null;
+function openSheet(html,onClose){sheetEl.innerHTML=html;sheetEl.hidden=false;scrimEl.hidden=false;sheetEl.scrollTop=0;onSheetClose=onClose||null}
+function closeSheet(){if(sheetEl.hidden)return;sheetEl.hidden=true;scrimEl.hidden=true;const f=onSheetClose;onSheetClose=null;f&&f()}
+scrimEl.onclick=closeSheet;
+let toastT;function toast(m){toastEl.textContent=m;toastEl.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>toastEl.hidden=true,1900)}
+async function copyText(ta){try{await navigator.clipboard.writeText(ta.value);toast("已複製")}catch(e){ta.focus();ta.select();toast("已全選，請手動複製")}}
+
+/* ---------- state: local first, cloud when available ---------- */
+let LS="";
+const blank=()=>({hl:{},notes:{},refl:{},claims:[],cards:[],mode:"both",at:0});
+let S=blank();
+function loadState(){LS="rd4:"+VID;S=blank();try{Object.assign(S,JSON.parse(localStorage.getItem(LS))||{})}catch(e){}}
+const ui={side:"overview",m:"side",coreOnly:false,linkTo:null,fresh:null,open:new Set(),busy:{}};
+let cloud=null,cloudBase=null,cloudOff=null,sb=null,sbUser=null,pushT=null,remoteWaiting=false;
+const canSync=()=>!!(cloud||(sb&&sbUser));
+const syncEl=$("#sync");
+function badge(t,c){syncEl.textContent=t;syncEl.className="sync "+(c||"")}
+function commit(){if(!VID)return;S.at=Date.now();try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){} meta();if(canSync()){badge("同步中…");clearTimeout(pushT);pushT=setTimeout(push,900)}}
+async function push(){if(!canSync())return;const at=S.at;try{
+  if(cloud)await cloud.set({json:JSON.stringify(S),at});
+  else{const {error}=await sb.from("reader_state").upsert({user_id:sbUser.id,video_id:VID,state:S,at});if(error)throw error}
+  if(at===S.at)badge("已同步","ok")}catch(e){badge("同步失敗，內容仍在這台裝置","warn")}}
+/* Supabase: used on the hosted site when src/config.json is filled in */
+async function pull(){if(!sb||!sbUser||!VID)return;badge("同步中…");
+  const {data,error}=await sb.from("reader_state").select("state,at").eq("video_id",VID).maybeSingle();
+  if(error){badge("同步失敗，內容仍在這台裝置","warn");return}
+  if(data&&data.at>S.at){adopt(JSON.stringify(data.state));badge("已同步","ok")}else if(S.at&&(!data||data.at<S.at))push();else badge("已同步","ok")}
+function setUser(u){const was=sbUser&&sbUser.id;sbUser=u||null;if(!u){badge("登入","link");LIB=LIB.filter(x=>x.demo);renderHome();return}if(u.id!==was){badge("已登入","ok");pull();loadLibrary()}}
+(async()=>{if(window.claude||!CFG.supabaseUrl||!CFG.supabaseAnonKey)return;try{
+  await new Promise((ok,no)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";s.onload=ok;s.onerror=no;document.head.appendChild(s)});
+  sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey);
+  const {data}=await sb.auth.getSession();setUser(data.session&&data.session.user);
+  sb.auth.onAuthStateChange((_e,ses)=>setUser(ses&&ses.user));
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
+}catch(e){badge("同步服務載入失敗，內容仍在這台裝置","warn")}})();
+syncEl.onclick=()=>{if(!sb){if(!window.claude)toast("後端還沒接上");return}
+  if(sbUser){openSheet(`<div class="eyebrow">同步</div><p class="q-zh">已用 ${esc(sbUser.email||"")} 登入。</p><p style="margin:0;color:var(--mute)">在任何裝置用同一個信箱登入，就會看到同一份筆記。</p><div class="row"><span class="sp"></span><button class="btn line" id="sb-out">登出</button></div>`);
+    $("#sb-out").onclick=async()=>{await sb.auth.signOut();closeSheet()};return}
+  openSheet(`<div class="eyebrow">登入</div><p class="q-zh">輸入信箱，我們寄一個登入連結給你。</p><input type="email" id="sb-mail" placeholder="you@example.com" autocomplete="email"><p id="sb-msg" style="margin:0;color:var(--mute);font-size:15px">不用密碼。在這台裝置上寫的東西登入後會保留。</p><div class="row"><span class="sp"></span><button class="btn" id="sb-go">寄登入連結</button></div>`);
+  $("#sb-go").onclick=async e=>{const b=e.currentTarget,mail=$("#sb-mail").value.trim();if(!mail)return;b.disabled=true;
+    const {error}=await sb.auth.signInWithOtp({email:mail,options:{emailRedirectTo:location.origin+location.pathname}});
+    $("#sb-msg").textContent=error?"沒有寄出："+error.message:"寄出了。到信箱點連結，回到這一頁就會開始同步。";if(error)b.disabled=false}};
+function adopt(json){if(!VID)return;try{S=Object.assign(blank(),JSON.parse(json))}catch(e){return}try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}
+  if(document.activeElement&&document.activeElement.tagName==="TEXTAREA"){remoteWaiting=true;return}if(root.dataset.view==="video")renderAll()}
+document.addEventListener("focusout",()=>{if(remoteWaiting){remoteWaiting=false;setTimeout(()=>{if(!(document.activeElement&&document.activeElement.tagName==="TEXTAREA")&&root.dataset.view==="video")renderAll()},50)}});
+function bindCloud(){
+  if(cloudOff){try{cloudOff()}catch(e){} cloudOff=null}
+  cloud=null;if(!cloudBase||!VID)return;
+  cloud=cloudBase.doc("video-"+VID);badge("同步中…");
+  const off=cloud.onSnapshot(snap=>{
+    const d=snap.exists?snap.data():null;
+    if(!d){if(S.at)push();else badge("已同步","ok");return}
+    if(d.at>S.at){adopt(d.json);badge("已同步","ok")}else if(d.at<S.at)push();else badge("已同步","ok");
+  },()=>{badge("同步暫停，內容仍在這台裝置","warn")});
+  if(typeof off==="function")cloudOff=off;
+}
+(async()=>{try{
+  if(!window.claude||!window.claude.use)return;
+  const [u,db]=await Promise.all([window.claude.use("user"),window.claude.use("db")]);
+  const id=u&&await u.id();if(!db||!id)return;
+  cloudBase=db.collection("data/users/"+id);bindCloud();
+}catch(e){}})();
+
+/* live Claude (optional): prewritten content is always on screen first */
+let ask=null;
+(async()=>{try{ask=await window.claude?.use?.("sample")}catch(e){} if(ask)document.body.classList.add("has-ai")})();
+const AI_ERR={not_granted:"這個頁面沒有取得呼叫 Claude 的許可，這項功能先關閉。",rate_limited:"呼叫太頻繁，等一分鐘再試。",cancelled:""};
+async function askAI(prompt,out,btn){
+  if(!ask)return;out.hidden=false;out.textContent="思考中…";if(btn)btn.disabled=true;
+  try{await ask(prompt,{modelTier:"quick",onText:({text})=>{out.textContent=text}})}
+  catch(e){out.textContent=(e&&e.text)||AI_ERR[e&&e.code]||"這次沒有成功。其他內容不受影響，可以稍後再試。"}
+  finally{if(btn)btn.disabled=false}
+}
+
+/* ---------- player ---------- */
+let player=null,ytOK=false,tick=null,lastUserScroll=0,nowId=null;
+function noYT(){if(ytOK)return;root.classList.add("no-yt");$("#pfmsg").textContent="這個頁面不能嵌入播放器。時間戳會在 YouTube 從那一秒開啟。"}
+let ytLoading=false;
+function initYT(){
+  $("#pthumb").hidden=false;$("#pthumb").src=V.demo?THUMB:`https://i.ytimg.com/vi/${VID}/mqdefault.jpg`;$("#pfall").href=yt(CH[0]?CH[0].t:0);
+  const start=SEGS[0]?SEGS[0].t:0;
+  if(player&&ytOK){try{player.cueVideoById({videoId:VID,startSeconds:start})}catch(e){} return}
+  if(ytLoading)return;ytLoading=true;
+  window.onYouTubeIframeAPIReady=()=>{try{player=new YT.Player("yt",{videoId:VID,playerVars:{playsinline:1,rel:0,start},events:{
+    onReady:()=>{ytOK=true;root.classList.remove("no-yt");root.classList.add("yt-ok")},
+    onStateChange:e=>{clearInterval(tick);if(e.data===1)tick=setInterval(follow,500)},
+    onError:()=>{if(!ytOK)noYT()}}})}catch(e){noYT()}};
+  const s=document.createElement("script");s.src="https://www.youtube.com/iframe_api";s.onerror=noYT;document.head.appendChild(s);
+  setTimeout(()=>{if(!ytOK)noYT()},9000);
+}
+function seek(t){if(!ytOK)return false;try{player.seekTo(t,true);player.playVideo()}catch(e){return false}root.classList.remove("p-min");$("#pmin").textContent="收起影片";return true}
+function follow(){
+  let cur;try{cur=player.getCurrentTime()}catch(e){return}
+  let hit=null;for(const tu of TURNS){if(tu.t<=cur+.3)hit=tu;else break}
+  const i=hit?TURNS.indexOf(hit):-1,next=TURNS[i+1];
+  if(hit&&!(next&&next.t-hit.t<150?cur<next.t:cur<hit.t+90))hit=null;
+  const id=hit?hit.id:null;if(id===nowId)return;nowId=id;
+  $$(".turn.now",rscroll).forEach(e=>e.classList.remove("now"));
+  if(!id)return;const el=$(`[data-turn="${id}"]`,rscroll);if(!el)return;el.classList.add("now");
+  if(Date.now()-lastUserScroll>4000)el.scrollIntoView({block:"center",behavior:"smooth"});
+}
+["wheel","touchmove"].forEach(ev=>rscroll.addEventListener(ev,()=>lastUserScroll=Date.now(),{passive:true}));
+$("#pmin").onclick=e=>{const m=root.classList.toggle("p-min");e.currentTarget.textContent=m?"顯示影片":"收起影片"};
+document.addEventListener("click",e=>{const a=e.target.closest("a[data-t]");if(!a)return;if(seek(+a.dataset.t)){e.preventDefault();if(a.dataset.goread!=null)setTab("read");else if(ui.m!=="read")toast("從 "+fmt(+a.dataset.t)+" 播放中")}});
+
+/* ---------- read ---------- */
+const span=(id,lang)=>{const s=SENT[id];return `<span class="s${S.notes[id]?" has-note":""}" data-id="${id}" data-hl="${S.hl[id]||""}" role="button" tabindex="0">${esc(s[lang])}</span>`};
+function renderRead(){
+  const top=rscroll.scrollTop,mono=/^zh/i.test(V.lang||"");
+  root.classList.toggle("mono",mono);
+  rscroll.className="scroll m-"+S.mode;
+  rscroll.innerHTML=`<div class="rin">`+SEGS.map((g,gi)=>{
+    const deep=isDeep(g),open=deep||ui.open.has(g.id),busy=ui.busy[g.id];
+    const body=!open?"":g.turns.map((tu,ti)=>{const ids=tu.s.map((p,si)=>p?`${g.id}-${ti}-${si}`:null);const line=l=>ids.map(id=>id?span(id,l):`<span class="gap">[…]</span>`).join(l==="en"?" ":"");
+      return `<div class="turn sp-${tu.sp===V.host?"L":"P"}" data-turn="${g.id}-${ti}"><div class="who"><b>${esc(who(tu)).toUpperCase()}</b>${tlink(tu.t)}</div><p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></div>`}).join("");
+    const tools=deep?"":`<div class="row segtools">${open?"":`<button class="btn sm line" data-open="${g.id}">顯示原文</button>`}<button class="btn sm" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):"精讀這一章（翻譯＋第一性原理）"}</button></div>`;
+    const absorb=!deep?"":`<div class="absorb">
+      <div class="eyebrow">這一段在說什麼</div><ul>${(g.sum||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+      <div class="eyebrow">第一性原理</div><p class="core">${esc(g.core)}</p>
+      <details><summary>展開推理鏈（${(g.chain||[]).length} 步）</summary><ol class="chain">${(g.chain||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ol></details>
+      <div class="eyebrow">換到你身上</div><p class="ask">${esc(g.ask)}</p>
+      <textarea id="refl-${g.id}" data-refl="${g.id}" placeholder="寫一兩句就好">${esc(S.refl[g.id]||"")}</textarea>
+    </div>`;
+    return `<section class="a-seg${deep?"":" raw"}" id="seg-${g.id}">
+    <header><i>第 ${gi+1} 段，共 ${SEGS.length} 段</i><h3>${esc(g.title)}</h3>${tlink(g.t)}</header>${tools}${body}${absorb}</section>`}).join("")+`</div>`;
+  rscroll.scrollTop=top;nowId=null;
+  $$("[data-mode]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===S.mode));
+}
+function markSent(id){$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>{e.dataset.hl=S.hl[id]||"";e.classList.toggle("has-note",!!S.notes[id])})}
+function sentSheet(id){
+  const s=SENT[id];$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>e.classList.add("on"));
+  openSheet(`<p class="q-zh">${esc(s.zh)}</p>${s.zh===s.en?"":`<p class="q-en">${esc(s.en)}</p>`}
+    <div class="hl-row">${[["y","洞見","var(--hl-y)"],["p","疑問","var(--hl-p)"],["g","要去做","var(--hl-g)"],["","不畫","transparent"]].map(([k,l,c])=>`<button data-hl="${k}" aria-pressed="${(S.hl[id]||"")===k}"><i style="background:${c}"></i>${l}</button>`).join("")}</div>
+    <textarea id="a-note" placeholder="這句讓你想到什麼？">${esc(S.notes[id]||"")}</textarea>
+    <div class="ai-out" id="a-aiout" hidden></div>
+    <div class="row">${tlink(s.t,"▶ 從這段播放 "+fmt(s.t))}<span class="sp"></span><button class="btn sm ghost ai-only" id="a-ask">請 AI 解釋這句</button><button class="btn sm" id="a-done">完成</button></div>`,
+    ()=>{$$(".s.on",rscroll).forEach(e=>e.classList.remove("on"));if(ui.side!=="overview")renderSide()});
+  $$("[data-hl]",sheetEl).forEach(b=>b.onclick=()=>{const k=b.dataset.hl;if(k)S.hl[id]=k;else delete S.hl[id];commit();markSent(id);$$("[data-hl]",sheetEl).forEach(x=>x.setAttribute("aria-pressed",x===b))});
+  $("#a-note").oninput=e=>{const v=e.target.value;if(v.trim()){S.notes[id]=v;if(!S.hl[id])S.hl[id]="y"}else delete S.notes[id];commit();markSent(id)};
+  $("#a-done").onclick=closeSheet;
+  $("#a-ask").onclick=e=>askAI(`你是陪讀夥伴。讀者的母語是繁體中文，是一位創業者，正在讀一段英文訪談逐字稿。請用繁體中文、最多 90 個字，解釋下面這句話在上下文中的意思，並點出它背後的一個假設。直接講，不要開場白，不要條列。\n\n這段的主題：${s.seg.title}\n上下文：${s.turn.s.filter(Boolean).map(p=>p[0]).join(" ")}\n要解釋的句子：${s.en}`,$("#a-aiout"),e.currentTarget);
+}
+rscroll.addEventListener("click",e=>{const s=e.target.closest(".s"),o=e.target.closest("[data-open]"),d=e.target.closest("[data-deepen]");
+  if(s)sentSheet(s.dataset.id);else if(o){ui.open.add(o.dataset.open);renderRead()}else if(d)deepen(+d.dataset.deepen)});
+rscroll.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.classList.contains("s"))sentSheet(e.target.dataset.id)});
+rscroll.addEventListener("input",e=>{const k=e.target.dataset&&e.target.dataset.refl;if(k){S.refl[k]=e.target.value;commit()}});
+$$("[data-mode]").forEach(b=>b.onclick=()=>{S.mode=b.dataset.mode;commit();rscroll.className="scroll m-"+S.mode;$$("[data-mode]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
+
+/* ---------- overview ---------- */
+const segsIn=i=>SEGS.filter(g=>g.t>=CH[i].t&&(i===CH.length-1||g.t<CH[i+1].t));
+function renderOverview(){
+  const list=CH.map((c,i)=>({c,i,segs:segsIn(i)})).filter(x=>!ui.coreOnly||x.c.worth===3);
+  const nDeep=SEGS.filter(isDeep).length;
+  side.innerHTML=`<div class="pad ov">
+    <div class="eyebrow">${V.duration?fmtDur(V.duration)+" · ":""}${CH.length} 個章節${V.channel?" · "+esc(V.channel):""}</div>
+    <p class="thesis">${esc(THESIS)}</p>
+    <h2>${esc(V.title)}</h2>
+    <ul>${TLDR.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+    <div class="row"><div class="eyebrow" style="flex:1">章節</div><div class="chips"><button data-core="0" aria-pressed="${!ui.coreOnly}">全部</button><button data-core="1" aria-pressed="${ui.coreOnly}">只看核心</button></div></div>
+    <div class="chs">${list.map(({c,i,segs})=>`<article class="ch w${c.worth}">
+      <header><b><span class="t">${esc(c.zh)}</span><small>${esc(c.en)}</small></b><span class="w w${c.worth}">${["","可跳過","值得看","核心"][c.worth]}</span>${tlink(c.t)}</header>
+      <p>${esc(c.sum)}</p>${c.take?`<p class="take">→ ${esc(c.take)}</p>`:""}
+      <div class="row">${segs.map(g=>isDeep(g)?`<button class="btn sm" data-seg="${g.id}">精讀「${esc(g.title)}」</button>`
+        :`<button class="btn sm" data-deepen="${SEGS.indexOf(g)}" ${ui.busy[g.id]?"disabled":""}>${ui.busy[g.id]?esc(ui.busy[g.id]):"精讀這一章"}</button><button class="btn sm line" data-seg="${g.id}" data-raw>看原文</button>`).join("")
+        ||`<a class="btn sm ghost" data-t="${c.t}" data-goread href="${yt(c.t)}" target="_blank" rel="noopener">播放這一章</a>`}</div>
+    </article>`).join("")}</div>
+    <p class="meta">${V.demo?"這支範例只把 5 段展開成逐字稿。其餘章節的摘要讀的是完整逐字稿，可以直接播放。":`已精讀 ${nDeep} / ${SEGS.length} 章。還沒精讀的章節可以先看原文，或按「精讀」產生翻譯和第一性原理。`}</p></div>`;
+}
+
+/* ---------- distill ---------- */
+function sparks(){const out=[];SEGS.forEach(g=>{const k=isDeep(g)?keyIds(g):[];if(k.length)out.push({id:"ai-"+g.id,seg:g,ai:true,text:g.spark,t:SENT[k[0]].t});
+  Object.keys(S.hl).filter(id=>SENT[id]&&SENT[id].seg===g).sort().forEach(id=>out.push({id,seg:g,text:SENT[id].zh,hl:S.hl[id],t:SENT[id].t}))});return out}
+const lvName=n=>n>=3?"樹":n===2?"芽":"種子";
+const liveEv=c=>{const ids=new Set(sparks().map(s=>s.id));return c.ev.filter(e=>ids.has(e))};
+function renderDistill(){
+  const sp=sparks(),used=new Set(S.claims.flatMap(c=>c.ev)),lt=ui.linkTo&&S.claims.find(c=>c.id===ui.linkTo);
+  let h="",last=null;
+  sp.forEach(s=>{if(s.seg!==last){h+=`<div class="dlab">${s.seg.title}</div>`;last=s.seg}
+    h+=`<button class="spark${used.has(s.id)?" used":""}${lt&&lt.ev.includes(s.id)?" pick":""}" data-spark="${s.id}" data-hl="${s.hl||""}"><small>${fmt(s.t)} · ${s.ai?"AI 挑的":"你畫的"}</small><span>${esc(s.text)}</span></button>`});
+  side.innerHTML=(lt?`<div class="banner"><span>點左邊的火花，加入或移除證據</span><button class="btn sm" id="d-done">完成</button></div>`:"")+
+    `<div class="dmap" id="dmap"><svg id="dsvg"></svg><div class="dcol"><div class="eyebrow">火花 ${sp.length}</div>${h}</div>
+    <div class="dright" id="dright"><div class="eyebrow">我的主張 ${S.claims.length}</div>${S.claims.length?"":`<div class="dempty">點左邊任何一個火花，寫下你的第一個主張</div>`}
+    ${S.claims.map(c=>{const n=liveEv(c).length,card=S.cards.some(k=>k.claim===c.id);return `<button class="claim lv${Math.min(3,Math.max(1,n))}${card?" carded":""}${ui.linkTo===c.id?" pick":""}" data-claim="${c.id}"><small>${card?"已成卡 · ":""}${lvName(n)} · ${n} 個證據</small>${esc(c.text)}</button>`}).join("")}</div></div>`;
+  requestAnimationFrame(layoutDistill);
+}
+function layoutDistill(){
+  const map=$("#dmap");if(!map)return;const right=$("#dright"),mr=map.getBoundingClientRect(),rr=right.getBoundingClientRect();
+  const mid=el=>{const r=el.getBoundingClientRect();return {x:r.right-mr.left,y:r.top-mr.top+r.height/2}};
+  const items=S.claims.map(c=>{const el=$(`[data-claim="${c.id}"]`,map),ev=liveEv(c).map(id=>$(`[data-spark="${id}"]`,map)).filter(Boolean).map(mid);
+    const want=ev.length?ev.reduce((a,p)=>a+p.y,0)/ev.length:60;return {c,el,ev,want,h:el.offsetHeight}}).sort((a,b)=>a.want-b.want);
+  let y=34;const off=rr.top-mr.top;
+  items.forEach(it=>{const top=Math.max(y,it.want-off-it.h/2);it.el.style.top=top+"px";it.cy=top+off+it.h/2;y=top+it.h+22});
+  right.style.minHeight=y+"px";
+  const lx=rr.left-mr.left;
+  $("#dsvg").innerHTML=items.flatMap(it=>it.ev.map(p=>`<path d="M${p.x} ${p.y} C${(p.x+lx)/2} ${p.y} ${(p.x+lx)/2} ${it.cy} ${lx} ${it.cy}"/>`)).join("");
+}
+window.addEventListener("resize",()=>{if(ui.side==="distill")layoutDistill()});
+function sparkSheet(id){
+  const s=sparks().find(x=>x.id===id);if(!s)return;const g=s.seg,q=s.ai?keyIds(g).map(i=>SENT[i]):[SENT[id]];
+  openSheet(`<div class="eyebrow">火花 · ${g.title}</div><p class="q-en" style="color:var(--ink)">${q.map(x=>esc(x.en)).join(" ")}</p><p class="q-zh" style="font-size:17px;font-weight:400;color:var(--mute)">${q.map(x=>esc(x.zh)).join("")}</p>
+    ${!s.ai&&S.notes[id]?`<p style="margin:0;font-weight:700">✎ ${esc(S.notes[id])}</p>`:""}
+    <div class="row">${tlink(q[0].t,"▶ 從這段播放 "+fmt(q[0].t))}</div>
+    <details><summary>這一段的第一性原理</summary><p style="margin:8px 0 0">${g.core}</p></details>
+    ${S.claims.length?`<div class="eyebrow">當成哪個主張的證據？</div><div class="linked">${S.claims.map(c=>`<button data-toggle="${c.id}" aria-pressed="${c.ev.includes(id)}"><span>${esc(c.text)}</span><span class="x">${c.ev.includes(id)?"✓":"＋"}</span></button>`).join("")}</div>`:""}
+    <div class="eyebrow">${S.claims.length?"或者寫一個新主張":"這讓你想主張什麼？"}</div><textarea id="d-new" placeholder="用你會對朋友講的方式寫一句"></textarea>
+    <div class="row"><span class="sp"></span><button class="btn" id="d-plant" disabled>種下去</button></div>`,renderDistill);
+  const ta=$("#d-new");ta.oninput=()=>$("#d-plant").disabled=ta.value.trim().length<4;
+  $("#d-plant").onclick=()=>{S.claims.push({id:"k"+Date.now().toString(36),text:ta.value.trim(),ev:[id]});commit();closeSheet();toast("種下了一顆種子")};
+  $$("[data-toggle]",sheetEl).forEach(b=>b.onclick=()=>{const c=S.claims.find(x=>x.id===b.dataset.toggle),on=c.ev.includes(id);c.ev=on?c.ev.filter(e=>e!==id):[...c.ev,id];commit();b.setAttribute("aria-pressed",!on);b.lastElementChild.textContent=on?"＋":"✓"});
+}
+function claimSheet(cid){
+  const c=S.claims.find(x=>x.id===cid);if(!c)return;const sp=sparks(),ev=liveEv(c).map(id=>sp.find(s=>s.id===id)),n=ev.length;
+  openSheet(`<div class="eyebrow">我的主張 · ${lvName(n)} · ${n} 個證據</div><textarea id="d-edit">${esc(c.text)}</textarea>
+    <div class="linked">${ev.map(s=>`<div><span>${esc(s.text)}</span><button class="x" data-unlink="${s.id}" aria-label="移除證據">×</button></div>`).join("")||`<div><span style="color:var(--mute)">還沒有證據</span></div>`}</div>
+    <p style="margin:0;font-size:15px;color:var(--mute)">${n>=2?"證據夠了，可以鑄成觀點卡。每支影片最多留 "+MAXC+" 張。":"再連 "+(2-n)+" 個證據，就能鑄成觀點卡。"}</p>
+    <div class="row"><button class="btn line sm" id="d-del">刪除</button><button class="btn line sm" id="d-add">加證據</button><span class="sp"></span><button class="btn" id="d-mint" ${n>=2?"":"disabled"}>鑄成觀點卡</button></div>`,renderDistill);
+  $("#d-edit").oninput=e=>{c.text=e.target.value;commit()};
+  $("#d-add").onclick=()=>{ui.linkTo=cid;closeSheet()};
+  $("#d-del").onclick=()=>{S.claims=S.claims.filter(x=>x.id!==cid);commit();closeSheet()};
+  $("#d-mint").onclick=()=>mintSheet(cid);
+  $$("[data-unlink]",sheetEl).forEach(b=>b.onclick=()=>{c.ev=c.ev.filter(e=>e!==b.dataset.unlink);commit();claimSheet(cid)});
+}
+function mintSheet(cid){
+  const c=S.claims.find(x=>x.id===cid),sp=sparks(),ev=liveEv(c).map(id=>sp.find(s=>s.id===id));
+  const tally={};ev.forEach(s=>tally[s.seg.id]=(tally[s.seg.id]||0)+1);const g=SEGS.find(x=>x.id===Object.keys(tally).sort((a,b)=>tally[b]-tally[a])[0]);
+  const others=S.cards.filter(k=>k.claim!==cid),full=others.length>=MAXC;let revised=false;
+  openSheet(`<div class="eyebrow">鑄卡之前，先過反方這一關</div><textarea id="m-text">${esc(c.text)}</textarea>
+    <div class="counter"><b>反方會說</b>${g.counter}</div><div class="ai-out" id="m-ai" hidden></div>
+    <button class="btn sm ghost ai-only" id="m-live" style="align-self:flex-start">針對我這句話再反駁一次</button>
+    ${full?`<div class="eyebrow">已經有 ${MAXC} 張了。換掉哪一張？</div><div class="linked">${others.map((k,i)=>`<button data-swap="${k.id}" aria-pressed="${i===0}"><span>${esc(k.text)}</span></button>`).join("")}</div>`:""}
+    <div class="row"><span style="font-size:15px;color:var(--mute);flex:1">改了句子會標成「修正過」。</span><button class="btn" id="m-go">${full?"換掉並收成卡片":"收成卡片"}</button></div>`,renderDistill);
+  let swap=full?others[0].id:null;
+  $$("[data-swap]",sheetEl).forEach(b=>b.onclick=()=>{swap=b.dataset.swap;$$("[data-swap]",sheetEl).forEach(x=>x.setAttribute("aria-pressed",x===b))});
+  $("#m-text").oninput=e=>{c.text=e.target.value;revised=true;commit()};
+  $("#m-live").onclick=e=>askAI(`你是嚴格但友善的辯論對手。讀者看完一段訪談，用自己的話寫下一個主張。請用繁體中文、最多 100 個字，指出這個主張最弱的一個環節（一個具體反例，或一個沒說出口的假設），最後用一個問題結尾。不要稱讚，不要重述他的話，不要條列。\n\n訪談重點：${g.sum.join(" ")}\n他引用的證據：${ev.map(s=>s.text).join("；")}\n讀者的主張：${c.text}`,$("#m-ai"),e.currentTarget);
+  $("#m-go").onclick=()=>{if(c.text.trim().length<4)return;
+    S.cards=S.cards.filter(k=>k.claim!==cid&&k.id!==swap);const card={id:"c"+Date.now().toString(36),claim:cid,text:c.text.trim(),ev:liveEv(c),revised,at:Date.now()};S.cards.push(card);commit();
+    ui.fresh=card.id;closeSheet();toast("得到一張觀點卡");setTab("cards")};
+}
+
+/* ---------- cards ---------- */
+function evQuote(id){if(id.startsWith("ai-")){const g=SEGS.find(x=>"ai-"+x.id===id);if(!g)return null;const q=keyIds(g).map(i=>SENT[i]);if(!q.length)return null;return {en:q.map(x=>x.en).join(" "),zh:q.map(x=>x.zh).join(""),t:q[0].t}}return SENT[id]}
+function renderCards(){
+  const cards=S.cards,names={y:"洞見",p:"疑問",g:"要去做"};
+  const post=cards.length?`看完《${V.title}》，我只留下這 ${cards.length} 句：\n\n`+cards.map((k,i)=>`${i+1}. ${k.text}`).join("\n\n"):"";
+  const hl=Object.keys(S.hl).filter(id=>SENT[id]).sort((a,b)=>SENT[a].t-SENT[b].t||a.localeCompare(b)),refl=SEGS.filter(g=>(S.refl[g.id]||"").trim());
+  side.innerHTML=`<div class="pad"><div><div class="eyebrow">這支影片最多留 ${MAXC} 張</div><h2>${cards.length?"這些句子是你寫的。":"還沒有觀點卡。"}</h2></div>
+    ${cards.map(k=>`<div class="vcard${ui.fresh===k.id?" mint":""}"><div class="row"><span class="tag">${k.revised?"修正過":"原句過關"}</span><span class="sp"></span><button data-drop="${k.id}">移除</button></div><p>${esc(k.text)}</p>
+      ${k.ev.map(evQuote).filter(Boolean).filter((q,i,a)=>!a.some((o,j)=>j!==i&&o.en.includes(q.en)&&(o.en.length>q.en.length||j<i))).slice(0,3).map(q=>`<div class="ev">${esc(q.en)} ${tlink(q.t)}</div>`).join("")}</div>`).join("")}
+    ${Array.from({length:MAXC-cards.length},(_,i)=>`<div class="slot">${i===0&&!cards.length?"到「淬煉」把火花連成主張，有 2 個證據就能鑄成卡片。":"空位"}</div>`).join("")}
+    ${cards.length?`<div class="eyebrow">組成貼文</div><textarea class="big" id="c-post">${esc(post)}</textarea><div class="ai-out" id="c-ai" hidden></div>
+      <div class="row"><button class="btn" id="c-copy">複製</button><button class="btn ghost ai-only" id="c-polish">請 AI 順成一篇貼文</button></div>`:""}
+    <details><summary>全部筆記（畫線 ${hl.length} · 回答 ${refl.length}）</summary><div style="display:grid;gap:8px;margin-top:10px">
+      ${refl.map(g=>`<div class="ncard"><small>我對「${g.title}」的回答</small><span class="mine">${esc(S.refl[g.id])}</span></div>`).join("")}
+      ${hl.map(id=>{const s=SENT[id];return `<div class="ncard" data-hl="${S.hl[id]}"><small>${names[S.hl[id]]} · ${tlink(s.t)}</small><span>${esc(s.zh)}</span><span class="q-en" style="font-size:17px">${esc(s.en)}</span>${S.notes[id]?`<span class="mine">✎ ${esc(S.notes[id])}</span>`:""}</div>`}).join("")||""}
+    </div></details></div>`;
+  ui.fresh=null;
+}
+
+/* ---------- shell ---------- */
+function meta(){
+  const h=Object.keys(S.hl).length,r=Object.values(S.refl).filter(v=>v&&v.trim()).length,k=S.claims.length,c=S.cards.length;
+  const done=[h>=3,r>=1,k>=1,c>=1,c>=MAXC];
+  $("#pips").innerHTML=done.map(d=>`<i class="${d?"on":""}"></i>`).join("");
+  $("#n-d").textContent=k||"";$("#n-c").textContent=c?c+"/"+MAXC:"";
+  const st=$("#steps");st.hidden=ui.side!=="distill";
+  st.innerHTML=[["畫線 "+h,h>=1],["寫主張 "+k,k>=1],["連 2 個證據",S.claims.some(x=>liveEv(x).length>=2)],["鑄卡 "+c+"/"+MAXC,c>=1]].map(([t,on],i)=>`<span class="${on?"on":""}">${i+1} ${t}</span>`).join("");
+}
+function renderSide(){({overview:renderOverview,distill:renderDistill,cards:renderCards})[ui.side]();meta();
+  $$("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===(ui.m==="read"?"read":ui.side)));root.dataset.m=ui.m}
+function setTab(t){closeSheet();const prev=ui.side;if(t==="read")ui.m="read";else{ui.m="side";ui.side=t}if(t!=="distill")ui.linkTo=null;renderSide();if(t!=="read"&&t!==prev)side.scrollTop=0}
+function renderAll(){renderRead();renderSide()}
+$("#tabs").onclick=e=>{const b=e.target.closest("[data-tab]");if(b)setTab(b.dataset.tab)};
+side.addEventListener("click",e=>{
+  const t=e.target.closest("button");if(!t)return;
+  if(t.dataset.core!=null){ui.coreOnly=t.dataset.core==="1";renderOverview()}
+  else if(t.dataset.deepen!=null)deepen(+t.dataset.deepen);
+  else if(t.dataset.seg){if(t.dataset.raw!=null){ui.open.add(t.dataset.seg);renderRead()}setTab("read");const el=$("#seg-"+t.dataset.seg);el&&el.scrollIntoView({block:"start"});lastUserScroll=Date.now()}
+  else if(t.id==="d-done"){ui.linkTo=null;renderDistill()}
+  else if(t.dataset.spark){if(ui.linkTo){const c=S.claims.find(x=>x.id===ui.linkTo),id=t.dataset.spark;c.ev=c.ev.includes(id)?c.ev.filter(x=>x!==id):[...c.ev,id];commit();renderDistill()}else sparkSheet(t.dataset.spark)}
+  else if(t.dataset.claim){if(ui.linkTo){ui.linkTo=null;renderDistill()}else claimSheet(t.dataset.claim)}
+  else if(t.dataset.drop){S.cards=S.cards.filter(k=>k.id!==t.dataset.drop);commit();renderCards()}
+  else if(t.id==="c-copy")copyText($("#c-post"));
+  else if(t.id==="c-polish")askAI(`把下面這位讀者自己寫的結論整理成一篇繁體中文社群貼文，250 字以內。規則：只能使用他寫的觀點，不能加入新論點；保留他的口吻；不要勵志結尾，不要 hashtag，不要 emoji。\n\n${$("#c-post").value}`,$("#c-ai"),t);
+});
+
+/* ---------- library, adding a video, processing ---------- */
+let LIB=[{video_id:DEMO.vid,title:DEMO.title,status:"ready",demo:true}];
+const cache={};const driving=new Set();
+const canIngest=()=>!!(sb&&sbUser);
+function setLib(vid,patch){let it=LIB.find(x=>x.video_id===vid&&!x.demo);if(!it){it={video_id:vid,title:"",status:"queued"};LIB.splice(1,0,it)}Object.assign(it,patch);if(root.dataset.view==="home")renderHome()}
+async function loadLibrary(){if(!canIngest())return;
+  const {data,error}=await sb.from("videos").select("video_id,title,status,progress,error,updated_at").order("updated_at",{ascending:false});
+  if(error)return;LIB=[LIB.find(x=>x.demo),...data];renderHome();
+  data.filter(v=>v.status==="queued"||v.status==="processing").forEach(v=>drive(v.video_id));
+}
+async function fn(body){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session)return {error:"登入已過期，請重新登入。",fatal:true};
+  let r;try{r=await fetch(CFG.supabaseUrl+"/functions/v1/ingest",{method:"POST",headers:{"content-type":"application/json",apikey:CFG.supabaseAnonKey,Authorization:"Bearer "+session.access_token},body:JSON.stringify(body)})}
+  catch(e){return {error:"連不上後端，檢查網路後會自動重試。",httpStatus:0}}
+  const j=await r.json().catch(()=>({}));if(!r.ok&&!j.error)j.error="後端沒有回應（"+r.status+"）";j.httpStatus=r.status;return j;
+}
+/* Keeps asking the backend for the next unit until the video is ready. Safe to call again at any time:
+   the server remembers what is done, so a reload or a failed unit resumes from where it stopped. */
+async function drive(vid){
+  if(driving.has(vid))return;driving.add(vid);let fails=0;
+  try{while(true){
+    const j=await fn({action:"step",video_id:vid});
+    if(j.error){fails++;if(j.fatal||fails>=4){setLib(vid,{status:"error",error:j.error,note:""});break}
+      setLib(vid,{note:`遇到問題，第 ${fails} 次重試中：${j.error}`});await sleep(j.httpStatus===429?20000:3000*fails);continue}
+    fails=0;setLib(vid,{title:j.title,status:j.status,progress:j.progress,error:j.error,note:""});
+    if(j.busy){await sleep(4000);continue}
+    if(j.status==="ready"){delete cache[vid];toast("處理完成："+(j.title||vid));break}
+    if(j.status==="error")break;
+  }}finally{driving.delete(vid)}
+}
+async function addVideo(url){
+  const msg=$("#add-msg");
+  if(!/(youtube\.com|youtu\.be)/.test(url)){msg.textContent="請貼上 YouTube 影片的網址。";return}
+  if(!canIngest()){msg.textContent="先登入才能加入影片。";syncEl.click();return}
+  msg.textContent="加入中…";const j=await fn({action:"start",url});
+  if(j.error){msg.textContent="沒有加入："+j.error;return}
+  msg.textContent="";$("#add-url").value="";setLib(j.video_id,j);
+  if(j.status!=="ready")drive(j.video_id);
+}
+async function deepen(k){
+  const g=SEGS[k];if(!g||isDeep(g)||ui.busy[g.id])return;
+  if(V.demo||!canIngest()){toast("這一章要在部署版登入後才能精讀");return}
+  const vid=VID,show=t=>{ui.busy[g.id]=t;if(VID===vid){renderRead();if(ui.side==="overview")renderOverview()}};
+  show("準備中…");let fails=0;
+  while(true){
+    const j=await fn({action:"deepen",video_id:vid,chapter:k});
+    if(j.error){fails++;if(j.fatal||fails>=4){delete ui.busy[g.id];if(VID===vid){renderRead();renderSide()}toast("精讀沒有完成："+j.error);return}
+      show(`重試中（${fails}）…`);await sleep(j.httpStatus===429?20000:3000*fails);continue}
+    fails=0;if(j.busy){await sleep(3000);continue}
+    if(j.done)break;
+    show(j.progress?`翻譯中 ${j.progress.done}/${j.progress.total} 句`:"處理中…");
+  }
+  delete ui.busy[g.id];delete cache[vid];
+  const c=await fetchContent(vid);
+  if(c&&VID===vid){V=c;SEGS=c.segs;CH=c.chapters;indexContent();renderAll();toast("這一章精讀好了")}
+}
+async function fetchContent(vid){
+  if(cache[vid])return cache[vid];
+  const {data,error}=await sb.from("videos").select("content").eq("video_id",vid).maybeSingle();
+  if(error||!data||!data.content)return null;
+  return cache[vid]=data.content;
+}
+const STEP={meta:"讀取影片資訊",transcribe:"讀影片內容",outline:"整理章節和摘要",synth:"寫整支影片的總覽",ready:"完成"};
+function statusLine(it){
+  if(it.demo)return "範例 · 已處理好";
+  if(it.status==="ready")return "可以閱讀";
+  if(it.status==="error")return "沒有完成："+(it.error||"未知的問題");
+  if(it.note)return it.note;
+  const p=it.progress||{};
+  if(p.phase==="transcribe")return p.total?`正在讀影片內容，${p.done||0} / ${p.total} 段（每段 5 分鐘）`:`正在讀影片內容，已完成 ${p.done||0} 段（每段 5 分鐘）`;
+  if(p.phase==="outline"&&p.total>1)return `正在整理章節和摘要，${p.done||0} / ${p.total}`;
+  return "正在"+(STEP[p.phase]||"排隊")+"…";
+}
+function renderHome(){
+  const why=window.claude?"這個預覽頁不能處理新影片，也不能嵌入播放器（平台會擋）。部署版才有這兩項。"
+    :!(CFG.supabaseUrl&&CFG.supabaseAnonKey)?"後端還沒接上，目前只能看範例。"
+    :!sbUser?"先登入，才能加入影片並跨裝置同步。":"";
+  const keep=$("#add-url")?$("#add-url").value:"";
+  homeEl.innerHTML=`<div class="pad home">
+    <div><h2>把看過的影片變成自己的觀點</h2><p class="meta">貼上網址，先看摘要決定值不值得細看，再精讀、畫線、淬煉成最多三張觀點卡。</p></div>
+    <form id="add" class="add"><input id="add-url" type="url" inputmode="url" placeholder="貼上 YouTube 網址" ${canIngest()?"":"disabled"}><button class="btn" ${canIngest()?"":"disabled"}>加入</button></form>
+    <p class="meta" id="add-msg">${why}</p>
+    ${!window.claude&&sb&&!sbUser?`<div><button class="btn" id="home-login">登入</button></div>`:""}
+    <div class="eyebrow">我的影片</div>
+    <div class="lib">${LIB.map(it=>`<button class="item${it.status==="ready"?"":" wait"}" data-vid="${it.video_id}" data-status="${it.status}"${it.demo?" data-demo":""}>
+      <img alt="" src="${it.demo?THUMB:`https://i.ytimg.com/vi/${it.video_id}/mqdefault.jpg`}" onerror="this.style.visibility='hidden'">
+      <span><b>${esc(it.title||"（讀取中）"+it.video_id)}</b><small class="${it.status==="error"?"err":""}">${esc(statusLine(it))}</small>${it.status==="error"?`<em>點這裡從中斷的地方重試</em>`:""}</span></button>`).join("")}</div>
+  </div>`;
+  if(keep)$("#add-url").value=keep;
+  $("#add").onsubmit=e=>{e.preventDefault();addVideo($("#add-url").value.trim())};
+  const hl=$("#home-login");if(hl)hl.onclick=()=>syncEl.click();
+}
+homeEl.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-vid]");if(!b)return;const vid=b.dataset.vid,st=b.dataset.status;
+  if(b.dataset.demo!=null){openVideo(DEMO);return}
+  if(st==="error"){setLib(vid,{status:"processing",error:null,note:"重新開始…"});drive(vid);return}
+  if(st!=="ready"){toast("還在處理中，完成後會通知你");return}
+  const c=await fetchContent(vid);if(!c){toast("讀不到這支影片的內容，請稍後再試");return}
+  openVideo(c);
+});
+function openVideo(c){
+  V=c;VID=c.vid;SEGS=c.segs||[];CH=c.chapters||[];THESIS=c.thesis||"";TLDR=c.tldr||[];
+  indexContent();loadState();bindCloud();pull();
+  $("#vt").textContent=c.title+(c.channel?" · "+c.channel:"");
+  ui.side="overview";ui.m="side";ui.linkTo=null;ui.open=new Set();
+  root.dataset.view="video";renderAll();initYT();rscroll.scrollTop=0;side.scrollTop=0;
+}
+function goHome(){closeSheet();try{if(player&&ytOK)player.pauseVideo()}catch(e){} root.dataset.view="home";$("#vt").textContent="";renderHome()}
+$("#gohome").onclick=goHome;
+renderHome();
+</script>
