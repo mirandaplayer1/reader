@@ -27,7 +27,7 @@ button,textarea,input{font:inherit;color:inherit}
 button{cursor:pointer;border:0;background:none;padding:0}
 a{color:inherit}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
-textarea,input[type=email]{width:100%;border:1px solid var(--line);background:var(--surf2);border-radius:6px;padding:12px 14px;font-size:17px;line-height:1.6;resize:none}
+textarea,input[type=email],input[type=password]{width:100%;border:1px solid var(--line);background:var(--surf2);border-radius:6px;padding:12px 14px;font-size:17px;line-height:1.6;resize:none}
 textarea{min-height:92px} textarea.big{min-height:230px}
 textarea:focus,input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 22%,transparent)}
 ::placeholder{color:var(--mute);opacity:.75}
@@ -432,13 +432,29 @@ function setUser(u){const was=sbUser&&sbUser.id;sbUser=u||null;if(!u){badge("登
   sb.auth.onAuthStateChange((_e,ses)=>setUser(ses&&ses.user));
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
 }catch(e){badge("同步服務載入失敗，內容仍在這台裝置","warn")}})();
+const rateMsg=e=>(e&&(e.status===429||/rate limit/i.test(e.message||"")))?"寄信額度用完了：整個專案每小時只能寄幾封登入信。等一小時再試，或改用密碼登入。":null;
 syncEl.onclick=()=>{if(!sb){if(!window.claude)toast("後端還沒接上");return}
-  if(sbUser){openSheet(`<div class="eyebrow">同步</div><p class="q-zh">已用 ${esc(sbUser.email||"")} 登入。</p><p style="margin:0;color:var(--mute)">在任何裝置用同一個信箱登入，就會看到同一份筆記。</p><div class="row"><span class="sp"></span><button class="btn line" id="sb-out">登出</button></div>`);
-    $("#sb-out").onclick=async()=>{await sb.auth.signOut();closeSheet()};return}
-  openSheet(`<div class="eyebrow">登入</div><p class="q-zh">輸入信箱，我們寄一個登入連結給你。</p><input type="email" id="sb-mail" placeholder="you@example.com" autocomplete="email"><p id="sb-msg" style="margin:0;color:var(--mute);font-size:15px">不用密碼。在這台裝置上寫的東西登入後會保留。</p><div class="row"><span class="sp"></span><button class="btn" id="sb-go">寄登入連結</button></div>`);
-  $("#sb-go").onclick=async e=>{const b=e.currentTarget,mail=$("#sb-mail").value.trim();if(!mail)return;b.disabled=true;
+  if(sbUser){openSheet(`<div class="eyebrow">帳號</div><p class="q-zh">已用 ${esc(sbUser.email||"")} 登入。</p>
+    <p style="margin:0;color:var(--mute)">在任何裝置用同一個信箱登入，就會看到同一份影片和筆記。</p>
+    <div class="eyebrow">設定密碼（之後換裝置不用收信）</div>
+    <input type="password" id="sb-newpw" placeholder="至少 8 個字" autocomplete="new-password">
+    <p id="sb-pwmsg" style="margin:0;color:var(--mute);font-size:15px">設定後，其他裝置輸入信箱和這組密碼就能登入。</p>
+    <div class="row"><button class="btn line" id="sb-out">登出</button><span class="sp"></span><button class="btn" id="sb-setpw">儲存密碼</button></div>`);
+    $("#sb-out").onclick=async()=>{await sb.auth.signOut();closeSheet()};
+    $("#sb-setpw").onclick=async e=>{const b=e.currentTarget,pw=$("#sb-newpw").value;if(pw.length<8){$("#sb-pwmsg").textContent="密碼至少要 8 個字。";return}
+      b.disabled=true;const {error}=await sb.auth.updateUser({password:pw});b.disabled=false;
+      $("#sb-pwmsg").textContent=error?"沒有存成功："+error.message:"存好了。其他裝置用信箱加這組密碼登入，不用收信。";if(!error)$("#sb-newpw").value=""};
+    return}
+  openSheet(`<div class="eyebrow">登入</div><p class="q-zh">輸入信箱。有設定過密碼就一起填，沒有的話我們寄登入連結給你。</p>
+    <input type="email" id="sb-mail" placeholder="you@example.com" autocomplete="email">
+    <input type="password" id="sb-pw" placeholder="密碼（設定過才填）" autocomplete="current-password">
+    <p id="sb-msg" style="margin:0;color:var(--mute);font-size:15px">在這台裝置上寫的東西登入後會保留。</p>
+    <div class="row"><span class="sp"></span><button class="btn" id="sb-go">登入</button></div>`);
+  $("#sb-go").onclick=async e=>{const b=e.currentTarget,mail=$("#sb-mail").value.trim(),pw=$("#sb-pw").value,msg=$("#sb-msg");if(!mail)return;b.disabled=true;
+    if(pw){const {error}=await sb.auth.signInWithPassword({email:mail,password:pw});
+      if(error){msg.textContent="登入失敗：信箱或密碼不對。還沒設定過密碼的話，把密碼欄清空，改收登入連結。";b.disabled=false}else closeSheet();return}
     const {error}=await sb.auth.signInWithOtp({email:mail,options:{emailRedirectTo:location.origin+location.pathname}});
-    $("#sb-msg").textContent=error?"沒有寄出："+error.message:"寄出了。到信箱點連結，回到這一頁就會開始同步。";if(error)b.disabled=false}};
+    msg.textContent=error?(rateMsg(error)||"沒有寄出："+error.message):"寄出了。到信箱點連結，回到這一頁就會登入。連結一小時內有效，只能用一次。";if(error)b.disabled=false}};
 function adopt(json){if(!VID)return;try{S=Object.assign(blank(),JSON.parse(json))}catch(e){return}try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}
   if(document.activeElement&&document.activeElement.tagName==="TEXTAREA"){remoteWaiting=true;return}if(root.dataset.view==="video")renderAll()}
 document.addEventListener("focusout",()=>{if(remoteWaiting){remoteWaiting=false;setTimeout(()=>{if(!(document.activeElement&&document.activeElement.tagName==="TEXTAREA")&&root.dataset.view==="video")renderAll()},50)}});
