@@ -1,5 +1,5 @@
 <title>Reader</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;700;900&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
 /*__CSS__*/
 </style>
@@ -83,7 +83,7 @@ function setUser(u){const was=sbUser&&sbUser.id;sbUser=u||null;if(!u){badge("登
 syncEl.onclick=()=>{if(!sb)return;
   if(sbUser){openSheet(`<div class="eyebrow">同步</div><p class="q-zh">已用 ${esc(sbUser.email||"")} 登入。</p><p style="margin:0;color:var(--mute)">在任何裝置用同一個信箱登入，就會看到同一份筆記。</p><div class="row"><span class="sp"></span><button class="btn line" id="sb-out">登出</button></div>`);
     $("#sb-out").onclick=async()=>{await sb.auth.signOut();closeSheet()};return}
-  openSheet(`<div class="eyebrow">登入以同步</div><p class="q-zh">輸入信箱，我們寄一個登入連結給你。</p><input type="email" id="sb-mail" placeholder="you@example.com" autocomplete="email"><p id="sb-msg" style="margin:0;color:var(--mute);font-size:13.5px">不用密碼。在這台裝置上寫的東西登入後會保留。</p><div class="row"><span class="sp"></span><button class="btn" id="sb-go">寄登入連結</button></div>`);
+  openSheet(`<div class="eyebrow">登入以同步</div><p class="q-zh">輸入信箱，我們寄一個登入連結給你。</p><input type="email" id="sb-mail" placeholder="you@example.com" autocomplete="email"><p id="sb-msg" style="margin:0;color:var(--mute);font-size:15px">不用密碼。在這台裝置上寫的東西登入後會保留。</p><div class="row"><span class="sp"></span><button class="btn" id="sb-go">寄登入連結</button></div>`);
   $("#sb-go").onclick=async e=>{const b=e.currentTarget,mail=$("#sb-mail").value.trim();if(!mail)return;b.disabled=true;
     const {error}=await sb.auth.signInWithOtp({email:mail,options:{emailRedirectTo:location.origin+location.pathname}});
     $("#sb-msg").textContent=error?"沒有寄出："+error.message:"寄出了。到信箱點連結，回到這一頁就會開始同步。";if(error)b.disabled=false}};
@@ -187,9 +187,9 @@ function renderOverview(){
     <p class="thesis">${THESIS}</p>
     <h2>Pieter Levels: Programming, Viral AI Startups, and Digital Nomad Life</h2>
     <ul>${TLDR.map(x=>`<li>${x}</li>`).join("")}</ul>
-    <div class="row"><div class="eyebrow" style="flex:1">章節 · 圓點越多越值得細看</div><div class="chips"><button data-core="0" aria-pressed="${!ui.coreOnly}">全部</button><button data-core="1" aria-pressed="${ui.coreOnly}">只看核心</button></div></div>
+    <div class="row"><div class="eyebrow" style="flex:1">章節</div><div class="chips"><button data-core="0" aria-pressed="${!ui.coreOnly}">全部</button><button data-core="1" aria-pressed="${ui.coreOnly}">只看核心</button></div></div>
     <div class="chs">${list.map(({c,i,segs})=>`<article class="ch w${c.worth}">
-      <header><b><span class="t">${esc(c.zh)}</span><small>${esc(c.en)}</small></b><span class="w" title="值得細看的程度">${[1,2,3].map(n=>`<i class="${n<=c.worth?"on":""}"></i>`).join("")}</span>${tlink(c.t)}</header>
+      <header><b><span class="t">${esc(c.zh)}</span><small>${esc(c.en)}</small></b><span class="w w${c.worth}">${["","可跳過","值得看","核心"][c.worth]}</span>${tlink(c.t)}</header>
       <p>${esc(c.sum)}</p>${c.take?`<p class="take">→ ${esc(c.take)}</p>`:""}
       <div class="row">${segs.map(g=>`<button class="btn sm" data-seg="${g.id}">精讀「${g.title}」</button>`).join("")||`<a class="btn sm ghost" data-t="${c.t}" data-goread href="${yt(c.t)}" target="_blank" rel="noopener">播放這一章</a>`}</div>
     </article>`).join("")}</div>
@@ -226,7 +226,7 @@ function layoutDistill(){
 window.addEventListener("resize",()=>{if(ui.side==="distill")layoutDistill()});
 function sparkSheet(id){
   const s=sparks().find(x=>x.id===id);if(!s)return;const g=s.seg,q=s.ai?keyIds(g).map(i=>SENT[i]):[SENT[id]];
-  openSheet(`<div class="eyebrow">火花 · ${g.title}</div><p class="q-en" lang="en" style="color:var(--ink)">${q.map(x=>esc(x.en)).join(" ")}</p><p class="q-zh" style="font-size:15px;font-weight:400;color:var(--mute)">${q.map(x=>esc(x.zh)).join("")}</p>
+  openSheet(`<div class="eyebrow">火花 · ${g.title}</div><p class="q-en" lang="en" style="color:var(--ink)">${q.map(x=>esc(x.en)).join(" ")}</p><p class="q-zh" style="font-size:17px;font-weight:400;color:var(--mute)">${q.map(x=>esc(x.zh)).join("")}</p>
     ${!s.ai&&S.notes[id]?`<p style="margin:0;font-weight:700">✎ ${esc(S.notes[id])}</p>`:""}
     <div class="row">${tlink(q[0].t,"▶ 從這段播放 "+fmt(q[0].t))}</div>
     <details><summary>這一段的第一性原理</summary><p style="margin:8px 0 0">${g.core}</p></details>
@@ -241,7 +241,7 @@ function claimSheet(cid){
   const c=S.claims.find(x=>x.id===cid);if(!c)return;const sp=sparks(),ev=liveEv(c).map(id=>sp.find(s=>s.id===id)),n=ev.length;
   openSheet(`<div class="eyebrow">我的主張 · ${lvName(n)} · ${n} 個證據</div><textarea id="d-edit">${esc(c.text)}</textarea>
     <div class="linked">${ev.map(s=>`<div><span>${esc(s.text)}</span><button class="x" data-unlink="${s.id}" aria-label="移除證據">×</button></div>`).join("")||`<div><span style="color:var(--mute)">還沒有證據</span></div>`}</div>
-    <p style="margin:0;font-size:13px;color:var(--mute)">${n>=2?"證據夠了，可以鑄成觀點卡。每支影片最多留 "+MAXC+" 張。":"再連 "+(2-n)+" 個證據，就能鑄成觀點卡。"}</p>
+    <p style="margin:0;font-size:15px;color:var(--mute)">${n>=2?"證據夠了，可以鑄成觀點卡。每支影片最多留 "+MAXC+" 張。":"再連 "+(2-n)+" 個證據，就能鑄成觀點卡。"}</p>
     <div class="row"><button class="btn line sm" id="d-del">刪除</button><button class="btn line sm" id="d-add">加證據</button><span class="sp"></span><button class="btn" id="d-mint" ${n>=2?"":"disabled"}>鑄成觀點卡</button></div>`,renderDistill);
   $("#d-edit").oninput=e=>{c.text=e.target.value;commit()};
   $("#d-add").onclick=()=>{ui.linkTo=cid;closeSheet()};
@@ -257,7 +257,7 @@ function mintSheet(cid){
     <div class="counter"><b>反方會說</b>${g.counter}</div><div class="ai-out" id="m-ai" hidden></div>
     <button class="btn sm ghost ai-only" id="m-live" style="align-self:flex-start">針對我這句話再反駁一次</button>
     ${full?`<div class="eyebrow">已經有 ${MAXC} 張了。換掉哪一張？</div><div class="linked">${others.map((k,i)=>`<button data-swap="${k.id}" aria-pressed="${i===0}"><span>${esc(k.text)}</span></button>`).join("")}</div>`:""}
-    <div class="row"><span style="font-size:13px;color:var(--mute);flex:1">改了句子會標成「修正過」。</span><button class="btn" id="m-go">${full?"換掉並收成卡片":"收成卡片"}</button></div>`,renderDistill);
+    <div class="row"><span style="font-size:15px;color:var(--mute);flex:1">改了句子會標成「修正過」。</span><button class="btn" id="m-go">${full?"換掉並收成卡片":"收成卡片"}</button></div>`,renderDistill);
   let swap=full?others[0].id:null;
   $$("[data-swap]",sheetEl).forEach(b=>b.onclick=()=>{swap=b.dataset.swap;$$("[data-swap]",sheetEl).forEach(x=>x.setAttribute("aria-pressed",x===b))});
   $("#m-text").oninput=e=>{c.text=e.target.value;revised=true;commit()};
@@ -281,7 +281,7 @@ function renderCards(){
       <div class="row"><button class="btn" id="c-copy">複製</button><button class="btn ghost ai-only" id="c-polish">請 AI 順成一篇貼文</button></div>`:""}
     <details><summary>全部筆記（畫線 ${hl.length} · 回答 ${refl.length}）</summary><div style="display:grid;gap:8px;margin-top:10px">
       ${refl.map(g=>`<div class="ncard"><small>我對「${g.title}」的回答</small><span class="mine">${esc(S.refl[g.id])}</span></div>`).join("")}
-      ${hl.map(id=>{const s=SENT[id];return `<div class="ncard" data-hl="${S.hl[id]}"><small>${names[S.hl[id]]} · ${tlink(s.t)}</small><span>${esc(s.zh)}</span><span class="q-en" style="font-size:16px" lang="en">${esc(s.en)}</span>${S.notes[id]?`<span class="mine">✎ ${esc(S.notes[id])}</span>`:""}</div>`}).join("")||""}
+      ${hl.map(id=>{const s=SENT[id];return `<div class="ncard" data-hl="${S.hl[id]}"><small>${names[S.hl[id]]} · ${tlink(s.t)}</small><span>${esc(s.zh)}</span><span class="q-en" style="font-size:17px" lang="en">${esc(s.en)}</span>${S.notes[id]?`<span class="mine">✎ ${esc(S.notes[id])}</span>`:""}</div>`}).join("")||""}
     </div></details></div>`;
   ui.fresh=null;
 }
