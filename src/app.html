@@ -404,7 +404,7 @@ async function fetchContent(vid){
   if(error||!data||!data.content)return null;
   return cache[vid]=data.content;
 }
-const STEP={meta:"讀取影片資訊",transcribe:"讀影片內容",outline:"整理章節和摘要",ready:"完成"};
+const STEP={meta:"讀取影片資訊",transcribe:"讀影片內容",outline:"整理章節和摘要",synth:"寫整支影片的總覽",ready:"完成"};
 function statusLine(it){
   if(it.demo)return "範例 · 已處理好";
   if(it.status==="ready")return "可以閱讀";
@@ -412,6 +412,7 @@ function statusLine(it){
   if(it.note)return it.note;
   const p=it.progress||{};
   if(p.phase==="transcribe")return p.total?`正在讀影片內容，${p.done||0} / ${p.total} 段（每段 5 分鐘）`:`正在讀影片內容，已完成 ${p.done||0} 段（每段 5 分鐘）`;
+  if(p.phase==="outline"&&p.total>1)return `正在整理章節和摘要，${p.done||0} / ${p.total}`;
   return "正在"+(STEP[p.phase]||"排隊")+"…";
 }
 function renderHome(){

@@ -95,6 +95,19 @@ const TRANSCRIPT_SCHEMA = {
   required: ["turns", "visuals", "reached_end"],
 };
 
+const STR = { type: "STRING" }, INT = { type: "INTEGER" };
+const LIST = (items) => ({ type: "ARRAY", items });
+const OBJ = (properties) => ({ type: "OBJECT", properties, required: Object.keys(properties) });
+const CHAPTER_ITEM = OBJ({ t: INT, en: STR, zh: STR, sum: STR, take: STR, worth: INT });
+const META = { lang: STR, title: STR, host: STR, thesis: STR, tldr: LIST(STR) };
+const SCHEMA = {
+  outline: OBJ({ ...META, chapters: LIST(CHAPTER_ITEM) }),
+  window: OBJ({ chapters: LIST(CHAPTER_ITEM) }),
+  synth: OBJ({ ...META, worth: LIST(INT) }),
+  translate: OBJ({ zh: LIST(STR) }),
+  analysis: OBJ({ title: STR, spark: STR, sum: LIST(STR), core: STR, chain: LIST(STR), ask: STR, key: LIST(INT), counter: STR }),
+};
+
 async function gemini(deps, model, parts, maxTokens = 32768, schema = null) {
   const res = await deps.fetch(`${GEMINI}/models/${model}:generateContent`, {
     method: "POST",
@@ -117,7 +130,7 @@ async function gemini(deps, model, parts, maxTokens = 32768, schema = null) {
 }
 
 // Text-only stages. Claude is used when an Anthropic key is configured, otherwise Gemini.
-async function llmJSON(deps, prompt, maxTokens = 16000) {
+async function llmJSON(deps, prompt, maxTokens = 16000, schema = null) {
   if (deps.anthropicKey) {
     const res = await deps.fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -132,7 +145,7 @@ async function llmJSON(deps, prompt, maxTokens = 16000) {
     if (!res.ok) throw new Error((body.error && body.error.message) || "Claude request failed (" + res.status + ")");
     return parseJSON((body.content || []).map((b) => b.text || "").join(""));
   }
-  return gemini(deps, deps.textModel, [{ text: prompt }], maxTokens);
+  return gemini(deps, deps.textModel, [{ text: prompt }], maxTokens, schema);
 }
 
 const STYLE =
@@ -212,24 +225,25 @@ export async function ingestStep(row, deps) {
     return { status: "processing", work, progress: { phase: ended ? "outline" : "transcribe", done: work.next, total: ended ? work.next : (work.length ? Math.ceil(work.length / CHUNK_SECONDS) : null) } };
   }
 
-  if (work.phase === "outline") {
-    const lines = work.turns.map((t) => `[${t.t}] ${t.speaker}: ${t.text}`).join("\n");
-    const vis = work.visuals.length ? "\n\n畫面上出現、講者沒有唸出來的文字：\n" + work.visuals.map((v) => `[${v.t}] ${v.text}`).join("\n") : "";
-    const prompt =
-      `下面是一支影片的完整逐字稿，每一行開頭的方括號是該段開始的秒數。請幫一位正在找 product-market fit 的一人創業者整理這支影片，讓他能很快判斷值不值得細看。\n\n` +
-      `輸出 JSON：\n{"lang":"<逐字稿語言的 BCP-47 代碼，例如 en、zh-TW、ja>","title":"<影片標題，若逐字稿看不出來就寫最貼切的一句>",` +
-      `"host":"<訪問者或主持人的 speaker 標籤，沒有就寫空字串>","thesis":"<一句話講完整支影片的主張，60 字內>",` +
-      `"tldr":["<重點 1>","<重點 2>","<重點 3>"],` +
-      `"chapters":[{"t":<這一章開始的秒數，必須是逐字稿裡某一行的秒數>,"en":"<原文語言的短標題>","zh":"<10 字內的中文標題，具體講在談什麼>",` +
-      `"sum":"<兩句話，75 字內，講者實際說了或做了什麼，帶具體的數字、名稱、做法>","take":"<一句 40 字內可帶走的原則；純閒聊、或內容本身沒有可帶走的道理就留空字串，不要硬湊>","worth":<1 到 3 的整數，3 是核心>}]}\n\n` +
-      `規則：\n- 依主題切章，一章只講一件事。20 分鐘以內的影片切 3 到 6 章；更長的影片每章大約 3 到 15 分鐘。第一章從第一行的秒數開始。\n- worth 看的是「這一章對讀者有多少可以帶走的東西」：3 是核心論點或可以直接照做的方法，2 是有用的補充，1 是開場、閒聊、致謝這類可以跳過的。3 分最多佔三分之一，但整支影片最重要的那一章一定要是 3。\n- 講者是 "On screen" 的段落是畫面描述，照樣整理進章節。\n- ${STYLE}\n\n逐字稿：\n${lines}${vis}`;
-    const out = await llmJSON(deps, prompt, 16000);
-    const starts = work.turns.map((t) => t.t);
-    const snap = (t) => starts.reduce((best, s) => (Math.abs(s - t) < Math.abs(best - t) ? s : best), starts[0]);
-    let chapters = (Array.isArray(out.chapters) ? out.chapters : [])
+  // Chapters are cut one hour of transcript at a time, so no single request grows with the length of the video.
+  const CHAPTER_SPEC =
+    `{"t":<這一章開始的秒數，必須是逐字稿裡某一行的秒數>,"en":"<原文語言的短標題>","zh":"<10 字內的中文標題，具體講在談什麼>",` +
+    `"sum":"<兩句話，75 字內，講者實際說了或做了什麼，帶具體的數字、名稱、做法>","take":"<一句 40 字內可帶走的原則；純閒聊、或內容本身沒有可帶走的道理就留空字串，不要硬湊>","worth":<1 到 3 的整數，3 是核心>}`;
+  const CHAPTER_RULES =
+    `- 依主題切章，一章只講一件事。20 分鐘以內的影片切 3 到 6 章；更長的影片每章大約 3 到 15 分鐘，任何一章都不要超過 15 分鐘，話題換了就切。\n` +
+    `- worth 看的是「這一章對讀者有多少可以帶走的東西」：3 是核心論點或可以直接照做的方法，2 是有用的補充，1 是開場、閒聊、致謝這類可以跳過的。3 分最多佔三分之一。\n` +
+    `- 講者是 "On screen" 的段落是畫面描述，照樣整理進章節。\n- ${STYLE}`;
+  const READER = `一位正在找 product-market fit 的一人創業者`;
+  const WINDOW = 3600;
+  const cleanChapters = (list, starts) => {
+    const snap = (t) => starts.reduce((best, x) => (Math.abs(x - t) < Math.abs(best - t) ? x : best), starts[0]);
+    return (Array.isArray(list) ? list : [])
       .map((c) => ({ t: snap(Number(c.t) || 0), en: String(c.en || ""), zh: String(c.zh || ""), sum: String(c.sum || ""), take: String(c.take || ""), worth: Math.min(3, Math.max(1, Math.round(Number(c.worth) || 1))) }))
-      .sort((x, y) => x.t - y.t)
-      .filter((c, i, arr) => i === 0 || c.t > arr[i - 1].t);
+      .sort((x, y) => x.t - y.t);
+  };
+  const finish = (meta, chapters) => {
+    const starts = work.turns.map((t) => t.t);
+    chapters = chapters.sort((x, y) => x.t - y.t).filter((c, i, arr) => i === 0 || c.t > arr[i - 1].t);
     if (!chapters.length) throw new Error("沒有產生章節，請重試。");
     chapters[0].t = starts[0];
     const segs = chapters.map((c, i) => {
@@ -239,11 +253,57 @@ export async function ingestStep(row, deps) {
       return { id: "c" + i, t: c.t, title: c.zh || c.en, deep: false, turns };
     });
     const content = {
-      vid: row.video_id, lang: String(out.lang || "en"), title: row.title || String(out.title || ""), channel: work.channel || "",
-      duration: work.duration, host: String(out.host || ""), thesis: String(out.thesis || ""),
-      tldr: (Array.isArray(out.tldr) ? out.tldr : []).map(String).slice(0, 3), chapters, segs, visuals: work.visuals,
+      vid: row.video_id, lang: String(meta.lang || "en"), title: row.title || String(meta.title || ""), channel: work.channel || "",
+      duration: work.duration, host: String(meta.host || ""), thesis: String(meta.thesis || ""),
+      tldr: (Array.isArray(meta.tldr) ? meta.tldr : []).map(String).slice(0, 3), chapters, segs, visuals: work.visuals,
     };
     return { status: "ready", title: content.title, content, work: { phase: "ready", channel: work.channel }, progress: { phase: "ready", done: 1, total: 1 }, error: null };
+  };
+  const META_SPEC =
+    `"lang":"<逐字稿語言的 BCP-47 代碼，例如 en、zh-TW、ja>","title":"<影片標題，看不出來就寫最貼切的一句>",` +
+    `"host":"<訪問者或主持人的 speaker 標籤，沒有就寫空字串>","thesis":"<一句話講完整支影片的主張，60 字內>","tldr":["<重點 1>","<重點 2>","<重點 3>"]`;
+
+  if (work.phase === "outline") {
+    const first = work.turns[0].t, last = work.turns[work.turns.length - 1].t;
+    const windows = Math.max(1, Math.ceil((last - first + 1) / WINDOW));
+    const visLines = (a, b) => { const v = work.visuals.filter((x) => x.t >= a && x.t < b); return v.length ? "\n\n畫面上出現、講者沒有唸出來的文字：\n" + v.map((x) => `[${x.t}] ${x.text}`).join("\n") : ""; };
+
+    if (windows === 1) {
+      const lines = work.turns.map((t) => `[${t.t}] ${t.speaker}: ${t.text}`).join("\n");
+      const prompt =
+        `下面是一支影片的完整逐字稿，每一行開頭的方括號是該段開始的秒數。請幫${READER}整理這支影片，讓他能很快判斷值不值得細看。\n\n` +
+        `輸出 JSON：\n{${META_SPEC},"chapters":[${CHAPTER_SPEC}]}\n\n規則：\n- 第一章從第一行的秒數開始。整支影片最重要的那一章一定要是 3。\n${CHAPTER_RULES}\n\n逐字稿：\n${lines}${visLines(0, Infinity)}`;
+      const out = await llmJSON(deps, prompt, 16000, SCHEMA.outline);
+      return finish(out, cleanChapters(out.chapters, work.turns.map((t) => t.t)));
+    }
+
+    const w = work.ow || 0, a = first + w * WINDOW, b = a + WINDOW;
+    const part = work.turns.filter((t) => t.t >= a && t.t < b);
+    if (part.length) {
+      const lines = part.map((t) => `[${t.t}] ${t.speaker}: ${t.text}`).join("\n");
+      const prompt =
+        `下面是一支長影片逐字稿的第 ${w + 1} 部分（共 ${windows} 部分），每一行開頭的方括號是該段開始的秒數。請幫${READER}把這一部分切成章節。\n\n` +
+        `輸出 JSON：{"chapters":[${CHAPTER_SPEC}]}\n\n規則：\n- 只整理這一部分的內容。第一章從這一部分第一行的秒數開始。\n${CHAPTER_RULES}\n\n逐字稿：\n${lines}${visLines(a, b)}`;
+      const out = await llmJSON(deps, prompt, 12000, SCHEMA.window);
+      work.chapters = (work.chapters || []).concat(cleanChapters(out.chapters, part.map((t) => t.t)));
+    }
+    work.ow = w + 1;
+    if (work.ow >= windows) work.phase = "synth";
+    return { status: "processing", work, progress: { phase: "outline", done: work.ow, total: windows } };
+  }
+
+  if (work.phase === "synth") {
+    const chapters = work.chapters || [];
+    const list = chapters.map((c, i) => `${i}. [${clock(c.t)}] ${c.zh}（${c.en}）：${c.sum}${c.take ? " → " + c.take : ""}`).join("\n");
+    const opening = work.turns.slice(0, 12).map((t) => `${t.speaker}: ${t.text}`).join("\n").slice(0, 3000);
+    const prompt =
+      `下面是一支長影片的章節清單（已經整理好），以及影片開頭的一小段逐字稿。請幫${READER}寫出整支影片的總覽。\n\n` +
+      `輸出 JSON：{${META_SPEC},"worth":[<依章節順序，每一章 1 到 3 的整數>]}\n\n` +
+      `規則：\n- thesis 和 tldr 要涵蓋整支影片，不要只講開頭。\n- worth 是把所有章節放在一起重新評：3 是整支影片的核心，最多佔三分之一；1 是可以跳過的。陣列長度必須是 ${chapters.length}。\n- ${STYLE}\n\n章節：\n${list}\n\n開頭逐字稿：\n${opening}`;
+    const out = await llmJSON(deps, prompt, 4000, SCHEMA.synth);
+    if (Array.isArray(out.worth) && out.worth.length === chapters.length)
+      chapters.forEach((c, i) => { c.worth = Math.min(3, Math.max(1, Math.round(Number(out.worth[i]) || c.worth))); });
+    return finish(out, chapters);
   }
 
   return {};
@@ -269,7 +329,7 @@ export async function deepenStep(row, k, deps) {
       `輸出 JSON：{"zh":["<第 1 句的翻譯>", ...]}，陣列長度必須剛好是 ${batch.length}，順序一一對應。\n` +
       `規則：忠於原意，讀起來像人講的中文；不要加原文沒有的內容，不要省略；產品名、人名、技術名詞保留原文；口語的贅字可以順掉。\n\n` +
       `這一章的主題：${seg.title}\n\n` + batch.map((x, i) => `${i + 1}. ${x.p[0]}`).join("\n");
-    const out = await llmJSON(deps, prompt, 12000);
+    const out = await llmJSON(deps, prompt, 12000, SCHEMA.translate);
     const zh = Array.isArray(out.zh) ? out.zh : [];
     if (zh.length !== batch.length) throw new Error("翻譯句數對不上（要 " + batch.length + " 句，拿到 " + zh.length + " 句），請重試。");
     batch.forEach((x, i) => { x.p[1] = String(zh[i] || "").trim() || x.p[0]; });
@@ -286,7 +346,7 @@ export async function deepenStep(row, k, deps) {
     `"ask":"<一個把這個原理換到讀者自己身上的問題>","key":[<最能代表這一章的 1 到 2 個句子編號，要相鄰>],` +
     `"counter":"<站在反方，指出這個結論最弱的一個環節或不適用的情況，用一個問題結尾，100 字內>"}\n\n` +
     `規則：\n- core 和 chain 要從前提一步步推到結論，每一步都能獨立成立，不要只是換句話重複摘要。\n- 照內容本身的道理寫。如果這一章跟創業或做產品無關（例如故事、動畫、純示範），就講它本身的道理，ask 也問一般性的問題，不要硬套到創業上。\n- ${STYLE}\n\n這一章的主題：${seg.title}\n\n${numbered}`;
-  const out = await llmJSON(deps, prompt, 6000);
+  const out = await llmJSON(deps, prompt, 6000, SCHEMA.analysis);
   const keyIdx = (Array.isArray(out.key) ? out.key : []).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < total).slice(0, 2);
   const key = (keyIdx.length ? keyIdx : [0]).map((n) => [flat[n].ti, flat[n].si]);
   Object.assign(seg, {

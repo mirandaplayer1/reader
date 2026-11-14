@@ -19,7 +19,9 @@ const fetchStub=async(url,opt)=>{calls++;
     // every third chunk answers with clip-relative times, to exercise the offset repair
     const rel=(a/300)%3===2;out={turns:turns.map(t=>({ts:mmss(rel?t.t-a:t.t),speaker:t.speaker,text:t.text})),visuals:[],reached_end:true}}
   else{const p=parts[0].text;
-    if(p.includes('"chapters"'))out={lang:'en',title:'x',host:'Lex Fridman',thesis:'主旨',tldr:['a','b','c'],chapters:[{t:0,en:'Intro',zh:'開場',sum:'s',take:'',worth:1},{t:125,en:'Philosophy',zh:'哲學',sum:'s',take:'t',worth:3},{t:9234,en:'Ship fast',zh:'快速上線',sum:'s',take:'t',worth:3}]};
+    if(p.includes('"worth":[<'))out={lang:'en',title:'x',host:'Lex Fridman',thesis:'主旨',tldr:['a','b','c'],worth:p.match(/^\d+\. \[/gm).map((_,i)=>i===1?3:1)};
+    else if(p.includes('"chapters"')&&p.includes('部分（共'))out={chapters:(()=>{const ts=[...p.matchAll(/^\[(\d+)\]/gm)].map(m=>+m[1]);return [{t:ts[0],en:'A',zh:'甲',sum:'s',take:'',worth:2},{t:ts[Math.floor(ts.length/2)],en:'B',zh:'乙',sum:'s',take:'t',worth:3}]})()};
+    else if(p.includes('"chapters"'))out={lang:'en',title:'x',host:'Lex Fridman',thesis:'主旨',tldr:['a','b','c'],chapters:[{t:0,en:'Intro',zh:'開場',sum:'s',take:'',worth:1},{t:125,en:'Philosophy',zh:'哲學',sum:'s',take:'t',worth:3},{t:9234,en:'Ship fast',zh:'快速上線',sum:'s',take:'t',worth:3}]};
     else if(p.includes('"zh":['))out={zh:p.split('\n').filter(l=>/^\d+\. /.test(l)).map(l=>'譯:'+l.slice(0,12))};
     else out={title:'標題',spark:'火花',sum:['1','2','3'],core:'核心',chain:['a','b','c','d'],ask:'問?',key:[3,4],counter:'反方?'}}
   return {ok:true,json:async()=>({candidates:[{content:{parts:[{text:'```json\n'+JSON.stringify(out)+'\n```'}]}}]})}};
@@ -28,7 +30,7 @@ let row={video_id:'oFtjKbXKqbg',url:'u',title:'',status:'queued',work:{},content
 while(row.status!=='ready'){row={...row,...await ingestStep(row,deps)};steps++;assert(steps<80,'runaway');assert(row.status!=='error',row.error)}
 const c=row.content;console.log('ingest ok: steps',steps,'chapters',c.chapters.length,'segs',c.segs.length,'turns',c.segs.reduce((a,g)=>a+g.turns.length,0),'duration',c.duration);
 const kept=c.segs.flatMap(g=>g.turns.flatMap(t=>t.s.map(p=>p[0]))).join(' ').replace(/\s+/g,' ');const want=[...real].sort((p,q)=>p.t-q.t).map(t=>t.text).join(' ').replace(/\s+/g,' ');assert(kept===want,'every word kept once, in order');assert(c.duration===13409,'duration from token count');
-assert(c.chapters[1].t===123,'chapter start snapped to a real turn');
+assert(c.chapters.length===8&&c.chapters[1].worth===3&&c.chapters[0].worth===1,'windowed outline: 4 windows x 2 chapters, re-rated');assert(c.thesis==='主旨','synth');
 let d=0,r;do{r=await deepenStep(row,1,deps);if(r.content)row.content=r.content;d++;assert(d<200,'runaway deepen')}while(!r.done);
 const g=row.content.segs[1];assert(g.deep&&g.turns.every(t=>t.s.every(p=>p[1])),'translated');assert(g.key.length===2&&g.chain.length===4,'analysis');
 console.log('deepen ok: calls',d,'sentences',g.turns.reduce((a,t)=>a+t.s.length,0),'key',JSON.stringify(g.key));
