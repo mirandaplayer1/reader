@@ -14,8 +14,8 @@ alter table public.reader_state enable row level security;
 drop policy if exists "own rows only" on public.reader_state;
 create policy "own rows only" on public.reader_state
   for all to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 -- One row per (user, video): processing status, intermediate work, and the finished content
 -- (chapters, transcript split into sentences, translations and analysis added chapter by chapter).
@@ -40,5 +40,5 @@ alter table public.videos enable row level security;
 drop policy if exists "own videos only" on public.videos;
 create policy "own videos only" on public.videos
   for all to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);

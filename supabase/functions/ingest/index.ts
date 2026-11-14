@@ -39,6 +39,14 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const summary = (r: any) => ({ video_id: r.video_id, title: r.title, status: r.status, progress: r.progress, error: r.error });
 
+    if (body.action === "diag") {
+      // Which Gemini models this key can use; helps pick GEMINI_VIDEO_MODEL without exposing the key.
+      const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": geminiKey } });
+      const j = await r.json().catch(() => ({}));
+      return json({ status: r.status, error: j.error?.message, videoModel: deps.videoModel, textModel: deps.textModel, claude: !!deps.anthropicKey,
+        models: (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m: any) => m.name) });
+    }
+
     if (body.action === "start") {
       const vid = parseVideoId(body.url);
       if (!vid) return json({ error: "這不是 YouTube 影片網址。" }, 400);
