@@ -187,63 +187,80 @@ details summary:hover{color:var(--ink)}
 .ncard .mine{font-weight:700} .ncard small{color:var(--mute);font-size:13.5px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-/* ---------- Colour system (60 / 30 / 10) ----------
-   60  neutral page: off-white and warm greys tinted toward the sand hue, so nothing is pure white or pure grey
-   30  one material: sand-oak #C0A169 (header, callouts, markers) and its light tint
-   10  one accent: indigo #3A4083 for anything you act on, with lavender #9390D7 for lines and selection.
-       Sand (~40deg) and indigo (~235deg) sit almost opposite on the wheel, so each makes the other look cleaner.
-   Highlights are a separate three-step scale at one lightness; they mean "you marked this" and are used for nothing else. */
+/* ---------- Colour system: Paris 2024 only ----------
+   Sources: the four swatches #F1ABC9 pink, #D9C47A gold, #2393CD blue, #102D69 navy, plus the track sampled from photos
+   (lavender #9390D7 / #A4ADE6, indigo ground #3A4083).
+   60  neutral page: near-white and greys tinted toward the lavender hue, navy-black text
+   30  the track: lavender tints for callouts, markers, lines, selection
+   10  indigo for anything you act on (header, buttons, cards); pink is the single thread of contrast, used sparingly
+   Highlights are their own three-step scale: gold, pink, blue at one lightness. */
 :root{
-  --bg:#FBFAF7; --surf:#FFFFFF; --surf2:#F4F1EA; --hover:rgba(70,55,25,.07); --ink:#2B2A27; --mute:#75726B; --line:rgba(70,55,25,.14);
-  --sand:#C0A169; --sand-d:#8A6E3C; --sand-l:#F3ECDC; --sand-ink:#2E2412;
-  --indigo:#3A4083; --lav:#9390D7; --lav-l:#ECEDFA;
-  --acc:var(--indigo); --grow:var(--indigo); --link:#4A4FB0; --warn:#A8552F; --on-acc:#FFFFFF;
-  --hl-y:#F6E9B8; --hl-p:#F6D9E4; --hl-g:#D3E9DB; --edge-y:#D9B93A; --edge-p:#DE8FB1; --edge-g:#62B287; --tag-y:var(--sand-l);
+  --bg:#FCFCFE; --surf:#FFFFFF; --surf2:#F3F3FA; --hover:rgba(32,39,98,.06); --ink:#1E2140; --mute:#5F627C; --line:rgba(32,39,98,.14);
+  --pink:#F1ABC9; --pink-d:#AD3D6B; --gold:#D9C47A; --blue:#2393CD; --navy:#102D69;
+  --indigo:#3A4083; --lav:#9390D7; --lav-2:#A4ADE6; --lav-l:#ECEDFA;
+  --acc:var(--indigo); --grow:var(--indigo); --link:#4A4FB0; --warn:var(--pink-d); --on-acc:#FFFFFF;
+  --hl-y:#F5EDCF; --hl-p:#FBE2EC; --hl-g:#D9ECF8; --edge-y:var(--gold); --edge-p:var(--pink); --edge-g:var(--blue);
+  --tag-y:var(--hl-y); --tag-g:#E6E7F2; --scrim:rgba(16,22,60,.42);
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#1C1B19; --surf:#232220; --surf2:#292724; --hover:rgba(255,240,210,.06); --ink:#ECE8DF; --mute:#A09B90; --line:rgba(255,240,210,.12);
-  --sand-l:#3A3222; --sand-d:#D8BC86; --lav-l:#2A2C4D;
-  --acc:#A4ADE6; --grow:#A4ADE6; --link:#A4ADE6; --warn:#E0926C; --on-acc:#15173A;
-  --hl-y:#4A411E; --hl-p:#4C2B3A; --hl-g:#21402F } }
+  --bg:#14152B; --surf:#1B1D38; --surf2:#212344; --hover:rgba(200,205,255,.07); --ink:#E8E9F6; --mute:#9EA1C0; --line:rgba(200,205,255,.14);
+  --pink-d:#F1ABC9; --lav-l:#2A2D58; --indigo:#4A51A3;
+  --acc:#A4ADE6; --grow:#A4ADE6; --link:#A4ADE6; --on-acc:#14152B;
+  --hl-y:#4A4322; --hl-p:#532A3D; --hl-g:#17405A; --tag-g:#2D3058; --scrim:rgba(0,0,0,.6) } }
 :root[data-theme="dark"]{
-  --bg:#1C1B19; --surf:#232220; --surf2:#292724; --hover:rgba(255,240,210,.06); --ink:#ECE8DF; --mute:#A09B90; --line:rgba(255,240,210,.12);
-  --sand-l:#3A3222; --sand-d:#D8BC86; --lav-l:#2A2C4D;
-  --acc:#A4ADE6; --grow:#A4ADE6; --link:#A4ADE6; --warn:#E0926C; --on-acc:#15173A;
-  --hl-y:#4A411E; --hl-p:#4C2B3A; --hl-g:#21402F }
+  --bg:#14152B; --surf:#1B1D38; --surf2:#212344; --hover:rgba(200,205,255,.07); --ink:#E8E9F6; --mute:#9EA1C0; --line:rgba(200,205,255,.14);
+  --pink-d:#F1ABC9; --lav-l:#2A2D58; --indigo:#4A51A3;
+  --acc:#A4ADE6; --grow:#A4ADE6; --link:#A4ADE6; --on-acc:#14152B;
+  --hl-y:#4A4322; --hl-p:#532A3D; --hl-g:#17405A; --tag-g:#2D3058; --scrim:rgba(0,0,0,.6) }
 
-/* 30: sand */
-.top{border-bottom:0;background:#3A4083;color:#fff}
-.top .vt{color:rgba(255,255,255,.82)} .top .sync,.top .sync.link,.top .sync.warn{color:#fff}
-.pips i{background:rgba(255,255,255,.3)} .pips i.on{background:var(--sand)}
+/* header */
+.top{border-bottom:0;background:var(--indigo);color:#fff}
+.top .vt{color:rgba(255,255,255,.84)} .top .sync,.top .sync.link,.top .sync.warn{color:#fff}
+.pips i{background:rgba(255,255,255,.3)} .pips i.on{background:var(--pink)}
+
+/* 30: lavender track */
 .rin{counter-reset:seg}
 .a-seg{counter-increment:seg}
 .a-seg>header i{display:flex;align-items:center;gap:8px}
-.a-seg>header i::before{content:counter(seg);display:grid;place-items:center;width:26px;height:26px;border-radius:5px;background:var(--sand);color:var(--sand-ink);font-weight:700;font-size:15px}
-.a-seg .absorb{background:var(--sand-l)}
-.a-seg .chain li::before{color:var(--sand-d);font-weight:700}
-.thesis{border-left:5px solid var(--sand);padding-left:16px}
-.w.w3{background:var(--sand-l)}
-.vcard .tag{background:var(--sand);color:var(--sand-ink)}
-
-/* 10: indigo and lavender */
-.a-seg .turn.now{border-left-color:var(--lav)}
-.tlink:hover,details summary:hover{color:var(--link)}
+.a-seg>header i::before{content:counter(seg);display:grid;place-items:center;width:26px;height:26px;border-radius:5px;background:var(--lav-2);color:#102D69;font-weight:700;font-size:15px}
+.a-seg .absorb{background:var(--lav-l)}
+.a-seg .chain li::before{color:var(--link);font-weight:700}
 .s.on{box-shadow:0 2px 0 var(--lav)} .s.has-note::after{color:var(--link)}
+.dmap path{stroke:var(--lav);opacity:.9}
+.claim{box-shadow:inset 0 0 0 1px var(--lav)} .claim.lv2{box-shadow:inset 0 0 0 2px var(--lav)} .claim.lv3{background:var(--lav-l);box-shadow:inset 0 0 0 2px var(--acc);color:var(--ink)}
+.spark.used{box-shadow:inset 0 0 0 1px var(--lav)}
+.spark:not([data-hl="y"]):not([data-hl="p"]):not([data-hl="g"]){border-left-color:var(--lav)}
+.spark.pick,.linked [aria-pressed="true"]{background:var(--lav-l);color:var(--ink)} .spark.pick small{color:var(--mute)}
+textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mix(in srgb,var(--lav) 28%,transparent)}
+.w.w3{background:var(--hl-y)}
+
+/* 10: indigo actions, pink thread */
+.btn{background:var(--indigo);color:#fff}
+.btn.ghost,.btn.line{background:none;color:var(--ink)}
+.banner .btn{background:#fff;color:var(--navy)}
+.tlink:hover,details summary:hover{color:var(--link)}
 .tabs button[aria-pressed="true"]{color:var(--acc);box-shadow:inset 0 3px 0 var(--acc)}
 .steps span.on{color:var(--acc)}
 .hl-row button[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--acc)}
-textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mix(in srgb,var(--lav) 28%,transparent)}
-.dmap path{stroke:var(--lav);opacity:.9}
-.claim{box-shadow:inset 0 0 0 1px var(--lav)} .claim.lv2{box-shadow:inset 0 0 0 2px var(--lav)} .claim.lv3{background:var(--lav-l);box-shadow:inset 0 0 0 2px var(--indigo);color:var(--ink)}
+.thesis{border-left:5px solid var(--pink);padding-left:16px}
+.a-seg .turn.now{border-left-color:var(--pink)}
 .claim.carded{background:var(--indigo);color:#fff;box-shadow:none}
-.spark.used{box-shadow:inset 0 0 0 1px var(--lav)}
-.spark:not([data-hl="y"]):not([data-hl="p"]):not([data-hl="g"]){border-left-color:var(--lav)}
-.spark.pick,.linked [aria-pressed="true"]{background:var(--lav-l)}
 .vcard{background:var(--indigo);color:#fff;box-shadow:none}
-.vcard .ev{color:rgba(255,255,255,.84);border-left-color:var(--sand)}
-.vcard .tlink{color:rgba(255,255,255,.84);text-decoration-color:rgba(255,255,255,.4)} .vcard .tlink:hover{color:#fff}
-.vcard button{color:rgba(255,255,255,.75)} .vcard button:hover{color:#fff}
-.banner,#toast{background:var(--indigo);color:#fff}
+.vcard .ev{color:rgba(255,255,255,.86);border-left-color:var(--pink)}
+.vcard .tlink{color:rgba(255,255,255,.86);text-decoration-color:rgba(255,255,255,.4)} .vcard .tlink:hover{color:#fff}
+.vcard .tag{background:var(--gold);color:var(--navy)}
+.vcard button{color:rgba(255,255,255,.78)} .vcard button:hover{color:#fff}
+.banner,#toast{background:var(--navy);color:#fff}
+
+/* wide screens: the tab row sits above the right column only */
+@media (min-width:980px){
+  #root{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,520px);grid-template-rows:auto auto minmax(0,1fr)}
+  .top{grid-column:1/-1}
+  .panes{display:contents}
+  .pane.read{grid-column:1;grid-row:2/4}
+  .tabs{grid-column:2;grid-row:2;width:auto;align-self:auto}
+  .pane.side{grid-column:2;grid-row:3;max-width:none}
+}
 
 </style>
 
