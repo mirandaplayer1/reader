@@ -258,3 +258,26 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
   .tabs{grid-column:2;grid-row:2;width:auto;align-self:auto}
   .pane.side{grid-column:2;grid-row:3;max-width:none}
 }
+
+/* home / library */
+#home{display:none}
+#root[data-view="home"] #home{display:block}
+#root[data-view="home"] .panes,#root[data-view="home"] .tabs,#root[data-view="home"] .pips{display:none}
+.top h1 button{font:inherit;color:inherit}
+.home{max-width:720px;margin:0 auto}
+.add{display:flex;gap:8px} .add input{flex:1;min-width:0;width:auto;border:1px solid var(--line);background:var(--surf);border-radius:6px;padding:11px 14px;font-size:17px}
+.add input:disabled{opacity:.55}
+.lib{display:grid;gap:10px}
+.item{display:flex;gap:14px;align-items:center;text-align:left;padding:10px;border-radius:8px;box-shadow:inset 0 0 0 1px var(--line);background:var(--surf);width:100%}
+.item:hover{background:var(--surf2)}
+.item img{width:112px;aspect-ratio:16/9;object-fit:cover;border-radius:5px;flex:none;background:var(--surf2)}
+.item span{min-width:0;display:grid;gap:3px}
+.item b{font-size:17px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.item small{font-size:14.5px;color:var(--mute);line-height:1.5} .item small.err{color:var(--warn)}
+.item em{font-style:normal;font-size:14px;color:var(--link);text-decoration:underline;text-underline-offset:3px}
+/* chapters that have a transcript but no translation yet */
+.segtools{margin:6px 0 4px}
+.a-seg.raw .turn .zh{display:none} .a-seg.raw .turn .en{color:var(--ink);margin-top:0}
+.mono .turn .en,.mono .rbar .seg3{display:none}
+@media (min-width:980px){ #home{grid-column:1/-1;grid-row:2/4} }
+#toast{max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis}

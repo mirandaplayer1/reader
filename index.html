@@ -262,19 +262,43 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
   .pane.side{grid-column:2;grid-row:3;max-width:none}
 }
 
+/* home / library */
+#home{display:none}
+#root[data-view="home"] #home{display:block}
+#root[data-view="home"] .panes,#root[data-view="home"] .tabs,#root[data-view="home"] .pips{display:none}
+.top h1 button{font:inherit;color:inherit}
+.home{max-width:720px;margin:0 auto}
+.add{display:flex;gap:8px} .add input{flex:1;min-width:0;width:auto;border:1px solid var(--line);background:var(--surf);border-radius:6px;padding:11px 14px;font-size:17px}
+.add input:disabled{opacity:.55}
+.lib{display:grid;gap:10px}
+.item{display:flex;gap:14px;align-items:center;text-align:left;padding:10px;border-radius:8px;box-shadow:inset 0 0 0 1px var(--line);background:var(--surf);width:100%}
+.item:hover{background:var(--surf2)}
+.item img{width:112px;aspect-ratio:16/9;object-fit:cover;border-radius:5px;flex:none;background:var(--surf2)}
+.item span{min-width:0;display:grid;gap:3px}
+.item b{font-size:17px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.item small{font-size:14.5px;color:var(--mute);line-height:1.5} .item small.err{color:var(--warn)}
+.item em{font-style:normal;font-size:14px;color:var(--link);text-decoration:underline;text-underline-offset:3px}
+/* chapters that have a transcript but no translation yet */
+.segtools{margin:6px 0 4px}
+.a-seg.raw .turn .zh{display:none} .a-seg.raw .turn .en{color:var(--ink);margin-top:0}
+.mono .turn .en,.mono .rbar .seg3{display:none}
+@media (min-width:980px){ #home{grid-column:1/-1;grid-row:2/4} }
+#toast{max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis}
+
 </style>
 
-<div id="root" data-m="side">
+<div id="root" data-m="side" data-view="home">
   <header class="top">
-    <h1>Reader</h1>
-    <span class="vt">Pieter Levels · Lex Fridman #440</span>
+    <h1><button id="gohome" aria-label="回到我的影片">Reader</button></h1>
+    <span class="vt" id="vt"></span>
     <span class="pips" id="pips" title="內化進度"></span>
     <button class="sync" id="sync">僅存在這台裝置</button>
   </header>
+  <div class="scroll" id="home"></div>
   <div class="panes">
     <section class="pane read">
       <div class="player"><div id="yt"></div>
-        <a class="pfall" id="pfall" target="_blank" rel="noopener"><img alt="" id="pthumb"><span><b>在 YouTube 開啟影片 ↗</b><small id="pfmsg">影片載入中…</small></span></a>
+        <a class="pfall" id="pfall" target="_blank" rel="noopener"><img alt="" id="pthumb" onerror="this.hidden=true"><span><b>在 YouTube 開啟影片 ↗</b><small id="pfmsg">影片載入中…</small></span></a>
       </div>
       <div class="rbar"><div class="seg3" role="group" aria-label="顯示語言"><button data-mode="zh">中</button><button data-mode="both">中英</button><button data-mode="en">EN</button></div><span class="sp" style="flex:1"></span><button class="mini" id="pmin">收起影片</button></div>
       <div class="scroll" id="rscroll"></div>
@@ -286,9 +310,9 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
 <div id="scrim" hidden></div><div id="sheet" hidden></div><div id="toast" hidden></div>
 
 <script>
-const VID="oFtjKbXKqbg";
+let VID="";
 const THUMB="data:image/jpeg;base64,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";
-const SEGS=[
+const DEMO_SEGS=[
 {id:"s1",t:123,title:"先收錢，再相信",spark:"有人掏信用卡，才算驗證",
  turns:[
  {sp:"L",t:123,s:[["You’ve launched a lot of companies and built a lot of products.","你推出過很多公司、做過很多產品。"],["As you say, most failed, but some succeeded.","就像你說的，大部分失敗了，但有些成功。"],["What’s your philosophy behind building the startups that you did?","你做這些新創，背後的哲學是什麼？"]]},
@@ -348,10 +372,13 @@ const SEGS=[
  counter:"「壞了再修」只在錯誤可逆時成立。金流算錯、資料外洩、寄錯信給所有用戶，這些兩分鐘修不回來。你的產品裡，哪些地方不可逆，值得慢下來？"}
 ];
 
-const CH=[{"t": 0, "en": "Introduction", "zh": "開場與來賓介紹", "sum": "Lex 介紹 Pieter 獨自做過 40 多個產品，旅居 40 多國。技術只用 HTML、jQuery、PHP、SQLite。", "take": "", "worth": 1}, {"t": 123, "en": "Startup philosophy", "zh": "不募資快速驗證", "sum": "他不拿 VC，設計、程式、logo 全自己做，點子約兩週內上線。有人掏信用卡付錢才算驗證，多數點子失敗。", "take": "用付款驗證需求，光有註冊不算。", "worth": 3}, {"t": 574, "en": "Low points", "zh": "27 歲的低潮", "sum": "27 歲時他獨自在亞洲旅館，月收入掉到約 500 美元。照父親「去鏟沙」的建議，開始每月做一個附 Stripe 付款的產品。", "take": "低潮時先動手做事，給自己一個每天能推進的目標。", "worth": 2}, {"t": 783, "en": "12 startups in 12 months", "zh": "一年做12個產品", "sum": "他每月公開上線一個產品，第一個 Play My Inbox 有數萬人用但沒收費。30 天內最難的是決定哪些功能不做。", "take": "期限內只做產品、付款、著陸頁，登入這類先用陽春版。", "worth": 3}, {"t": 1195, "en": "Travelling and depression", "zh": "旅居的孤獨焦慮", "sum": "他在清邁月租 150 美元起步，獨自旅行卻越來越焦慮，體會到限制比自由讓人快樂。因為孤單才做了 Nomad List。", "take": "自己的痛點可以直接變成產品，他用社群網站解決孤單。", "worth": 1}, {"t": 1954, "en": "Indie hacking", "zh": "點子從哪來", "sum": "他把日常裡煩人的問題列成清單，各配一個解法，挑做得出來的動手。旅行時也會看到別國已有、本國還沒有的服務。", "take": "從自己遇到的問題出發，拿技術找問題通常行不通。", "worth": 3}, {"t": 2197, "en": "Photo AI", "zh": "Photo AI起源", "sum": "Avatar AI 一週約賺 15 萬美元，後來轉成 Photo AI。初版只有 Stripe 付款連結加 Typeform，前幾百單手動處理。", "take": "先用付款連結加表單手動交付，有人買再寫程式自動化。", "worth": 3}, {"t": 4373, "en": "How to learn AI", "zh": "跟上AI與A/B測試", "sum": "他靠 X 上的 AI 圈帳號追新東西，再到 Replicate 試模型。Photo AI 拿 10% 用戶隨機測參數，看收藏與下載決定採用哪組。", "take": "有流量後讓用戶行為替你選參數，並在註冊時告知。", "worth": 2}, {"t": 4890, "en": "Robots", "zh": "機器人與順流而行", "sum": "他認為機器狗和 Vision Pro 目前是找問題的解法，人生則像衝浪別硬控制。Nomad List 最初只是一份公開可編輯的 Google 試算表。", "take": "用已經會的工具先驗證市場，程式之後可以重寫。", "worth": 2}, {"t": 5387, "en": "Hoodmaps", "zh": "群眾標註城市地圖", "sum": "Hoodmaps 讓人在地圖上塗色標出觀光、文青等區，每格取最多人選的顏色。它從沒賺錢，還收過 2 萬美元地圖帳單。", "take": "收費會趕走絕大多數用戶，靠群眾資料的產品要另找收入。", "worth": 3}, {"t": 6832, "en": "Learning new programming languages", "zh": "邊做邊學", "sum": "他學東西就是直接做，問 Google 或 ChatGPT，只看下一個要解的問題。別人拍的一支 TikTok 曾讓他每月多賺 2 萬美元。", "take": "只盯下一個小問題，獲客先靠短影音與貼文的自然流量。", "worth": 2}, {"t": 7404, "en": "Monetize your website", "zh": "一開始就收費", "sum": "他不做免費方案，免費用戶很少轉換還會濫用。每位用戶至少收 30 美元，1,000 人就是月入 3 萬；他也寫信向供應商要折扣。", "take": "第一天就收錢，定價要高到少量用戶也能養活你。", "worth": 3}, {"t": 7799, "en": "Fighting SPAM", "zh": "用GPT-4o擋垃圾", "sum": "Nomad List 的匿名城市評論交給 GPT-4o 判斷是否冒犯，被拒的會傳到他的 Telegram。1 萬人的聊天社群也由它取代人類版主。", "take": "審核這類主觀判斷的工作，可以交給 LLM 處理。", "worth": 2}, {"t": 8013, "en": "Automation", "zh": "全自動營運", "sum": "他不請人，聚會的發推與私訊全由程式處理，網站靠一堆 cron job 運作。UptimeRobot 每分鐘查健康檢查頁，出錯就發 Telegram。", "take": "重複的營運工作寫成腳本，加上監控，只在出錯時通知你。", "worth": 2}, {"t": 8698, "en": "When to sell startup", "zh": "為什麼不賣公司", "sum": "他從沒賣過公司，買家常拖 6 到 12 個月再壓價。產品利潤率 90% 且全自動，行情只有 3 到 5 倍，他寧可自己等三年。", "take": "高利潤又自動化的產品，繼續持有常比低倍數出售划算。", "worth": 1}, {"t": 8872, "en": "Coding solo", "zh": "為何獨自寫程式", "sum": "他不信任別人的產出，也認為開會妥協只會得到平庸結果。想把 jQuery 全改寫成 Vue.js 的開發者，合作一週就結束。", "take": "由一個人決定並動手寫，省掉共識會議。", "worth": 2}, {"t": 9234, "en": "Ship fast", "zh": "直接部署正式站", "sum": "他不設測試環境，改完推上 GitHub，一兩秒後就在正式站，一年約 37,000 次 commit。用戶回報的 bug 他計時約兩分鐘修好。", "take": "小步修改立刻上線，修 bug 的速度會讓用戶很開心。", "worth": 3}, {"t": 9758, "en": "Best IDE for programming", "zh": "編輯器與框架", "sum": "他從 Sublime Text 換到 VS Code，認為工具不重要，用熟就快。React 還沒學，他把時間排給經營產品與學 AI。", "take": "工具用熟的就好，時間留給產品與影響大的新技術。", "worth": 1}, {"t": 10329, "en": "Andrej Karpathy", "zh": "Mac與沙發工作", "sum": "他誇 Karpathy 能不用術語講懂 LLM。自己 2014 年換 Mac，現在只用一台 16 吋 MacBook 在沙發上寫程式，對更多設備存疑。", "take": "設備變多可能拖慢你，一台筆電也能高產出。", "worth": 1}, {"t": 10894, "en": "Productivity", "zh": "高產出的一天", "sum": "他凌晨 2 點睡、10 點起，做新東西需要整段不被打擾的時間。Remote OK 靠徵才貼文加購，2021 年高峰月入 14 萬美元。", "take": "維護可以零碎做，做新產品要留整段獨處時間。", "worth": 2}, {"t": 11721, "en": "Minimalism", "zh": "只留一個背包", "sum": "他跟風 100 Things Challenge，把電腦和 Canon 5D 上 eBay 賣掉，最後剩約 50 件。他說新東西帶來的快樂只維持兩週。", "take": "東西少，換城市的負擔就小。", "worth": 1}, {"t": 12247, "en": "Emails", "zh": "關掉私訊", "sum": "私訊太多他乾脆關掉。他觀察到需要人推的人通常做不成，好友 Andre 是自己動手學才開了公司；到處發訊息問人多半是拖延。", "take": "少問前輩怎麼做，直接開始並模仿他們的方法。", "worth": 1}, {"t": 12680, "en": "Coffee", "zh": "咖啡館與歐洲創業", "sum": "他說咖啡館是做產品的第三空間，歐洲許多店卻禁用筆電。他引數據：歐洲頂尖企業 80% 創於 1950 年前，美國 36%。", "take": "", "worth": 1}, {"t": 13145, "en": "E/acc", "zh": "E/acc 與歐洲", "sum": "他支持 e/acc，認為它對未來提出樂觀看法，科技能解決很多問題。他自己做了歐洲版 EU/acc，還出了帽 T 和藍色帽子。", "take": "", "worth": 1}, {"t": 13281, "en": "Advice for young people", "zh": "給年輕人的建議", "sum": "他建議別聽任何人的，照自己想的做，初期多半不順，他自己也經歷過很糟的時期。要做就全力投入，半吊子不會成功。", "take": "社會容得下各做各的小生意，選了就全力做。", "worth": 1}];
 const CFG={"supabaseUrl": "", "supabaseAnonKey": ""};
-const THESIS="一個人不募資，靠很多次兩週就上線的小實驗，找出有人願意付錢的那一個，再用自動化讓它不必變成一家公司。";
-const TLDR=["驗證的標準是陌生人付錢。他的流程是 idea、build、launch、grow、monetize、automate、exit，每一步都求最短。","多數點子會失敗，所以他提高嘗試次數：一年做 12 個產品，每個限期一個月，而且公開做。","技術選自己最熟、最簡單的（PHP、jQuery、SQLite），重複的工作交給自動化，維持一個人做得完的規模。"];
+/* The built-in sample. Videos you add are stored in the same shape. */
+const DEMO={vid:"oFtjKbXKqbg",demo:true,lang:"en",title:"Pieter Levels: Programming, Viral AI Startups, and Digital Nomad Life",channel:"Lex Fridman Podcast #440",duration:13440,host:"L",speakers:{L:"Lex Fridman",P:"Pieter Levels"},
+  thesis:"一個人不募資，靠很多次兩週就上線的小實驗，找出有人願意付錢的那一個，再用自動化讓它不必變成一家公司。",
+  tldr:["驗證的標準是陌生人付錢。他的流程是 idea、build、launch、grow、monetize、automate、exit，每一步都求最短。","多數點子會失敗，所以他提高嘗試次數：一年做 12 個產品，每個限期一個月，而且公開做。","技術選自己最熟、最簡單的（PHP、jQuery、SQLite），重複的工作交給自動化，維持一個人做得完的規模。"],
+  chapters:[{"t": 0, "en": "Introduction", "zh": "開場與來賓介紹", "sum": "Lex 介紹 Pieter 獨自做過 40 多個產品，旅居 40 多國。技術只用 HTML、jQuery、PHP、SQLite。", "take": "", "worth": 1}, {"t": 123, "en": "Startup philosophy", "zh": "不募資快速驗證", "sum": "他不拿 VC，設計、程式、logo 全自己做，點子約兩週內上線。有人掏信用卡付錢才算驗證，多數點子失敗。", "take": "用付款驗證需求，光有註冊不算。", "worth": 3}, {"t": 574, "en": "Low points", "zh": "27 歲的低潮", "sum": "27 歲時他獨自在亞洲旅館，月收入掉到約 500 美元。照父親「去鏟沙」的建議，開始每月做一個附 Stripe 付款的產品。", "take": "低潮時先動手做事，給自己一個每天能推進的目標。", "worth": 2}, {"t": 783, "en": "12 startups in 12 months", "zh": "一年做12個產品", "sum": "他每月公開上線一個產品，第一個 Play My Inbox 有數萬人用但沒收費。30 天內最難的是決定哪些功能不做。", "take": "期限內只做產品、付款、著陸頁，登入這類先用陽春版。", "worth": 3}, {"t": 1195, "en": "Travelling and depression", "zh": "旅居的孤獨焦慮", "sum": "他在清邁月租 150 美元起步，獨自旅行卻越來越焦慮，體會到限制比自由讓人快樂。因為孤單才做了 Nomad List。", "take": "自己的痛點可以直接變成產品，他用社群網站解決孤單。", "worth": 1}, {"t": 1954, "en": "Indie hacking", "zh": "點子從哪來", "sum": "他把日常裡煩人的問題列成清單，各配一個解法，挑做得出來的動手。旅行時也會看到別國已有、本國還沒有的服務。", "take": "從自己遇到的問題出發，拿技術找問題通常行不通。", "worth": 3}, {"t": 2197, "en": "Photo AI", "zh": "Photo AI起源", "sum": "Avatar AI 一週約賺 15 萬美元，後來轉成 Photo AI。初版只有 Stripe 付款連結加 Typeform，前幾百單手動處理。", "take": "先用付款連結加表單手動交付，有人買再寫程式自動化。", "worth": 3}, {"t": 4373, "en": "How to learn AI", "zh": "跟上AI與A/B測試", "sum": "他靠 X 上的 AI 圈帳號追新東西，再到 Replicate 試模型。Photo AI 拿 10% 用戶隨機測參數，看收藏與下載決定採用哪組。", "take": "有流量後讓用戶行為替你選參數，並在註冊時告知。", "worth": 2}, {"t": 4890, "en": "Robots", "zh": "機器人與順流而行", "sum": "他認為機器狗和 Vision Pro 目前是找問題的解法，人生則像衝浪別硬控制。Nomad List 最初只是一份公開可編輯的 Google 試算表。", "take": "用已經會的工具先驗證市場，程式之後可以重寫。", "worth": 2}, {"t": 5387, "en": "Hoodmaps", "zh": "群眾標註城市地圖", "sum": "Hoodmaps 讓人在地圖上塗色標出觀光、文青等區，每格取最多人選的顏色。它從沒賺錢，還收過 2 萬美元地圖帳單。", "take": "收費會趕走絕大多數用戶，靠群眾資料的產品要另找收入。", "worth": 3}, {"t": 6832, "en": "Learning new programming languages", "zh": "邊做邊學", "sum": "他學東西就是直接做，問 Google 或 ChatGPT，只看下一個要解的問題。別人拍的一支 TikTok 曾讓他每月多賺 2 萬美元。", "take": "只盯下一個小問題，獲客先靠短影音與貼文的自然流量。", "worth": 2}, {"t": 7404, "en": "Monetize your website", "zh": "一開始就收費", "sum": "他不做免費方案，免費用戶很少轉換還會濫用。每位用戶至少收 30 美元，1,000 人就是月入 3 萬；他也寫信向供應商要折扣。", "take": "第一天就收錢，定價要高到少量用戶也能養活你。", "worth": 3}, {"t": 7799, "en": "Fighting SPAM", "zh": "用GPT-4o擋垃圾", "sum": "Nomad List 的匿名城市評論交給 GPT-4o 判斷是否冒犯，被拒的會傳到他的 Telegram。1 萬人的聊天社群也由它取代人類版主。", "take": "審核這類主觀判斷的工作，可以交給 LLM 處理。", "worth": 2}, {"t": 8013, "en": "Automation", "zh": "全自動營運", "sum": "他不請人，聚會的發推與私訊全由程式處理，網站靠一堆 cron job 運作。UptimeRobot 每分鐘查健康檢查頁，出錯就發 Telegram。", "take": "重複的營運工作寫成腳本，加上監控，只在出錯時通知你。", "worth": 2}, {"t": 8698, "en": "When to sell startup", "zh": "為什麼不賣公司", "sum": "他從沒賣過公司，買家常拖 6 到 12 個月再壓價。產品利潤率 90% 且全自動，行情只有 3 到 5 倍，他寧可自己等三年。", "take": "高利潤又自動化的產品，繼續持有常比低倍數出售划算。", "worth": 1}, {"t": 8872, "en": "Coding solo", "zh": "為何獨自寫程式", "sum": "他不信任別人的產出，也認為開會妥協只會得到平庸結果。想把 jQuery 全改寫成 Vue.js 的開發者，合作一週就結束。", "take": "由一個人決定並動手寫，省掉共識會議。", "worth": 2}, {"t": 9234, "en": "Ship fast", "zh": "直接部署正式站", "sum": "他不設測試環境，改完推上 GitHub，一兩秒後就在正式站，一年約 37,000 次 commit。用戶回報的 bug 他計時約兩分鐘修好。", "take": "小步修改立刻上線，修 bug 的速度會讓用戶很開心。", "worth": 3}, {"t": 9758, "en": "Best IDE for programming", "zh": "編輯器與框架", "sum": "他從 Sublime Text 換到 VS Code，認為工具不重要，用熟就快。React 還沒學，他把時間排給經營產品與學 AI。", "take": "工具用熟的就好，時間留給產品與影響大的新技術。", "worth": 1}, {"t": 10329, "en": "Andrej Karpathy", "zh": "Mac與沙發工作", "sum": "他誇 Karpathy 能不用術語講懂 LLM。自己 2014 年換 Mac，現在只用一台 16 吋 MacBook 在沙發上寫程式，對更多設備存疑。", "take": "設備變多可能拖慢你，一台筆電也能高產出。", "worth": 1}, {"t": 10894, "en": "Productivity", "zh": "高產出的一天", "sum": "他凌晨 2 點睡、10 點起，做新東西需要整段不被打擾的時間。Remote OK 靠徵才貼文加購，2021 年高峰月入 14 萬美元。", "take": "維護可以零碎做，做新產品要留整段獨處時間。", "worth": 2}, {"t": 11721, "en": "Minimalism", "zh": "只留一個背包", "sum": "他跟風 100 Things Challenge，把電腦和 Canon 5D 上 eBay 賣掉，最後剩約 50 件。他說新東西帶來的快樂只維持兩週。", "take": "東西少，換城市的負擔就小。", "worth": 1}, {"t": 12247, "en": "Emails", "zh": "關掉私訊", "sum": "私訊太多他乾脆關掉。他觀察到需要人推的人通常做不成，好友 Andre 是自己動手學才開了公司；到處發訊息問人多半是拖延。", "take": "少問前輩怎麼做，直接開始並模仿他們的方法。", "worth": 1}, {"t": 12680, "en": "Coffee", "zh": "咖啡館與歐洲創業", "sum": "他說咖啡館是做產品的第三空間，歐洲許多店卻禁用筆電。他引數據：歐洲頂尖企業 80% 創於 1950 年前，美國 36%。", "take": "", "worth": 1}, {"t": 13145, "en": "E/acc", "zh": "E/acc 與歐洲", "sum": "他支持 e/acc，認為它對未來提出樂觀看法，科技能解決很多問題。他自己做了歐洲版 EU/acc，還出了帽 T 和藍色帽子。", "take": "", "worth": 1}, {"t": 13281, "en": "Advice for young people", "zh": "給年輕人的建議", "sum": "他建議別聽任何人的，照自己想的做，初期多半不順，他自己也經歷過很糟的時期。要做就全力投入，半吊子不會成功。", "take": "社會容得下各做各的小生意，選了就全力做。", "worth": 1}],segs:DEMO_SEGS};
+let V=null,SEGS=[],CH=[],THESIS="",TLDR=[];
 const MAXC=3;
 
 /* ---------- helpers ---------- */
@@ -359,12 +386,17 @@ const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelect
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmt=t=>{const h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=String(Math.floor(t%60)).padStart(2,"0");return h?`${h}:${String(m).padStart(2,"0")}:${s}`:`${m}:${s}`};
 const yt=t=>`https://www.youtube.com/watch?v=${VID}&t=${t}s`;
+const fmtDur=t=>{const h=Math.floor(t/3600),m=Math.round(t%3600/60);return (h?h+" 小時 ":"")+m+" 分"};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const tlink=(t,label)=>`<a class="tlink" data-t="${t}" href="${yt(t)}" target="_blank" rel="noopener">${label||fmt(t)}</a>`;
-const SENT={},TURNS=[];
-SEGS.forEach(g=>g.turns.forEach((tu,ti)=>{TURNS.push({t:tu.t,id:`${g.id}-${ti}`});tu.s.forEach((p,si)=>{if(p)SENT[`${g.id}-${ti}-${si}`]={en:p[0],zh:p[1],t:tu.t,seg:g,turn:tu}})}));
-TURNS.sort((a,b)=>a.t-b.t);
-const keyIds=g=>g.key.map(([a,b])=>`${g.id}-${a}-${b}`);
-const root=$("#root"),sheetEl=$("#sheet"),scrimEl=$("#scrim"),toastEl=$("#toast"),side=$("#side"),rscroll=$("#rscroll");
+let SENT={},TURNS=[];
+function indexContent(){SENT={};TURNS=[];
+  SEGS.forEach(g=>g.turns.forEach((tu,ti)=>{TURNS.push({t:tu.t,id:`${g.id}-${ti}`});tu.s.forEach((p,si)=>{if(p)SENT[`${g.id}-${ti}-${si}`]={en:p[0],zh:p[1]||p[0],t:tu.t,seg:g,turn:tu}})}));
+  TURNS.sort((a,b)=>a.t-b.t)}
+const isDeep=g=>g.deep!==false;
+const keyIds=g=>(g.key||[]).map(([a,b])=>`${g.id}-${a}-${b}`).filter(id=>SENT[id]);
+const who=tu=>(V.speakers&&V.speakers[tu.sp])||tu.sp;
+const root=$("#root"),homeEl=$("#home"),sheetEl=$("#sheet"),scrimEl=$("#scrim"),toastEl=$("#toast"),side=$("#side"),rscroll=$("#rscroll");
 let onSheetClose=null;
 function openSheet(html,onClose){sheetEl.innerHTML=html;sheetEl.hidden=false;scrimEl.hidden=false;sheetEl.scrollTop=0;onSheetClose=onClose||null}
 function closeSheet(){if(sheetEl.hidden)return;sheetEl.hidden=true;scrimEl.hidden=true;const f=onSheetClose;onSheetClose=null;f&&f()}
@@ -373,25 +405,26 @@ let toastT;function toast(m){toastEl.textContent=m;toastEl.hidden=false;clearTim
 async function copyText(ta){try{await navigator.clipboard.writeText(ta.value);toast("已複製")}catch(e){ta.focus();ta.select();toast("已全選，請手動複製")}}
 
 /* ---------- state: local first, cloud when available ---------- */
-const LS="rd4:"+VID;
+let LS="";
 const blank=()=>({hl:{},notes:{},refl:{},claims:[],cards:[],mode:"both",at:0});
-let S=blank();try{Object.assign(S,JSON.parse(localStorage.getItem(LS))||{})}catch(e){}
-const ui={side:"overview",m:"side",coreOnly:false,linkTo:null,fresh:null};
-let cloud=null,sb=null,sbUser=null,pushT=null,remoteWaiting=false;
+let S=blank();
+function loadState(){LS="rd4:"+VID;S=blank();try{Object.assign(S,JSON.parse(localStorage.getItem(LS))||{})}catch(e){}}
+const ui={side:"overview",m:"side",coreOnly:false,linkTo:null,fresh:null,open:new Set(),busy:{}};
+let cloud=null,cloudBase=null,cloudOff=null,sb=null,sbUser=null,pushT=null,remoteWaiting=false;
 const canSync=()=>!!(cloud||(sb&&sbUser));
 const syncEl=$("#sync");
 function badge(t,c){syncEl.textContent=t;syncEl.className="sync "+(c||"")}
-function commit(){S.at=Date.now();try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){} meta();if(canSync()){badge("同步中…");clearTimeout(pushT);pushT=setTimeout(push,900)}}
+function commit(){if(!VID)return;S.at=Date.now();try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){} meta();if(canSync()){badge("同步中…");clearTimeout(pushT);pushT=setTimeout(push,900)}}
 async function push(){if(!canSync())return;const at=S.at;try{
   if(cloud)await cloud.set({json:JSON.stringify(S),at});
   else{const {error}=await sb.from("reader_state").upsert({user_id:sbUser.id,video_id:VID,state:S,at});if(error)throw error}
   if(at===S.at)badge("已同步","ok")}catch(e){badge("同步失敗，內容仍在這台裝置","warn")}}
 /* Supabase: used on the hosted site when src/config.json is filled in */
-async function pull(){if(!sb||!sbUser)return;badge("同步中…");
+async function pull(){if(!sb||!sbUser||!VID)return;badge("同步中…");
   const {data,error}=await sb.from("reader_state").select("state,at").eq("video_id",VID).maybeSingle();
   if(error){badge("同步失敗，內容仍在這台裝置","warn");return}
   if(data&&data.at>S.at){adopt(JSON.stringify(data.state));badge("已同步","ok")}else if(S.at&&(!data||data.at<S.at))push();else badge("已同步","ok")}
-function setUser(u){const was=sbUser&&sbUser.id;sbUser=u||null;if(!u){badge("登入以同步","link");return}if(u.id!==was)pull()}
+function setUser(u){const was=sbUser&&sbUser.id;sbUser=u||null;if(!u){badge("登入","link");LIB=LIB.filter(x=>x.demo);renderHome();return}if(u.id!==was){badge("已登入","ok");pull();loadLibrary()}}
 (async()=>{if(window.claude||!CFG.supabaseUrl||!CFG.supabaseAnonKey)return;try{
   await new Promise((ok,no)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";s.onload=ok;s.onerror=no;document.head.appendChild(s)});
   sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey);
@@ -399,26 +432,32 @@ function setUser(u){const was=sbUser&&sbUser.id;sbUser=u||null;if(!u){badge("登
   sb.auth.onAuthStateChange((_e,ses)=>setUser(ses&&ses.user));
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
 }catch(e){badge("同步服務載入失敗，內容仍在這台裝置","warn")}})();
-syncEl.onclick=()=>{if(!sb)return;
+syncEl.onclick=()=>{if(!sb){if(!window.claude)toast("後端還沒接上");return}
   if(sbUser){openSheet(`<div class="eyebrow">同步</div><p class="q-zh">已用 ${esc(sbUser.email||"")} 登入。</p><p style="margin:0;color:var(--mute)">在任何裝置用同一個信箱登入，就會看到同一份筆記。</p><div class="row"><span class="sp"></span><button class="btn line" id="sb-out">登出</button></div>`);
     $("#sb-out").onclick=async()=>{await sb.auth.signOut();closeSheet()};return}
-  openSheet(`<div class="eyebrow">登入以同步</div><p class="q-zh">輸入信箱，我們寄一個登入連結給你。</p><input type="email" id="sb-mail" placeholder="you@example.com" autocomplete="email"><p id="sb-msg" style="margin:0;color:var(--mute);font-size:15px">不用密碼。在這台裝置上寫的東西登入後會保留。</p><div class="row"><span class="sp"></span><button class="btn" id="sb-go">寄登入連結</button></div>`);
+  openSheet(`<div class="eyebrow">登入</div><p class="q-zh">輸入信箱，我們寄一個登入連結給你。</p><input type="email" id="sb-mail" placeholder="you@example.com" autocomplete="email"><p id="sb-msg" style="margin:0;color:var(--mute);font-size:15px">不用密碼。在這台裝置上寫的東西登入後會保留。</p><div class="row"><span class="sp"></span><button class="btn" id="sb-go">寄登入連結</button></div>`);
   $("#sb-go").onclick=async e=>{const b=e.currentTarget,mail=$("#sb-mail").value.trim();if(!mail)return;b.disabled=true;
     const {error}=await sb.auth.signInWithOtp({email:mail,options:{emailRedirectTo:location.origin+location.pathname}});
     $("#sb-msg").textContent=error?"沒有寄出："+error.message:"寄出了。到信箱點連結，回到這一頁就會開始同步。";if(error)b.disabled=false}};
-function adopt(json){try{S=Object.assign(blank(),JSON.parse(json))}catch(e){return}try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}
-  if(document.activeElement&&document.activeElement.tagName==="TEXTAREA"){remoteWaiting=true;return}renderAll()}
-document.addEventListener("focusout",()=>{if(remoteWaiting){remoteWaiting=false;setTimeout(()=>{if(!(document.activeElement&&document.activeElement.tagName==="TEXTAREA"))renderAll()},50)}});
-(async()=>{try{
-  if(!window.claude||!window.claude.use)return;
-  const [u,db]=await Promise.all([window.claude.use("user"),window.claude.use("db")]);
-  const id=u&&await u.id();if(!db||!id)return;
-  cloud=db.collection("data/users/"+id).doc("video-"+VID);badge("同步中…");
-  cloud.onSnapshot(snap=>{
+function adopt(json){if(!VID)return;try{S=Object.assign(blank(),JSON.parse(json))}catch(e){return}try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}
+  if(document.activeElement&&document.activeElement.tagName==="TEXTAREA"){remoteWaiting=true;return}if(root.dataset.view==="video")renderAll()}
+document.addEventListener("focusout",()=>{if(remoteWaiting){remoteWaiting=false;setTimeout(()=>{if(!(document.activeElement&&document.activeElement.tagName==="TEXTAREA")&&root.dataset.view==="video")renderAll()},50)}});
+function bindCloud(){
+  if(cloudOff){try{cloudOff()}catch(e){} cloudOff=null}
+  cloud=null;if(!cloudBase||!VID)return;
+  cloud=cloudBase.doc("video-"+VID);badge("同步中…");
+  const off=cloud.onSnapshot(snap=>{
     const d=snap.exists?snap.data():null;
     if(!d){if(S.at)push();else badge("已同步","ok");return}
     if(d.at>S.at){adopt(d.json);badge("已同步","ok")}else if(d.at<S.at)push();else badge("已同步","ok");
   },()=>{badge("同步暫停，內容仍在這台裝置","warn")});
+  if(typeof off==="function")cloudOff=off;
+}
+(async()=>{try{
+  if(!window.claude||!window.claude.use)return;
+  const [u,db]=await Promise.all([window.claude.use("user"),window.claude.use("db")]);
+  const id=u&&await u.id();if(!db||!id)return;
+  cloudBase=db.collection("data/users/"+id);bindCloud();
 }catch(e){}})();
 
 /* live Claude (optional): prewritten content is always on screen first */
@@ -434,10 +473,14 @@ async function askAI(prompt,out,btn){
 
 /* ---------- player ---------- */
 let player=null,ytOK=false,tick=null,lastUserScroll=0,nowId=null;
-$("#pthumb").src=THUMB;$("#pfall").href=yt(SEGS[0].t);
 function noYT(){if(ytOK)return;root.classList.add("no-yt");$("#pfmsg").textContent="這個頁面不能嵌入播放器。時間戳會在 YouTube 從那一秒開啟。"}
+let ytLoading=false;
 function initYT(){
-  window.onYouTubeIframeAPIReady=()=>{try{player=new YT.Player("yt",{videoId:VID,playerVars:{playsinline:1,rel:0,start:SEGS[0].t},events:{
+  $("#pthumb").hidden=false;$("#pthumb").src=V.demo?THUMB:`https://i.ytimg.com/vi/${VID}/mqdefault.jpg`;$("#pfall").href=yt(CH[0]?CH[0].t:0);
+  const start=SEGS[0]?SEGS[0].t:0;
+  if(player&&ytOK){try{player.cueVideoById({videoId:VID,startSeconds:start})}catch(e){} return}
+  if(ytLoading)return;ytLoading=true;
+  window.onYouTubeIframeAPIReady=()=>{try{player=new YT.Player("yt",{videoId:VID,playerVars:{playsinline:1,rel:0,start},events:{
     onReady:()=>{ytOK=true;root.classList.remove("no-yt");root.classList.add("yt-ok")},
     onStateChange:e=>{clearInterval(tick);if(e.data===1)tick=setInterval(follow,500)},
     onError:()=>{if(!ytOK)noYT()}}})}catch(e){noYT()}};
@@ -462,26 +505,30 @@ document.addEventListener("click",e=>{const a=e.target.closest("a[data-t]");if(!
 /* ---------- read ---------- */
 const span=(id,lang)=>{const s=SENT[id];return `<span class="s${S.notes[id]?" has-note":""}" data-id="${id}" data-hl="${S.hl[id]||""}" role="button" tabindex="0">${esc(s[lang])}</span>`};
 function renderRead(){
-  const top=rscroll.scrollTop;
+  const top=rscroll.scrollTop,mono=/^zh/i.test(V.lang||"");
+  root.classList.toggle("mono",mono);
   rscroll.className="scroll m-"+S.mode;
-  rscroll.innerHTML=`<div class="rin">`+SEGS.map((g,gi)=>`<section class="a-seg" id="seg-${g.id}">
-    <header><i>第 ${gi+1} 段，共 ${SEGS.length} 段</i><h3>${g.title}</h3>${tlink(g.t)}</header>
-    ${g.turns.map((tu,ti)=>{const ids=tu.s.map((p,si)=>p?`${g.id}-${ti}-${si}`:null);const line=l=>ids.map(id=>id?span(id,l):`<span class="gap">[…]</span>`).join(l==="en"?" ":"");
-      return `<div class="turn sp-${tu.sp}" data-turn="${g.id}-${ti}"><div class="who"><b>${tu.sp==="L"?"LEX FRIDMAN":"PIETER LEVELS"}</b>${tlink(tu.t)}</div><p class="zh">${line("zh")}</p><p class="en" lang="en">${line("en")}</p></div>`}).join("")}
-    <div class="absorb">
-      <div class="eyebrow">這一段在說什麼</div><ul>${g.sum.map(x=>`<li>${x}</li>`).join("")}</ul>
-      <div class="eyebrow">第一性原理</div><p class="core">${g.core}</p>
-      <details><summary>展開推理鏈（${g.chain.length} 步）</summary><ol class="chain">${g.chain.map(x=>`<li>${x}</li>`).join("")}</ol></details>
-      <div class="eyebrow">換到你身上</div><p class="ask">${g.ask}</p>
+  rscroll.innerHTML=`<div class="rin">`+SEGS.map((g,gi)=>{
+    const deep=isDeep(g),open=deep||ui.open.has(g.id),busy=ui.busy[g.id];
+    const body=!open?"":g.turns.map((tu,ti)=>{const ids=tu.s.map((p,si)=>p?`${g.id}-${ti}-${si}`:null);const line=l=>ids.map(id=>id?span(id,l):`<span class="gap">[…]</span>`).join(l==="en"?" ":"");
+      return `<div class="turn sp-${tu.sp===V.host?"L":"P"}" data-turn="${g.id}-${ti}"><div class="who"><b>${esc(who(tu)).toUpperCase()}</b>${tlink(tu.t)}</div><p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></div>`}).join("");
+    const tools=deep?"":`<div class="row segtools">${open?"":`<button class="btn sm line" data-open="${g.id}">顯示原文</button>`}<button class="btn sm" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):"精讀這一章（翻譯＋第一性原理）"}</button></div>`;
+    const absorb=!deep?"":`<div class="absorb">
+      <div class="eyebrow">這一段在說什麼</div><ul>${(g.sum||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+      <div class="eyebrow">第一性原理</div><p class="core">${esc(g.core)}</p>
+      <details><summary>展開推理鏈（${(g.chain||[]).length} 步）</summary><ol class="chain">${(g.chain||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ol></details>
+      <div class="eyebrow">換到你身上</div><p class="ask">${esc(g.ask)}</p>
       <textarea id="refl-${g.id}" data-refl="${g.id}" placeholder="寫一兩句就好">${esc(S.refl[g.id]||"")}</textarea>
-    </div></section>`).join("")+`</div>`;
+    </div>`;
+    return `<section class="a-seg${deep?"":" raw"}" id="seg-${g.id}">
+    <header><i>第 ${gi+1} 段，共 ${SEGS.length} 段</i><h3>${esc(g.title)}</h3>${tlink(g.t)}</header>${tools}${body}${absorb}</section>`}).join("")+`</div>`;
   rscroll.scrollTop=top;nowId=null;
   $$("[data-mode]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===S.mode));
 }
 function markSent(id){$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>{e.dataset.hl=S.hl[id]||"";e.classList.toggle("has-note",!!S.notes[id])})}
 function sentSheet(id){
   const s=SENT[id];$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>e.classList.add("on"));
-  openSheet(`<p class="q-zh">${esc(s.zh)}</p><p class="q-en" lang="en">${esc(s.en)}</p>
+  openSheet(`<p class="q-zh">${esc(s.zh)}</p>${s.zh===s.en?"":`<p class="q-en">${esc(s.en)}</p>`}
     <div class="hl-row">${[["y","洞見","var(--hl-y)"],["p","疑問","var(--hl-p)"],["g","要去做","var(--hl-g)"],["","不畫","transparent"]].map(([k,l,c])=>`<button data-hl="${k}" aria-pressed="${(S.hl[id]||"")===k}"><i style="background:${c}"></i>${l}</button>`).join("")}</div>
     <textarea id="a-note" placeholder="這句讓你想到什麼？">${esc(S.notes[id]||"")}</textarea>
     <div class="ai-out" id="a-aiout" hidden></div>
@@ -492,7 +539,8 @@ function sentSheet(id){
   $("#a-done").onclick=closeSheet;
   $("#a-ask").onclick=e=>askAI(`你是陪讀夥伴。讀者的母語是繁體中文，是一位創業者，正在讀一段英文訪談逐字稿。請用繁體中文、最多 90 個字，解釋下面這句話在上下文中的意思，並點出它背後的一個假設。直接講，不要開場白，不要條列。\n\n這段的主題：${s.seg.title}\n上下文：${s.turn.s.filter(Boolean).map(p=>p[0]).join(" ")}\n要解釋的句子：${s.en}`,$("#a-aiout"),e.currentTarget);
 }
-rscroll.addEventListener("click",e=>{const s=e.target.closest(".s");if(s)sentSheet(s.dataset.id)});
+rscroll.addEventListener("click",e=>{const s=e.target.closest(".s"),o=e.target.closest("[data-open]"),d=e.target.closest("[data-deepen]");
+  if(s)sentSheet(s.dataset.id);else if(o){ui.open.add(o.dataset.open);renderRead()}else if(d)deepen(+d.dataset.deepen)});
 rscroll.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.classList.contains("s"))sentSheet(e.target.dataset.id)});
 rscroll.addEventListener("input",e=>{const k=e.target.dataset&&e.target.dataset.refl;if(k){S.refl[k]=e.target.value;commit()}});
 $$("[data-mode]").forEach(b=>b.onclick=()=>{S.mode=b.dataset.mode;commit();rscroll.className="scroll m-"+S.mode;$$("[data-mode]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
@@ -501,22 +549,25 @@ $$("[data-mode]").forEach(b=>b.onclick=()=>{S.mode=b.dataset.mode;commit();rscro
 const segsIn=i=>SEGS.filter(g=>g.t>=CH[i].t&&(i===CH.length-1||g.t<CH[i+1].t));
 function renderOverview(){
   const list=CH.map((c,i)=>({c,i,segs:segsIn(i)})).filter(x=>!ui.coreOnly||x.c.worth===3);
+  const nDeep=SEGS.filter(isDeep).length;
   side.innerHTML=`<div class="pad ov">
-    <div class="eyebrow">3 小時 44 分 · ${CH.length} 個章節 · Lex Fridman Podcast #440</div>
-    <p class="thesis">${THESIS}</p>
-    <h2>Pieter Levels: Programming, Viral AI Startups, and Digital Nomad Life</h2>
-    <ul>${TLDR.map(x=>`<li>${x}</li>`).join("")}</ul>
+    <div class="eyebrow">${V.duration?fmtDur(V.duration)+" · ":""}${CH.length} 個章節${V.channel?" · "+esc(V.channel):""}</div>
+    <p class="thesis">${esc(THESIS)}</p>
+    <h2>${esc(V.title)}</h2>
+    <ul>${TLDR.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
     <div class="row"><div class="eyebrow" style="flex:1">章節</div><div class="chips"><button data-core="0" aria-pressed="${!ui.coreOnly}">全部</button><button data-core="1" aria-pressed="${ui.coreOnly}">只看核心</button></div></div>
     <div class="chs">${list.map(({c,i,segs})=>`<article class="ch w${c.worth}">
       <header><b><span class="t">${esc(c.zh)}</span><small>${esc(c.en)}</small></b><span class="w w${c.worth}">${["","可跳過","值得看","核心"][c.worth]}</span>${tlink(c.t)}</header>
       <p>${esc(c.sum)}</p>${c.take?`<p class="take">→ ${esc(c.take)}</p>`:""}
-      <div class="row">${segs.map(g=>`<button class="btn sm" data-seg="${g.id}">精讀「${g.title}」</button>`).join("")||`<a class="btn sm ghost" data-t="${c.t}" data-goread href="${yt(c.t)}" target="_blank" rel="noopener">播放這一章</a>`}</div>
+      <div class="row">${segs.map(g=>isDeep(g)?`<button class="btn sm" data-seg="${g.id}">精讀「${esc(g.title)}」</button>`
+        :`<button class="btn sm" data-deepen="${SEGS.indexOf(g)}" ${ui.busy[g.id]?"disabled":""}>${ui.busy[g.id]?esc(ui.busy[g.id]):"精讀這一章"}</button><button class="btn sm line" data-seg="${g.id}" data-raw>看原文</button>`).join("")
+        ||`<a class="btn sm ghost" data-t="${c.t}" data-goread href="${yt(c.t)}" target="_blank" rel="noopener">播放這一章</a>`}</div>
     </article>`).join("")}</div>
-    <p class="meta">這份試作只把 5 段展開成逐字稿。其餘章節的摘要讀的是完整逐字稿，可以直接播放。</p></div>`;
+    <p class="meta">${V.demo?"這支範例只把 5 段展開成逐字稿。其餘章節的摘要讀的是完整逐字稿，可以直接播放。":`已精讀 ${nDeep} / ${SEGS.length} 章。還沒精讀的章節可以先看原文，或按「精讀」產生翻譯和第一性原理。`}</p></div>`;
 }
 
 /* ---------- distill ---------- */
-function sparks(){const out=[];SEGS.forEach(g=>{out.push({id:"ai-"+g.id,seg:g,ai:true,text:g.spark,t:SENT[keyIds(g)[0]].t});
+function sparks(){const out=[];SEGS.forEach(g=>{const k=isDeep(g)?keyIds(g):[];if(k.length)out.push({id:"ai-"+g.id,seg:g,ai:true,text:g.spark,t:SENT[k[0]].t});
   Object.keys(S.hl).filter(id=>SENT[id]&&SENT[id].seg===g).sort().forEach(id=>out.push({id,seg:g,text:SENT[id].zh,hl:S.hl[id],t:SENT[id].t}))});return out}
 const lvName=n=>n>=3?"樹":n===2?"芽":"種子";
 const liveEv=c=>{const ids=new Set(sparks().map(s=>s.id));return c.ev.filter(e=>ids.has(e))};
@@ -545,7 +596,7 @@ function layoutDistill(){
 window.addEventListener("resize",()=>{if(ui.side==="distill")layoutDistill()});
 function sparkSheet(id){
   const s=sparks().find(x=>x.id===id);if(!s)return;const g=s.seg,q=s.ai?keyIds(g).map(i=>SENT[i]):[SENT[id]];
-  openSheet(`<div class="eyebrow">火花 · ${g.title}</div><p class="q-en" lang="en" style="color:var(--ink)">${q.map(x=>esc(x.en)).join(" ")}</p><p class="q-zh" style="font-size:17px;font-weight:400;color:var(--mute)">${q.map(x=>esc(x.zh)).join("")}</p>
+  openSheet(`<div class="eyebrow">火花 · ${g.title}</div><p class="q-en" style="color:var(--ink)">${q.map(x=>esc(x.en)).join(" ")}</p><p class="q-zh" style="font-size:17px;font-weight:400;color:var(--mute)">${q.map(x=>esc(x.zh)).join("")}</p>
     ${!s.ai&&S.notes[id]?`<p style="margin:0;font-weight:700">✎ ${esc(S.notes[id])}</p>`:""}
     <div class="row">${tlink(q[0].t,"▶ 從這段播放 "+fmt(q[0].t))}</div>
     <details><summary>這一段的第一性原理</summary><p style="margin:8px 0 0">${g.core}</p></details>
@@ -587,20 +638,20 @@ function mintSheet(cid){
 }
 
 /* ---------- cards ---------- */
-function evQuote(id){if(id.startsWith("ai-")){const g=SEGS.find(x=>"ai-"+x.id===id);const q=keyIds(g).map(i=>SENT[i]);return {en:q.map(x=>x.en).join(" "),zh:q.map(x=>x.zh).join(""),t:q[0].t}}return SENT[id]}
+function evQuote(id){if(id.startsWith("ai-")){const g=SEGS.find(x=>"ai-"+x.id===id);if(!g)return null;const q=keyIds(g).map(i=>SENT[i]);if(!q.length)return null;return {en:q.map(x=>x.en).join(" "),zh:q.map(x=>x.zh).join(""),t:q[0].t}}return SENT[id]}
 function renderCards(){
   const cards=S.cards,names={y:"洞見",p:"疑問",g:"要去做"};
-  const post=cards.length?`看完 Lex Fridman 訪 Pieter Levels（#440），我只留下這 ${cards.length} 句：\n\n`+cards.map((k,i)=>`${i+1}. ${k.text}`).join("\n\n"):"";
+  const post=cards.length?`看完《${V.title}》，我只留下這 ${cards.length} 句：\n\n`+cards.map((k,i)=>`${i+1}. ${k.text}`).join("\n\n"):"";
   const hl=Object.keys(S.hl).filter(id=>SENT[id]).sort((a,b)=>SENT[a].t-SENT[b].t||a.localeCompare(b)),refl=SEGS.filter(g=>(S.refl[g.id]||"").trim());
   side.innerHTML=`<div class="pad"><div><div class="eyebrow">這支影片最多留 ${MAXC} 張</div><h2>${cards.length?"這些句子是你寫的。":"還沒有觀點卡。"}</h2></div>
     ${cards.map(k=>`<div class="vcard${ui.fresh===k.id?" mint":""}"><div class="row"><span class="tag">${k.revised?"修正過":"原句過關"}</span><span class="sp"></span><button data-drop="${k.id}">移除</button></div><p>${esc(k.text)}</p>
-      ${k.ev.map(evQuote).filter(Boolean).filter((q,i,a)=>!a.some((o,j)=>j!==i&&o.en.includes(q.en)&&(o.en.length>q.en.length||j<i))).slice(0,3).map(q=>`<div class="ev" lang="en">${esc(q.en)} ${tlink(q.t)}</div>`).join("")}</div>`).join("")}
+      ${k.ev.map(evQuote).filter(Boolean).filter((q,i,a)=>!a.some((o,j)=>j!==i&&o.en.includes(q.en)&&(o.en.length>q.en.length||j<i))).slice(0,3).map(q=>`<div class="ev">${esc(q.en)} ${tlink(q.t)}</div>`).join("")}</div>`).join("")}
     ${Array.from({length:MAXC-cards.length},(_,i)=>`<div class="slot">${i===0&&!cards.length?"到「淬煉」把火花連成主張，有 2 個證據就能鑄成卡片。":"空位"}</div>`).join("")}
     ${cards.length?`<div class="eyebrow">組成貼文</div><textarea class="big" id="c-post">${esc(post)}</textarea><div class="ai-out" id="c-ai" hidden></div>
       <div class="row"><button class="btn" id="c-copy">複製</button><button class="btn ghost ai-only" id="c-polish">請 AI 順成一篇貼文</button></div>`:""}
     <details><summary>全部筆記（畫線 ${hl.length} · 回答 ${refl.length}）</summary><div style="display:grid;gap:8px;margin-top:10px">
       ${refl.map(g=>`<div class="ncard"><small>我對「${g.title}」的回答</small><span class="mine">${esc(S.refl[g.id])}</span></div>`).join("")}
-      ${hl.map(id=>{const s=SENT[id];return `<div class="ncard" data-hl="${S.hl[id]}"><small>${names[S.hl[id]]} · ${tlink(s.t)}</small><span>${esc(s.zh)}</span><span class="q-en" style="font-size:17px" lang="en">${esc(s.en)}</span>${S.notes[id]?`<span class="mine">✎ ${esc(S.notes[id])}</span>`:""}</div>`}).join("")||""}
+      ${hl.map(id=>{const s=SENT[id];return `<div class="ncard" data-hl="${S.hl[id]}"><small>${names[S.hl[id]]} · ${tlink(s.t)}</small><span>${esc(s.zh)}</span><span class="q-en" style="font-size:17px">${esc(s.en)}</span>${S.notes[id]?`<span class="mine">✎ ${esc(S.notes[id])}</span>`:""}</div>`}).join("")||""}
     </div></details></div>`;
   ui.fresh=null;
 }
@@ -622,7 +673,8 @@ $("#tabs").onclick=e=>{const b=e.target.closest("[data-tab]");if(b)setTab(b.data
 side.addEventListener("click",e=>{
   const t=e.target.closest("button");if(!t)return;
   if(t.dataset.core!=null){ui.coreOnly=t.dataset.core==="1";renderOverview()}
-  else if(t.dataset.seg){setTab("read");const el=$("#seg-"+t.dataset.seg);el&&el.scrollIntoView({block:"start"});lastUserScroll=Date.now()}
+  else if(t.dataset.deepen!=null)deepen(+t.dataset.deepen);
+  else if(t.dataset.seg){if(t.dataset.raw!=null){ui.open.add(t.dataset.seg);renderRead()}setTab("read");const el=$("#seg-"+t.dataset.seg);el&&el.scrollIntoView({block:"start"});lastUserScroll=Date.now()}
   else if(t.id==="d-done"){ui.linkTo=null;renderDistill()}
   else if(t.dataset.spark){if(ui.linkTo){const c=S.claims.find(x=>x.id===ui.linkTo),id=t.dataset.spark;c.ev=c.ev.includes(id)?c.ev.filter(x=>x!==id):[...c.ev,id];commit();renderDistill()}else sparkSheet(t.dataset.spark)}
   else if(t.dataset.claim){if(ui.linkTo){ui.linkTo=null;renderDistill()}else claimSheet(t.dataset.claim)}
@@ -630,6 +682,116 @@ side.addEventListener("click",e=>{
   else if(t.id==="c-copy")copyText($("#c-post"));
   else if(t.id==="c-polish")askAI(`把下面這位讀者自己寫的結論整理成一篇繁體中文社群貼文，250 字以內。規則：只能使用他寫的觀點，不能加入新論點；保留他的口吻；不要勵志結尾，不要 hashtag，不要 emoji。\n\n${$("#c-post").value}`,$("#c-ai"),t);
 });
-renderAll();initYT();
+
+/* ---------- library, adding a video, processing ---------- */
+let LIB=[{video_id:DEMO.vid,title:DEMO.title,status:"ready",demo:true}];
+const cache={};const driving=new Set();
+const canIngest=()=>!!(sb&&sbUser);
+function setLib(vid,patch){let it=LIB.find(x=>x.video_id===vid&&!x.demo);if(!it){it={video_id:vid,title:"",status:"queued"};LIB.splice(1,0,it)}Object.assign(it,patch);if(root.dataset.view==="home")renderHome()}
+async function loadLibrary(){if(!canIngest())return;
+  const {data,error}=await sb.from("videos").select("video_id,title,status,progress,error,updated_at").order("updated_at",{ascending:false});
+  if(error)return;LIB=[LIB.find(x=>x.demo),...data];renderHome();
+  data.filter(v=>v.status==="queued"||v.status==="processing").forEach(v=>drive(v.video_id));
+}
+async function fn(body){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session)return {error:"登入已過期，請重新登入。",fatal:true};
+  let r;try{r=await fetch(CFG.supabaseUrl+"/functions/v1/ingest",{method:"POST",headers:{"content-type":"application/json",apikey:CFG.supabaseAnonKey,Authorization:"Bearer "+session.access_token},body:JSON.stringify(body)})}
+  catch(e){return {error:"連不上後端，檢查網路後會自動重試。",httpStatus:0}}
+  const j=await r.json().catch(()=>({}));if(!r.ok&&!j.error)j.error="後端沒有回應（"+r.status+"）";j.httpStatus=r.status;return j;
+}
+/* Keeps asking the backend for the next unit until the video is ready. Safe to call again at any time:
+   the server remembers what is done, so a reload or a failed unit resumes from where it stopped. */
+async function drive(vid){
+  if(driving.has(vid))return;driving.add(vid);let fails=0;
+  try{while(true){
+    const j=await fn({action:"step",video_id:vid});
+    if(j.error){fails++;if(j.fatal||fails>=4){setLib(vid,{status:"error",error:j.error,note:""});break}
+      setLib(vid,{note:`遇到問題，第 ${fails} 次重試中：${j.error}`});await sleep(j.httpStatus===429?20000:3000*fails);continue}
+    fails=0;setLib(vid,{title:j.title,status:j.status,progress:j.progress,error:j.error,note:""});
+    if(j.busy){await sleep(4000);continue}
+    if(j.status==="ready"){delete cache[vid];toast("處理完成："+(j.title||vid));break}
+    if(j.status==="error")break;
+  }}finally{driving.delete(vid)}
+}
+async function addVideo(url){
+  const msg=$("#add-msg");
+  if(!/(youtube\.com|youtu\.be)/.test(url)){msg.textContent="請貼上 YouTube 影片的網址。";return}
+  if(!canIngest()){msg.textContent="先登入才能加入影片。";syncEl.click();return}
+  msg.textContent="加入中…";const j=await fn({action:"start",url});
+  if(j.error){msg.textContent="沒有加入："+j.error;return}
+  msg.textContent="";$("#add-url").value="";setLib(j.video_id,j);
+  if(j.status!=="ready")drive(j.video_id);
+}
+async function deepen(k){
+  const g=SEGS[k];if(!g||isDeep(g)||ui.busy[g.id])return;
+  if(V.demo||!canIngest()){toast("這一章要在部署版登入後才能精讀");return}
+  const vid=VID,show=t=>{ui.busy[g.id]=t;if(VID===vid){renderRead();if(ui.side==="overview")renderOverview()}};
+  show("準備中…");let fails=0;
+  while(true){
+    const j=await fn({action:"deepen",video_id:vid,chapter:k});
+    if(j.error){fails++;if(j.fatal||fails>=4){delete ui.busy[g.id];if(VID===vid){renderRead();renderSide()}toast("精讀沒有完成："+j.error);return}
+      show(`重試中（${fails}）…`);await sleep(j.httpStatus===429?20000:3000*fails);continue}
+    fails=0;if(j.busy){await sleep(3000);continue}
+    if(j.done)break;
+    show(j.progress?`翻譯中 ${j.progress.done}/${j.progress.total} 句`:"處理中…");
+  }
+  delete ui.busy[g.id];delete cache[vid];
+  const c=await fetchContent(vid);
+  if(c&&VID===vid){V=c;SEGS=c.segs;CH=c.chapters;indexContent();renderAll();toast("這一章精讀好了")}
+}
+async function fetchContent(vid){
+  if(cache[vid])return cache[vid];
+  const {data,error}=await sb.from("videos").select("content").eq("video_id",vid).maybeSingle();
+  if(error||!data||!data.content)return null;
+  return cache[vid]=data.content;
+}
+const STEP={meta:"讀取影片資訊",transcribe:"讀影片內容",outline:"整理章節和摘要",ready:"完成"};
+function statusLine(it){
+  if(it.demo)return "範例 · 已處理好";
+  if(it.status==="ready")return "可以閱讀";
+  if(it.status==="error")return "沒有完成："+(it.error||"未知的問題");
+  if(it.note)return it.note;
+  const p=it.progress||{};
+  if(p.phase==="transcribe")return `正在讀影片內容，已完成 ${p.done||0} 段（每段 10 分鐘）`;
+  return "正在"+(STEP[p.phase]||"排隊")+"…";
+}
+function renderHome(){
+  const why=window.claude?"這個預覽頁不能處理新影片，也不能嵌入播放器（平台會擋）。部署版才有這兩項。"
+    :!(CFG.supabaseUrl&&CFG.supabaseAnonKey)?"後端還沒接上，目前只能看範例。"
+    :!sbUser?"先登入，才能加入影片並跨裝置同步。":"";
+  const keep=$("#add-url")?$("#add-url").value:"";
+  homeEl.innerHTML=`<div class="pad home">
+    <div><h2>把看過的影片變成自己的觀點</h2><p class="meta">貼上網址，先看摘要決定值不值得細看，再精讀、畫線、淬煉成最多三張觀點卡。</p></div>
+    <form id="add" class="add"><input id="add-url" type="url" inputmode="url" placeholder="貼上 YouTube 網址" ${canIngest()?"":"disabled"}><button class="btn" ${canIngest()?"":"disabled"}>加入</button></form>
+    <p class="meta" id="add-msg">${why}</p>
+    ${!window.claude&&sb&&!sbUser?`<div><button class="btn" id="home-login">登入</button></div>`:""}
+    <div class="eyebrow">我的影片</div>
+    <div class="lib">${LIB.map(it=>`<button class="item${it.status==="ready"?"":" wait"}" data-vid="${it.video_id}" data-status="${it.status}"${it.demo?" data-demo":""}>
+      <img alt="" src="${it.demo?THUMB:`https://i.ytimg.com/vi/${it.video_id}/mqdefault.jpg`}" onerror="this.style.visibility='hidden'">
+      <span><b>${esc(it.title||"（讀取中）"+it.video_id)}</b><small class="${it.status==="error"?"err":""}">${esc(statusLine(it))}</small>${it.status==="error"?`<em>點這裡從中斷的地方重試</em>`:""}</span></button>`).join("")}</div>
+  </div>`;
+  if(keep)$("#add-url").value=keep;
+  $("#add").onsubmit=e=>{e.preventDefault();addVideo($("#add-url").value.trim())};
+  const hl=$("#home-login");if(hl)hl.onclick=()=>syncEl.click();
+}
+homeEl.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-vid]");if(!b)return;const vid=b.dataset.vid,st=b.dataset.status;
+  if(b.dataset.demo!=null){openVideo(DEMO);return}
+  if(st==="error"){setLib(vid,{status:"processing",error:null,note:"重新開始…"});drive(vid);return}
+  if(st!=="ready"){toast("還在處理中，完成後會通知你");return}
+  const c=await fetchContent(vid);if(!c){toast("讀不到這支影片的內容，請稍後再試");return}
+  openVideo(c);
+});
+function openVideo(c){
+  V=c;VID=c.vid;SEGS=c.segs||[];CH=c.chapters||[];THESIS=c.thesis||"";TLDR=c.tldr||[];
+  indexContent();loadState();bindCloud();pull();
+  $("#vt").textContent=c.title+(c.channel?" · "+c.channel:"");
+  ui.side="overview";ui.m="side";ui.linkTo=null;ui.open=new Set();
+  root.dataset.view="video";renderAll();initYT();rscroll.scrollTop=0;side.scrollTop=0;
+}
+function goHome(){closeSheet();try{if(player&&ytOK)player.pauseVideo()}catch(e){} root.dataset.view="home";$("#vt").textContent="";renderHome()}
+$("#gohome").onclick=goHome;
+renderHome();
 </script>
 </body></html>
