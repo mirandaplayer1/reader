@@ -1,0 +1,464 @@
+<title>Reader</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: one full-height app. Phone: one pane at a time behind a bottom tab bar. Wide: transcript + player on the left, overview / distill / cards on the right. */
+:root{
+  --bg:#F1F2F9; --surf:#FFFFFF; --surf2:#E8EAF5; --ink:#14152B; --mute:#62668A; --line:#DDE0EE;
+  --acc:#2B50F5; --grow:#0A9A6E; --warn:#C2410C; --on-acc:#FFFFFF;
+  --hl-y:#FFE55E; --hl-p:#FFBBD8; --hl-g:#A6F0CB; --edge-y:#E5BE00; --edge-p:#E8659F; --edge-g:#2FB57C;
+  --shadow:0 1px 2px rgba(20,21,43,.06),0 10px 28px rgba(20,21,43,.08);
+  --f-d:"Bricolage Grotesque","Noto Sans TC",system-ui,sans-serif;
+  --f-b:"Noto Sans TC",system-ui,"PingFang TC","Microsoft JhengHei",sans-serif;
+  --f-en:"Newsreader",Georgia,"Times New Roman",serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0B0C19; --surf:#16182E; --surf2:#20233F; --ink:#EEF0FB; --mute:#989BBE; --line:#2B2E4E;
+  --acc:#8198FF; --grow:#3FD8A5; --warn:#FF9466; --on-acc:#0B0C19;
+  --hl-y:rgba(255,229,94,.32); --hl-p:rgba(255,130,185,.32); --hl-g:rgba(100,235,178,.28);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45); color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0B0C19; --surf:#16182E; --surf2:#20233F; --ink:#EEF0FB; --mute:#989BBE; --line:#2B2E4E;
+  --acc:#8198FF; --grow:#3FD8A5; --warn:#FF9466; --on-acc:#0B0C19;
+  --hl-y:rgba(255,229,94,.32); --hl-p:rgba(255,130,185,.32); --hl-g:rgba(100,235,178,.28);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45); color-scheme:dark }
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-b);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased;overflow:hidden}
+button,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+textarea{width:100%;border:1.5px solid var(--line);background:var(--surf);border-radius:14px;padding:12px 14px;font-size:16px;line-height:1.6;resize:none;min-height:88px}
+textarea:focus{outline:none;border-color:var(--acc)}
+textarea.big{min-height:220px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 18px;border-radius:999px;font-weight:700;background:var(--acc);color:var(--on-acc);transition:transform .12s;text-decoration:none}
+.btn:active{transform:scale(.97)} .btn[disabled]{opacity:.35;pointer-events:none}
+.btn.ghost{background:var(--surf2);color:var(--ink)} .btn.line{background:none;border:1.5px solid var(--line);color:var(--ink)} .btn.grow{background:var(--grow)}
+.btn.sm{min-height:34px;padding:0 13px;font-size:13px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--mute)}
+.ai-only{display:none!important} body.has-ai .ai-only{display:inline-flex!important}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .row .sp{flex:1}
+.tlink{font-size:12px;font-weight:700;color:var(--acc);text-decoration:none;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+#root{height:100%;display:flex;flex-direction:column}
+.top{flex:none;display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--line)}
+.top h1{font-family:var(--f-d);font-size:19px;font-weight:800;margin:0;line-height:1}
+.top .vt{flex:1;min-width:0;font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pips{display:flex;gap:3px} .pips i{width:14px;height:5px;border-radius:3px;background:var(--surf2)} .pips i.on{background:var(--grow)}
+.sync{font-size:11px;font-weight:700;color:var(--mute);white-space:nowrap} .sync.ok{color:var(--grow)} .sync.warn{color:var(--warn)}
+.panes{flex:1;min-height:0;display:flex}
+.pane{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;position:relative}
+#root[data-m="read"] .pane.side,#root[data-m="side"] .pane.read{display:none}
+.scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.tabs{flex:none;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border-top:1px solid var(--line);background:var(--surf);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs button{padding:11px 4px 12px;font-size:12.5px;font-weight:700;color:var(--mute)}
+.tabs button[aria-pressed="true"]{color:var(--acc)}
+.tabs b{font-family:var(--f-d);font-variant-numeric:tabular-nums}
+@media (min-width:980px){
+  #root[data-m] .pane.read,#root[data-m] .pane.side{display:flex}
+  .pane.read{flex:1.3;border-right:1px solid var(--line)} .pane.side{max-width:500px}
+  .tabs{order:1;align-self:flex-end;width:500px;border-top:0;border-bottom:1px solid var(--line);background:none}
+  .tabs [data-tab="read"]{display:none}
+  .panes{order:2}
+  .rin{max-width:720px;margin:0 auto}
+}
+
+/* player */
+.player{flex:none;background:#000;width:100%;aspect-ratio:16/9;max-height:36vh;position:relative}
+.player iframe,.player #yt{position:absolute;inset:0;width:100%;height:100%;border:0}
+.pfall{position:absolute;inset:0;display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surf);text-decoration:none}
+.pfall img{height:100%;max-height:84px;aspect-ratio:16/9;object-fit:cover;border-radius:10px}
+.pfall b{display:block;font-size:14px;line-height:1.35} .pfall small{color:var(--mute);font-size:12px;line-height:1.4;display:block}
+#root.no-yt .player{aspect-ratio:auto;height:104px;background:var(--surf);border-bottom:1px solid var(--line)}
+#root.yt-ok .pfall{display:none}
+#root.p-min.yt-ok .player{height:0;aspect-ratio:auto;overflow:hidden}
+.rbar{flex:none;display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--line)}
+.seg3{display:inline-flex;background:var(--surf2);border-radius:10px;padding:2px}
+.seg3 button{padding:4px 12px;border-radius:8px;font-size:12.5px;font-weight:700;color:var(--mute)}
+.seg3 button[aria-pressed="true"]{background:var(--surf);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.rbar .mini{font-size:12px;font-weight:700;color:var(--mute)} #root.no-yt .rbar .mini{display:none}
+
+/* transcript */
+.rin{padding:0 18px 48px}
+.a-seg{padding-top:26px}
+.a-seg>header{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.a-seg>header h3{font-family:var(--f-d);font-size:26px;font-weight:900;margin:0;line-height:1.15;flex:1}
+.a-seg>header i{font-style:normal;font-family:var(--f-d);font-weight:800;color:var(--acc);font-size:14px}
+.turn{padding:12px 0 12px 12px;border-top:1px solid var(--line);border-left:3px solid transparent;margin-left:-12px}
+.turn.now{border-left-color:var(--acc)}
+.who{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.who b{font-size:12px;letter-spacing:.06em} .sp-L .who b{color:var(--mute)}
+.turn p{margin:0} .turn .zh{font-size:16.5px;line-height:1.85}
+.turn .en{font-family:var(--f-en);font-size:18.5px;line-height:1.55;color:var(--mute);margin-top:10px}
+.sp-L .zh{font-size:15px;color:var(--mute)} .sp-L .en{font-style:italic;font-size:17.5px}
+.m-zh .turn .en,.m-en .turn .zh{display:none} .m-en .turn .en{color:var(--ink);font-size:19.5px;margin-top:0}
+.s{cursor:pointer;border-radius:4px;padding:1px 0;-webkit-box-decoration-break:clone;box-decoration-break:clone;transition:background .2s}
+.s[data-hl="y"]{background:var(--hl-y)} .s[data-hl="p"]{background:var(--hl-p)} .s[data-hl="g"]{background:var(--hl-g)}
+.s.on{outline:2px solid var(--acc);outline-offset:1px} .s.has-note::after{content:"✎";font-size:11px;color:var(--acc);margin-left:2px;vertical-align:super}
+.gap{color:var(--mute);opacity:.6}
+.absorb{margin-top:10px;background:var(--surf);border-radius:22px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
+.absorb ul,.ov ul{margin:0;padding-left:1.1em;color:var(--mute);font-size:14px} .absorb li+li,.ov li+li{margin-top:4px}
+.core{font-size:18px;font-weight:700;line-height:1.5;margin:0}
+.chain{list-style:none;margin:8px 0 0;padding:0;counter-reset:c;display:grid;gap:8px}
+.chain li{counter-increment:c;padding-left:30px;position:relative;font-size:14px}
+.chain li::before{content:counter(c);position:absolute;left:0;top:1px;width:20px;height:20px;border-radius:50%;background:var(--acc);color:var(--on-acc);font-size:11px;font-weight:800;display:grid;place-items:center}
+details summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--acc)}
+.ask{font-weight:700;margin:0}
+
+/* sheet */
+#scrim{position:fixed;inset:0;background:rgba(8,9,20,.45);z-index:20}
+#sheet{position:fixed;left:50%;transform:translateX(-50%);width:min(100%,540px);bottom:0;z-index:21;background:var(--surf);border-radius:26px 26px 0 0;padding:10px 18px calc(18px + env(safe-area-inset-bottom,0px));max-height:84%;overflow-y:auto;box-shadow:0 -10px 40px rgba(0,0,0,.2);animation:up .22s ease-out;display:flex;flex-direction:column;gap:12px}
+#sheet::before{content:"";width:38px;height:4px;border-radius:2px;background:var(--line);align-self:center;flex:none}
+@keyframes up{from{transform:translate(-50%,40px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+#toast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:13px;font-weight:700;z-index:30;white-space:nowrap}
+.q-zh{font-size:17px;font-weight:500;margin:0;line-height:1.6}
+.q-en{font-family:var(--f-en);font-size:18.5px;color:var(--mute);margin:0;line-height:1.5}
+.ai-out{background:var(--surf2);border-radius:14px;padding:12px 14px;font-size:14px;white-space:pre-wrap}
+.ai-out::before{content:"Claude";display:block;font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--acc)}
+.hl-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.hl-row button{padding:9px 4px;border-radius:12px;background:var(--surf2);font-size:13px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:4px}
+.hl-row button i{width:22px;height:10px;border-radius:3px;border:1px solid var(--line)}
+.hl-row button[aria-pressed="true"]{outline:2px solid var(--ink)}
+.counter{background:var(--surf2);border-radius:16px;padding:12px 14px;font-size:14.5px}
+.counter b{display:block;font-size:11px;letter-spacing:.12em;color:var(--warn)}
+.linked{display:grid;gap:6px} .linked>*{display:flex;gap:8px;align-items:center;background:var(--surf2);border-radius:12px;padding:8px 12px;font-size:13px;text-align:left;width:100%}
+.linked span{flex:1} .linked .x{color:var(--mute);font-size:16px;width:24px;flex:none;text-align:center}
+.linked [aria-pressed="true"]{outline:2px solid var(--grow)}
+
+/* overview */
+.pad{padding:20px 18px 48px;display:flex;flex-direction:column;gap:16px}
+.pad h2{font-family:var(--f-d);font-size:28px;font-weight:900;margin:0;line-height:1.15;text-wrap:balance}
+.thesis{font-size:19px;font-weight:700;line-height:1.55;margin:0}
+.ov .meta{color:var(--mute);font-size:13px;margin:0}
+.chips{display:flex;gap:6px} .chips button{padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:700;background:var(--surf2);color:var(--mute)} .chips button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.chs{display:grid;gap:8px}
+.ch{background:var(--surf);border-radius:16px;padding:12px 14px;display:grid;gap:4px}
+.ch header{display:flex;align-items:baseline;gap:8px}
+.ch header b{flex:1;font-size:15.5px;line-height:1.35} .ch header small{color:var(--mute);font-size:11.5px;font-weight:400;display:block}
+.ch p{margin:0;font-size:13.5px;color:var(--mute);line-height:1.6}
+.ch .take{color:var(--ink);font-weight:500}
+.w{display:inline-flex;gap:2px;flex:none} .w i{width:6px;height:6px;border-radius:50%;background:var(--line)} .w i.on{background:var(--acc)}
+.ch .row{margin-top:4px}
+.ch.w1{opacity:.72}
+
+/* distill */
+.steps{flex:none;display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--line);font-size:12px;font-weight:700;color:var(--mute);overflow-x:auto;white-space:nowrap}
+.steps span{padding:3px 10px;border-radius:999px;background:var(--surf2)} .steps span.on{background:var(--grow);color:var(--on-acc)}
+.dmap{position:relative;padding:14px 12px 60px;display:grid;grid-template-columns:46% 1fr;gap:0 8%}
+.dmap svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.dmap path{fill:none;stroke:var(--grow);stroke-width:1.6;opacity:.6}
+.dcol{display:flex;flex-direction:column;gap:8px;position:relative;z-index:1}
+.dlab{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--mute);margin-top:10px}
+.spark{text-align:left;background:var(--surf);border:1.5px solid var(--line);border-left:5px solid var(--acc);border-radius:12px;padding:8px 10px;font-size:13px;line-height:1.45;font-weight:500;display:block;width:100%}
+.spark span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.spark small{display:block;font-size:10.5px;font-weight:700;color:var(--mute);font-variant-numeric:tabular-nums}
+.spark[data-hl="y"]{border-left-color:var(--edge-y)} .spark[data-hl="p"]{border-left-color:var(--edge-p)} .spark[data-hl="g"]{border-left-color:var(--edge-g)}
+.spark.used{border-color:var(--grow);border-left-width:5px} .spark.pick{outline:3px solid var(--grow);outline-offset:1px}
+.dright{position:relative;z-index:1}
+.claim{position:absolute;left:0;right:0;text-align:left;background:var(--grow);color:var(--on-acc);border-radius:16px;padding:10px 12px;font-size:13.5px;font-weight:700;line-height:1.45;box-shadow:0 0 0 calc(var(--lv)*4px) color-mix(in srgb,var(--grow) 20%,transparent)}
+.claim small{display:block;font-size:10.5px;opacity:.9;letter-spacing:.06em}
+.claim.pick{outline:3px solid var(--ink);outline-offset:6px}
+.dempty{position:absolute;left:0;right:0;top:34px;border:1.5px dashed var(--line);border-radius:16px;padding:16px 12px;color:var(--mute);font-size:13px;text-align:center}
+.banner{position:sticky;top:8px;z-index:3;margin:8px 12px 0;background:var(--ink);color:var(--bg);border-radius:14px;padding:8px 8px 8px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+.banner span{flex:1}
+
+/* cards */
+.vcard{background:var(--ink);color:var(--bg);border-radius:22px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.vcard p{margin:0;font-size:18px;font-weight:700;line-height:1.5}
+.vcard .ev{font-family:var(--f-en);font-size:15.5px;opacity:.8;line-height:1.45;border-left:2px solid var(--grow);padding-left:10px}
+.vcard .tag{font-size:11px;font-weight:700;padding:2px 10px;border-radius:999px;background:var(--grow);color:var(--on-acc)}
+.vcard .tlink{color:inherit;opacity:.75} .vcard button{font-size:12px;opacity:.7;text-decoration:underline}
+.vcard.mint{animation:mint .5s cubic-bezier(.2,1.4,.4,1)}
+@keyframes mint{from{transform:scale(.8) rotate(-4deg);opacity:0}to{transform:none;opacity:1}}
+.slot{border:1.5px dashed var(--line);border-radius:22px;padding:22px;color:var(--mute);text-align:center;font-size:13.5px}
+.ncard{background:var(--surf);border-radius:14px;padding:12px;border-left:5px solid var(--line);display:flex;flex-direction:column;gap:4px;font-size:14px}
+.ncard[data-hl="y"]{border-left-color:var(--edge-y)} .ncard[data-hl="p"]{border-left-color:var(--edge-p)} .ncard[data-hl="g"]{border-left-color:var(--edge-g)}
+.ncard .mine{font-weight:700} .ncard small{color:var(--mute)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="root" data-m="side">
+  <header class="top">
+    <h1>Reader</h1>
+    <span class="vt">Pieter Levels · Lex Fridman #440</span>
+    <span class="pips" id="pips" title="內化進度"></span>
+    <span class="sync" id="sync">僅存在這台裝置</span>
+  </header>
+  <div class="panes">
+    <section class="pane read">
+      <div class="player"><div id="yt"></div>
+        <a class="pfall" id="pfall" target="_blank" rel="noopener"><img alt="" id="pthumb"><span><b>在 YouTube 開啟影片 ↗</b><small id="pfmsg">影片載入中…</small></span></a>
+      </div>
+      <div class="rbar"><div class="seg3" role="group" aria-label="顯示語言"><button data-mode="zh">中</button><button data-mode="both">中英</button><button data-mode="en">EN</button></div><span class="sp" style="flex:1"></span><button class="mini" id="pmin">收起影片</button></div>
+      <div class="scroll" id="rscroll"></div>
+    </section>
+    <section class="pane side"><div class="steps" id="steps" hidden></div><div class="scroll" id="side"></div></section>
+  </div>
+  <nav class="tabs" id="tabs"><button data-tab="overview">總覽</button><button data-tab="read">閱讀</button><button data-tab="distill">淬煉 <b id="n-d"></b></button><button data-tab="cards">觀點卡 <b id="n-c"></b></button></nav>
+</div>
+<div id="scrim" hidden></div><div id="sheet" hidden></div><div id="toast" hidden></div>
+
+<script>
+const VID="oFtjKbXKqbg";
+const THUMB="__THUMB__";
+/*__DATA__*/
+const CH=/*__CH__*/[];
+const THESIS="一個人不募資，靠很多次兩週就上線的小實驗，找出有人願意付錢的那一個，再用自動化讓它不必變成一家公司。";
+const TLDR=["驗證的標準是陌生人付錢。他的流程是 idea、build、launch、grow、monetize、automate、exit，每一步都求最短。","多數點子會失敗，所以他提高嘗試次數：一年做 12 個產品，每個限期一個月，而且公開做。","技術選自己最熟、最簡單的（PHP、jQuery、SQLite），重複的工作交給自動化，維持一個人做得完的規模。"];
+const MAXC=3;
+
+/* ---------- helpers ---------- */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=t=>{const h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=String(Math.floor(t%60)).padStart(2,"0");return h?`${h}:${String(m).padStart(2,"0")}:${s}`:`${m}:${s}`};
+const yt=t=>`https://www.youtube.com/watch?v=${VID}&t=${t}s`;
+const tlink=(t,label)=>`<a class="tlink" data-t="${t}" href="${yt(t)}" target="_blank" rel="noopener">▶ ${label||fmt(t)}</a>`;
+const SENT={},TURNS=[];
+SEGS.forEach(g=>g.turns.forEach((tu,ti)=>{TURNS.push({t:tu.t,id:`${g.id}-${ti}`});tu.s.forEach((p,si)=>{if(p)SENT[`${g.id}-${ti}-${si}`]={en:p[0],zh:p[1],t:tu.t,seg:g,turn:tu}})}));
+TURNS.sort((a,b)=>a.t-b.t);
+const keyIds=g=>g.key.map(([a,b])=>`${g.id}-${a}-${b}`);
+const root=$("#root"),sheetEl=$("#sheet"),scrimEl=$("#scrim"),toastEl=$("#toast"),side=$("#side"),rscroll=$("#rscroll");
+let onSheetClose=null;
+function openSheet(html,onClose){sheetEl.innerHTML=html;sheetEl.hidden=false;scrimEl.hidden=false;sheetEl.scrollTop=0;onSheetClose=onClose||null}
+function closeSheet(){if(sheetEl.hidden)return;sheetEl.hidden=true;scrimEl.hidden=true;const f=onSheetClose;onSheetClose=null;f&&f()}
+scrimEl.onclick=closeSheet;
+let toastT;function toast(m){toastEl.textContent=m;toastEl.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>toastEl.hidden=true,1900)}
+async function copyText(ta){try{await navigator.clipboard.writeText(ta.value);toast("已複製")}catch(e){ta.focus();ta.select();toast("已全選，請手動複製")}}
+
+/* ---------- state: local first, cloud when available ---------- */
+const LS="rd4:"+VID;
+const blank=()=>({hl:{},notes:{},refl:{},claims:[],cards:[],mode:"both",at:0});
+let S=blank();try{Object.assign(S,JSON.parse(localStorage.getItem(LS))||{})}catch(e){}
+const ui={side:"overview",m:"side",coreOnly:false,linkTo:null,fresh:null};
+let cloud=null,pushT=null,remoteWaiting=false;
+const syncEl=$("#sync");
+function badge(t,c){syncEl.textContent=t;syncEl.className="sync "+(c||"")}
+function commit(){S.at=Date.now();try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){} meta();if(cloud){badge("同步中…");clearTimeout(pushT);pushT=setTimeout(push,900)}}
+async function push(){if(!cloud)return;const at=S.at;try{await cloud.set({json:JSON.stringify(S),at});if(at===S.at)badge("已同步","ok")}catch(e){badge("同步失敗，內容仍在這台裝置","warn")}}
+function adopt(json){try{S=Object.assign(blank(),JSON.parse(json))}catch(e){return}try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}
+  if(document.activeElement&&document.activeElement.tagName==="TEXTAREA"){remoteWaiting=true;return}renderAll()}
+document.addEventListener("focusout",()=>{if(remoteWaiting){remoteWaiting=false;setTimeout(()=>{if(!(document.activeElement&&document.activeElement.tagName==="TEXTAREA"))renderAll()},50)}});
+(async()=>{try{
+  if(!window.claude||!window.claude.use)return;
+  const [u,db]=await Promise.all([window.claude.use("user"),window.claude.use("db")]);
+  const id=u&&await u.id();if(!db||!id)return;
+  cloud=db.collection("data/users/"+id).doc("video-"+VID);badge("同步中…");
+  cloud.onSnapshot(snap=>{
+    const d=snap.exists?snap.data():null;
+    if(!d){if(S.at)push();else badge("已同步","ok");return}
+    if(d.at>S.at){adopt(d.json);badge("已同步","ok")}else if(d.at<S.at)push();else badge("已同步","ok");
+  },()=>{badge("同步暫停，內容仍在這台裝置","warn")});
+}catch(e){}})();
+
+/* live Claude (optional): prewritten content is always on screen first */
+let ask=null;
+(async()=>{try{ask=await window.claude?.use?.("sample")}catch(e){} if(ask)document.body.classList.add("has-ai")})();
+const AI_ERR={not_granted:"這個頁面沒有取得呼叫 Claude 的許可，這項功能先關閉。",rate_limited:"呼叫太頻繁，等一分鐘再試。",cancelled:""};
+async function askAI(prompt,out,btn){
+  if(!ask)return;out.hidden=false;out.textContent="思考中…";if(btn)btn.disabled=true;
+  try{await ask(prompt,{modelTier:"quick",onText:({text})=>{out.textContent=text}})}
+  catch(e){out.textContent=(e&&e.text)||AI_ERR[e&&e.code]||"這次沒有成功。其他內容不受影響，可以稍後再試。"}
+  finally{if(btn)btn.disabled=false}
+}
+
+/* ---------- player ---------- */
+let player=null,ytOK=false,tick=null,lastUserScroll=0,nowId=null;
+$("#pthumb").src=THUMB;$("#pfall").href=yt(SEGS[0].t);
+function noYT(){if(ytOK)return;root.classList.add("no-yt");$("#pfmsg").textContent="這個頁面不能嵌入播放器。時間戳會在 YouTube 從那一秒開啟。"}
+function initYT(){
+  window.onYouTubeIframeAPIReady=()=>{try{player=new YT.Player("yt",{videoId:VID,playerVars:{playsinline:1,rel:0,start:SEGS[0].t},events:{
+    onReady:()=>{ytOK=true;root.classList.remove("no-yt");root.classList.add("yt-ok")},
+    onStateChange:e=>{clearInterval(tick);if(e.data===1)tick=setInterval(follow,500)},
+    onError:()=>{if(!ytOK)noYT()}}})}catch(e){noYT()}};
+  const s=document.createElement("script");s.src="https://www.youtube.com/iframe_api";s.onerror=noYT;document.head.appendChild(s);
+  setTimeout(()=>{if(!ytOK)noYT()},9000);
+}
+function seek(t){if(!ytOK)return false;try{player.seekTo(t,true);player.playVideo()}catch(e){return false}root.classList.remove("p-min");$("#pmin").textContent="收起影片";return true}
+function follow(){
+  let cur;try{cur=player.getCurrentTime()}catch(e){return}
+  let hit=null;for(const tu of TURNS){if(tu.t<=cur+.3)hit=tu;else break}
+  const i=hit?TURNS.indexOf(hit):-1,next=TURNS[i+1];
+  if(hit&&!(next&&next.t-hit.t<150?cur<next.t:cur<hit.t+90))hit=null;
+  const id=hit?hit.id:null;if(id===nowId)return;nowId=id;
+  $$(".turn.now",rscroll).forEach(e=>e.classList.remove("now"));
+  if(!id)return;const el=$(`[data-turn="${id}"]`,rscroll);if(!el)return;el.classList.add("now");
+  if(Date.now()-lastUserScroll>4000)el.scrollIntoView({block:"center",behavior:"smooth"});
+}
+["wheel","touchmove"].forEach(ev=>rscroll.addEventListener(ev,()=>lastUserScroll=Date.now(),{passive:true}));
+$("#pmin").onclick=e=>{const m=root.classList.toggle("p-min");e.currentTarget.textContent=m?"顯示影片":"收起影片"};
+document.addEventListener("click",e=>{const a=e.target.closest("a[data-t]");if(!a)return;if(seek(+a.dataset.t)){e.preventDefault();if(a.dataset.goread!=null)setTab("read");else if(ui.m!=="read")toast("從 "+fmt(+a.dataset.t)+" 播放中")}});
+
+/* ---------- read ---------- */
+const span=(id,lang)=>{const s=SENT[id];return `<span class="s${S.notes[id]?" has-note":""}" data-id="${id}" data-hl="${S.hl[id]||""}" role="button" tabindex="0">${esc(s[lang])}</span>`};
+function renderRead(){
+  const top=rscroll.scrollTop;
+  rscroll.className="scroll m-"+S.mode;
+  rscroll.innerHTML=`<div class="rin">`+SEGS.map((g,gi)=>`<section class="a-seg" id="seg-${g.id}">
+    <header><i>${gi+1}/${SEGS.length}</i><h3>${g.title}</h3>${tlink(g.t)}</header>
+    ${g.turns.map((tu,ti)=>{const ids=tu.s.map((p,si)=>p?`${g.id}-${ti}-${si}`:null);const line=l=>ids.map(id=>id?span(id,l):`<span class="gap">[…]</span>`).join(l==="en"?" ":"");
+      return `<div class="turn sp-${tu.sp}" data-turn="${g.id}-${ti}"><div class="who"><b>${tu.sp==="L"?"LEX FRIDMAN":"PIETER LEVELS"}</b>${tlink(tu.t)}</div><p class="zh">${line("zh")}</p><p class="en" lang="en">${line("en")}</p></div>`}).join("")}
+    <div class="absorb">
+      <div class="eyebrow">這一段在說什麼</div><ul>${g.sum.map(x=>`<li>${x}</li>`).join("")}</ul>
+      <div class="eyebrow">第一性原理</div><p class="core">${g.core}</p>
+      <details><summary>展開推理鏈（${g.chain.length} 步）</summary><ol class="chain">${g.chain.map(x=>`<li>${x}</li>`).join("")}</ol></details>
+      <div class="eyebrow">換到你身上</div><p class="ask">${g.ask}</p>
+      <textarea id="refl-${g.id}" data-refl="${g.id}" placeholder="寫一兩句就好">${esc(S.refl[g.id]||"")}</textarea>
+    </div></section>`).join("")+`</div>`;
+  rscroll.scrollTop=top;nowId=null;
+  $$("[data-mode]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===S.mode));
+}
+function markSent(id){$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>{e.dataset.hl=S.hl[id]||"";e.classList.toggle("has-note",!!S.notes[id])})}
+function sentSheet(id){
+  const s=SENT[id];$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>e.classList.add("on"));
+  openSheet(`<p class="q-zh">${esc(s.zh)}</p><p class="q-en" lang="en">${esc(s.en)}</p>
+    <div class="hl-row">${[["y","洞見","var(--hl-y)"],["p","疑問","var(--hl-p)"],["g","要去做","var(--hl-g)"],["","不畫","transparent"]].map(([k,l,c])=>`<button data-hl="${k}" aria-pressed="${(S.hl[id]||"")===k}"><i style="background:${c}"></i>${l}</button>`).join("")}</div>
+    <textarea id="a-note" placeholder="這句讓你想到什麼？">${esc(S.notes[id]||"")}</textarea>
+    <div class="ai-out" id="a-aiout" hidden></div>
+    <div class="row">${tlink(s.t,"從這段播放 "+fmt(s.t))}<span class="sp"></span><button class="btn sm ghost ai-only" id="a-ask">請 AI 解釋這句</button><button class="btn sm" id="a-done">完成</button></div>`,
+    ()=>{$$(".s.on",rscroll).forEach(e=>e.classList.remove("on"));if(ui.side!=="overview")renderSide()});
+  $$("[data-hl]",sheetEl).forEach(b=>b.onclick=()=>{const k=b.dataset.hl;if(k)S.hl[id]=k;else delete S.hl[id];commit();markSent(id);$$("[data-hl]",sheetEl).forEach(x=>x.setAttribute("aria-pressed",x===b))});
+  $("#a-note").oninput=e=>{const v=e.target.value;if(v.trim()){S.notes[id]=v;if(!S.hl[id])S.hl[id]="y"}else delete S.notes[id];commit();markSent(id)};
+  $("#a-done").onclick=closeSheet;
+  $("#a-ask").onclick=e=>askAI(`你是陪讀夥伴。讀者的母語是繁體中文，是一位創業者，正在讀一段英文訪談逐字稿。請用繁體中文、最多 90 個字，解釋下面這句話在上下文中的意思，並點出它背後的一個假設。直接講，不要開場白，不要條列。\n\n這段的主題：${s.seg.title}\n上下文：${s.turn.s.filter(Boolean).map(p=>p[0]).join(" ")}\n要解釋的句子：${s.en}`,$("#a-aiout"),e.currentTarget);
+}
+rscroll.addEventListener("click",e=>{const s=e.target.closest(".s");if(s)sentSheet(s.dataset.id)});
+rscroll.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.classList.contains("s"))sentSheet(e.target.dataset.id)});
+rscroll.addEventListener("input",e=>{const k=e.target.dataset&&e.target.dataset.refl;if(k){S.refl[k]=e.target.value;commit()}});
+$$("[data-mode]").forEach(b=>b.onclick=()=>{S.mode=b.dataset.mode;commit();rscroll.className="scroll m-"+S.mode;$$("[data-mode]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
+
+/* ---------- overview ---------- */
+const segsIn=i=>SEGS.filter(g=>g.t>=CH[i].t&&(i===CH.length-1||g.t<CH[i+1].t));
+function renderOverview(){
+  const list=CH.map((c,i)=>({c,i,segs:segsIn(i)})).filter(x=>!ui.coreOnly||x.c.worth===3);
+  side.innerHTML=`<div class="pad ov">
+    <div><div class="eyebrow">3 小時 44 分 · ${CH.length} 個章節</div><h2>Pieter Levels: Programming, Viral AI Startups, and Digital Nomad Life</h2></div>
+    <p class="thesis">${THESIS}</p>
+    <ul>${TLDR.map(x=>`<li>${x}</li>`).join("")}</ul>
+    <div class="row"><div class="eyebrow" style="flex:1">章節 · 圓點越多越值得細看</div><div class="chips"><button data-core="0" aria-pressed="${!ui.coreOnly}">全部</button><button data-core="1" aria-pressed="${ui.coreOnly}">只看核心</button></div></div>
+    <div class="chs">${list.map(({c,i,segs})=>`<article class="ch w${c.worth}">
+      <header><b>${esc(c.zh)}<small>${esc(c.en)}</small></b><span class="w" title="值得細看的程度">${[1,2,3].map(n=>`<i class="${n<=c.worth?"on":""}"></i>`).join("")}</span>${tlink(c.t)}</header>
+      <p>${esc(c.sum)}</p>${c.take?`<p class="take">→ ${esc(c.take)}</p>`:""}
+      <div class="row">${segs.map(g=>`<button class="btn sm" data-seg="${g.id}">精讀「${g.title}」</button>`).join("")||`<a class="btn sm ghost" data-t="${c.t}" data-goread href="${yt(c.t)}" target="_blank" rel="noopener">播放這一章</a>`}</div>
+    </article>`).join("")}</div>
+    <p class="meta">這份試作只把 5 段展開成逐字稿。其餘章節的摘要讀的是完整逐字稿，可以直接播放。</p></div>`;
+}
+
+/* ---------- distill ---------- */
+function sparks(){const out=[];SEGS.forEach(g=>{out.push({id:"ai-"+g.id,seg:g,ai:true,text:g.spark,t:SENT[keyIds(g)[0]].t});
+  Object.keys(S.hl).filter(id=>SENT[id]&&SENT[id].seg===g).sort().forEach(id=>out.push({id,seg:g,text:SENT[id].zh,hl:S.hl[id],t:SENT[id].t}))});return out}
+const lvName=n=>n>=3?"樹":n===2?"芽":"種子";
+const liveEv=c=>{const ids=new Set(sparks().map(s=>s.id));return c.ev.filter(e=>ids.has(e))};
+function renderDistill(){
+  const sp=sparks(),used=new Set(S.claims.flatMap(c=>c.ev)),lt=ui.linkTo&&S.claims.find(c=>c.id===ui.linkTo);
+  let h="",last=null;
+  sp.forEach(s=>{if(s.seg!==last){h+=`<div class="dlab">${s.seg.title}</div>`;last=s.seg}
+    h+=`<button class="spark${used.has(s.id)?" used":""}${lt&&lt.ev.includes(s.id)?" pick":""}" data-spark="${s.id}" data-hl="${s.hl||""}"><small>${fmt(s.t)} · ${s.ai?"AI 挑的":"你畫的"}</small><span>${esc(s.text)}</span></button>`});
+  side.innerHTML=(lt?`<div class="banner"><span>點左邊的火花，加入或移除證據</span><button class="btn sm grow" id="d-done">完成</button></div>`:"")+
+    `<div class="dmap" id="dmap"><svg id="dsvg"></svg><div class="dcol"><div class="eyebrow">火花 ${sp.length}</div>${h}</div>
+    <div class="dright" id="dright"><div class="eyebrow">我的主張 ${S.claims.length}</div>${S.claims.length?"":`<div class="dempty">點左邊任何一個火花，寫下你的第一個主張</div>`}
+    ${S.claims.map(c=>{const n=liveEv(c).length,card=S.cards.some(k=>k.claim===c.id);return `<button class="claim${ui.linkTo===c.id?" pick":""}" data-claim="${c.id}" style="--lv:${Math.min(3,Math.max(1,n))}"><small>${card?"已成卡 · ":""}${lvName(n)} · ${n} 個證據</small>${esc(c.text)}</button>`}).join("")}</div></div>`;
+  requestAnimationFrame(layoutDistill);
+}
+function layoutDistill(){
+  const map=$("#dmap");if(!map)return;const right=$("#dright"),mr=map.getBoundingClientRect(),rr=right.getBoundingClientRect();
+  const mid=el=>{const r=el.getBoundingClientRect();return {x:r.right-mr.left,y:r.top-mr.top+r.height/2}};
+  const items=S.claims.map(c=>{const el=$(`[data-claim="${c.id}"]`,map),ev=liveEv(c).map(id=>$(`[data-spark="${id}"]`,map)).filter(Boolean).map(mid);
+    const want=ev.length?ev.reduce((a,p)=>a+p.y,0)/ev.length:60;return {c,el,ev,want,h:el.offsetHeight}}).sort((a,b)=>a.want-b.want);
+  let y=34;const off=rr.top-mr.top;
+  items.forEach(it=>{const top=Math.max(y,it.want-off-it.h/2);it.el.style.top=top+"px";it.cy=top+off+it.h/2;y=top+it.h+22});
+  right.style.minHeight=y+"px";
+  const lx=rr.left-mr.left;
+  $("#dsvg").innerHTML=items.flatMap(it=>it.ev.map(p=>`<path d="M${p.x} ${p.y} C${(p.x+lx)/2} ${p.y} ${(p.x+lx)/2} ${it.cy} ${lx} ${it.cy}"/>`)).join("");
+}
+window.addEventListener("resize",()=>{if(ui.side==="distill")layoutDistill()});
+function sparkSheet(id){
+  const s=sparks().find(x=>x.id===id);if(!s)return;const g=s.seg,q=s.ai?keyIds(g).map(i=>SENT[i]):[SENT[id]];
+  openSheet(`<div class="eyebrow">火花 · ${g.title}</div><p class="q-en" lang="en" style="color:var(--ink)">${q.map(x=>esc(x.en)).join(" ")}</p><p class="q-zh" style="font-size:15px;font-weight:400;color:var(--mute)">${q.map(x=>esc(x.zh)).join("")}</p>
+    ${!s.ai&&S.notes[id]?`<p style="margin:0;font-weight:700">✎ ${esc(S.notes[id])}</p>`:""}
+    <div class="row">${tlink(q[0].t,"從這段播放 "+fmt(q[0].t))}</div>
+    <details><summary>這一段的第一性原理</summary><p style="margin:8px 0 0">${g.core}</p></details>
+    ${S.claims.length?`<div class="eyebrow">當成哪個主張的證據？</div><div class="linked">${S.claims.map(c=>`<button data-toggle="${c.id}" aria-pressed="${c.ev.includes(id)}"><span>${esc(c.text)}</span><span class="x">${c.ev.includes(id)?"✓":"＋"}</span></button>`).join("")}</div>`:""}
+    <div class="eyebrow">${S.claims.length?"或者寫一個新主張":"這讓你想主張什麼？"}</div><textarea id="d-new" placeholder="用你會對朋友講的方式寫一句"></textarea>
+    <div class="row"><span class="sp"></span><button class="btn grow" id="d-plant" disabled>種下去</button></div>`,renderDistill);
+  const ta=$("#d-new");ta.oninput=()=>$("#d-plant").disabled=ta.value.trim().length<4;
+  $("#d-plant").onclick=()=>{S.claims.push({id:"k"+Date.now().toString(36),text:ta.value.trim(),ev:[id]});commit();closeSheet();toast("種下了一顆種子")};
+  $$("[data-toggle]",sheetEl).forEach(b=>b.onclick=()=>{const c=S.claims.find(x=>x.id===b.dataset.toggle),on=c.ev.includes(id);c.ev=on?c.ev.filter(e=>e!==id):[...c.ev,id];commit();b.setAttribute("aria-pressed",!on);b.lastElementChild.textContent=on?"＋":"✓"});
+}
+function claimSheet(cid){
+  const c=S.claims.find(x=>x.id===cid);if(!c)return;const sp=sparks(),ev=liveEv(c).map(id=>sp.find(s=>s.id===id)),n=ev.length;
+  openSheet(`<div class="eyebrow">我的主張 · ${lvName(n)} · ${n} 個證據</div><textarea id="d-edit">${esc(c.text)}</textarea>
+    <div class="linked">${ev.map(s=>`<div><span>${esc(s.text)}</span><button class="x" data-unlink="${s.id}" aria-label="移除證據">×</button></div>`).join("")||`<div><span style="color:var(--mute)">還沒有證據</span></div>`}</div>
+    <p style="margin:0;font-size:13px;color:var(--mute)">${n>=2?"證據夠了，可以鑄成觀點卡。每支影片最多留 "+MAXC+" 張。":"再連 "+(2-n)+" 個證據，就能鑄成觀點卡。"}</p>
+    <div class="row"><button class="btn line sm" id="d-del">刪除</button><button class="btn line sm" id="d-add">加證據</button><span class="sp"></span><button class="btn grow" id="d-mint" ${n>=2?"":"disabled"}>鑄成觀點卡</button></div>`,renderDistill);
+  $("#d-edit").oninput=e=>{c.text=e.target.value;commit()};
+  $("#d-add").onclick=()=>{ui.linkTo=cid;closeSheet()};
+  $("#d-del").onclick=()=>{S.claims=S.claims.filter(x=>x.id!==cid);commit();closeSheet()};
+  $("#d-mint").onclick=()=>mintSheet(cid);
+  $$("[data-unlink]",sheetEl).forEach(b=>b.onclick=()=>{c.ev=c.ev.filter(e=>e!==b.dataset.unlink);commit();claimSheet(cid)});
+}
+function mintSheet(cid){
+  const c=S.claims.find(x=>x.id===cid),sp=sparks(),ev=liveEv(c).map(id=>sp.find(s=>s.id===id));
+  const tally={};ev.forEach(s=>tally[s.seg.id]=(tally[s.seg.id]||0)+1);const g=SEGS.find(x=>x.id===Object.keys(tally).sort((a,b)=>tally[b]-tally[a])[0]);
+  const others=S.cards.filter(k=>k.claim!==cid),full=others.length>=MAXC;let revised=false;
+  openSheet(`<div class="eyebrow">鑄卡之前，先過反方這一關</div><textarea id="m-text">${esc(c.text)}</textarea>
+    <div class="counter"><b>反方會說</b>${g.counter}</div><div class="ai-out" id="m-ai" hidden></div>
+    <button class="btn sm ghost ai-only" id="m-live" style="align-self:flex-start">針對我這句話再反駁一次</button>
+    ${full?`<div class="eyebrow">已經有 ${MAXC} 張了。換掉哪一張？</div><div class="linked">${others.map((k,i)=>`<button data-swap="${k.id}" aria-pressed="${i===0}"><span>${esc(k.text)}</span></button>`).join("")}</div>`:""}
+    <div class="row"><span style="font-size:13px;color:var(--mute);flex:1">改了句子會標成「修正過」。</span><button class="btn grow" id="m-go">${full?"換掉並收成卡片":"收成卡片"}</button></div>`,renderDistill);
+  let swap=full?others[0].id:null;
+  $$("[data-swap]",sheetEl).forEach(b=>b.onclick=()=>{swap=b.dataset.swap;$$("[data-swap]",sheetEl).forEach(x=>x.setAttribute("aria-pressed",x===b))});
+  $("#m-text").oninput=e=>{c.text=e.target.value;revised=true;commit()};
+  $("#m-live").onclick=e=>askAI(`你是嚴格但友善的辯論對手。讀者看完一段訪談，用自己的話寫下一個主張。請用繁體中文、最多 100 個字，指出這個主張最弱的一個環節（一個具體反例，或一個沒說出口的假設），最後用一個問題結尾。不要稱讚，不要重述他的話，不要條列。\n\n訪談重點：${g.sum.join(" ")}\n他引用的證據：${ev.map(s=>s.text).join("；")}\n讀者的主張：${c.text}`,$("#m-ai"),e.currentTarget);
+  $("#m-go").onclick=()=>{if(c.text.trim().length<4)return;
+    S.cards=S.cards.filter(k=>k.claim!==cid&&k.id!==swap);const card={id:"c"+Date.now().toString(36),claim:cid,text:c.text.trim(),ev:liveEv(c),revised,at:Date.now()};S.cards.push(card);commit();
+    ui.fresh=card.id;closeSheet();toast("得到一張觀點卡");setTab("cards")};
+}
+
+/* ---------- cards ---------- */
+function evQuote(id){if(id.startsWith("ai-")){const g=SEGS.find(x=>"ai-"+x.id===id);const q=keyIds(g).map(i=>SENT[i]);return {en:q.map(x=>x.en).join(" "),zh:q.map(x=>x.zh).join(""),t:q[0].t}}return SENT[id]}
+function renderCards(){
+  const cards=S.cards,names={y:"洞見",p:"疑問",g:"要去做"};
+  const post=cards.length?`看完 Lex Fridman 訪 Pieter Levels（#440），我只留下這 ${cards.length} 句：\n\n`+cards.map((k,i)=>`${i+1}. ${k.text}`).join("\n\n"):"";
+  const hl=Object.keys(S.hl).filter(id=>SENT[id]).sort((a,b)=>SENT[a].t-SENT[b].t||a.localeCompare(b)),refl=SEGS.filter(g=>(S.refl[g.id]||"").trim());
+  side.innerHTML=`<div class="pad"><div><div class="eyebrow">這支影片最多留 ${MAXC} 張</div><h2>${cards.length?"這些句子是你寫的。":"還沒有觀點卡。"}</h2></div>
+    ${cards.map(k=>`<div class="vcard${ui.fresh===k.id?" mint":""}"><div class="row"><span class="tag">${k.revised?"修正過":"原句過關"}</span><span class="sp"></span><button data-drop="${k.id}">移除</button></div><p>${esc(k.text)}</p>
+      ${k.ev.map(evQuote).filter(Boolean).filter((q,i,a)=>!a.some((o,j)=>j!==i&&o.en.includes(q.en)&&(o.en.length>q.en.length||j<i))).slice(0,3).map(q=>`<div class="ev" lang="en">${esc(q.en)} ${tlink(q.t)}</div>`).join("")}</div>`).join("")}
+    ${Array.from({length:MAXC-cards.length},(_,i)=>`<div class="slot">${i===0&&!cards.length?"到「淬煉」把火花連成主張，有 2 個證據就能鑄成卡片。":"空位"}</div>`).join("")}
+    ${cards.length?`<div class="eyebrow">組成貼文</div><textarea class="big" id="c-post">${esc(post)}</textarea><div class="ai-out" id="c-ai" hidden></div>
+      <div class="row"><button class="btn" id="c-copy">複製</button><button class="btn ghost ai-only" id="c-polish">請 AI 順成一篇貼文</button></div>`:""}
+    <details><summary>全部筆記（畫線 ${hl.length} · 回答 ${refl.length}）</summary><div style="display:grid;gap:8px;margin-top:10px">
+      ${refl.map(g=>`<div class="ncard"><small>我對「${g.title}」的回答</small><span class="mine">${esc(S.refl[g.id])}</span></div>`).join("")}
+      ${hl.map(id=>{const s=SENT[id];return `<div class="ncard" data-hl="${S.hl[id]}"><small>${names[S.hl[id]]} · ${tlink(s.t)}</small><span>${esc(s.zh)}</span><span class="q-en" style="font-size:16px" lang="en">${esc(s.en)}</span>${S.notes[id]?`<span class="mine">✎ ${esc(S.notes[id])}</span>`:""}</div>`}).join("")||""}
+    </div></details></div>`;
+  ui.fresh=null;
+}
+
+/* ---------- shell ---------- */
+function meta(){
+  const h=Object.keys(S.hl).length,r=Object.values(S.refl).filter(v=>v&&v.trim()).length,k=S.claims.length,c=S.cards.length;
+  const done=[h>=3,r>=1,k>=1,c>=1,c>=MAXC];
+  $("#pips").innerHTML=done.map(d=>`<i class="${d?"on":""}"></i>`).join("");
+  $("#n-d").textContent=k||"";$("#n-c").textContent=c?c+"/"+MAXC:"";
+  const st=$("#steps");st.hidden=ui.side!=="distill";
+  st.innerHTML=[["畫線 "+h,h>=1],["寫主張 "+k,k>=1],["連 2 個證據",S.claims.some(x=>liveEv(x).length>=2)],["鑄卡 "+c+"/"+MAXC,c>=1]].map(([t,on],i)=>`<span class="${on?"on":""}">${i+1} ${t}</span>`).join("");
+}
+function renderSide(){({overview:renderOverview,distill:renderDistill,cards:renderCards})[ui.side]();meta();
+  $$("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===(ui.m==="read"?"read":ui.side)));root.dataset.m=ui.m}
+function setTab(t){closeSheet();const prev=ui.side;if(t==="read")ui.m="read";else{ui.m="side";ui.side=t}if(t!=="distill")ui.linkTo=null;renderSide();if(t!=="read"&&t!==prev)side.scrollTop=0}
+function renderAll(){renderRead();renderSide()}
+$("#tabs").onclick=e=>{const b=e.target.closest("[data-tab]");if(b)setTab(b.dataset.tab)};
+side.addEventListener("click",e=>{
+  const t=e.target.closest("button");if(!t)return;
+  if(t.dataset.core!=null){ui.coreOnly=t.dataset.core==="1";renderOverview()}
+  else if(t.dataset.seg){setTab("read");const el=$("#seg-"+t.dataset.seg);el&&el.scrollIntoView({block:"start"});lastUserScroll=Date.now()}
+  else if(t.id==="d-done"){ui.linkTo=null;renderDistill()}
+  else if(t.dataset.spark){if(ui.linkTo){const c=S.claims.find(x=>x.id===ui.linkTo),id=t.dataset.spark;c.ev=c.ev.includes(id)?c.ev.filter(x=>x!==id):[...c.ev,id];commit();renderDistill()}else sparkSheet(t.dataset.spark)}
+  else if(t.dataset.claim){if(ui.linkTo){ui.linkTo=null;renderDistill()}else claimSheet(t.dataset.claim)}
+  else if(t.dataset.drop){S.cards=S.cards.filter(k=>k.id!==t.dataset.drop);commit();renderCards()}
+  else if(t.id==="c-copy")copyText($("#c-post"));
+  else if(t.id==="c-polish")askAI(`把下面這位讀者自己寫的結論整理成一篇繁體中文社群貼文，250 字以內。規則：只能使用他寫的觀點，不能加入新論點；保留他的口吻；不要勵志結尾，不要 hashtag，不要 emoji。\n\n${$("#c-post").value}`,$("#c-ai"),t);
+});
+renderAll();initYT();
+</script>
