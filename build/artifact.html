@@ -787,12 +787,14 @@ async function fn(body){
 /* Keeps asking the backend for the next unit until the video is ready. Safe to call again at any time:
    the server remembers what is done, so a reload or a failed unit resumes from where it stopped. */
 async function drive(vid){
-  if(driving.has(vid))return;driving.add(vid);let fails=0;
+  if(driving.has(vid))return;driving.add(vid);let fails=0,drops=0;
   try{while(true){
     const j=await fn({action:"step",video_id:vid});
     if(j.error&&j.httpStatus===0){/* The request never arrived (offline, phone asleep, tab in the background): wait, never give up. */
+      if(++drops>=3){setLib(vid,{note:"這台裝置連不上，後端會繼續處理"});break}
       setLib(vid,{note:"連線中斷，恢復後會自動接著處理"});await back();await sleep(5000);continue}
-    if(j.error){fails++;if(j.fatal||j.status==="error"||fails>=8){setLib(vid,{status:"error",error:j.error,note:""});break}
+    drops=0;
+    if(j.error){fails++;if(j.fatal||j.status==="error"||fails>=3){setLib(vid,{status:"error",error:j.error,note:""});break}
       setLib(vid,{note:`遇到問題，第 ${fails} 次重試中：${j.error}`});await sleep(j.httpStatus===429?20000:3000*fails);continue}
     fails=0;setLib(vid,{title:j.title,status:j.status,progress:j.progress,error:j.error,note:""});
     if(j.busy){await sleep(4000);continue}
@@ -816,8 +818,7 @@ async function deepen(k){
   show("準備中…");let fails=0;
   while(true){
     const j=await fn({action:"deepen",video_id:vid,chapter:k});
-    if(j.error&&j.httpStatus===0){show("連線中斷，恢復後繼續…");await back();await sleep(5000);continue}
-    if(j.error){fails++;if(j.fatal||fails>=4){delete ui.busy[g.id];if(VID===vid){renderRead();renderSide()}toast("精讀沒有完成："+j.error);return}
+    if(j.error){fails++;if(j.fatal||fails>=3){delete ui.busy[g.id];if(VID===vid){renderRead();renderSide()}toast("精讀沒有完成："+j.error);return}
       show(`重試中（${fails}）…`);await sleep(j.httpStatus===429?20000:3000*fails);continue}
     fails=0;if(j.busy){await sleep(3000);continue}
     if(j.done)break;
