@@ -773,11 +773,15 @@ async function loadLibrary(){if(!canIngest())return;
   if(error)return;LIB=[LIB.find(x=>x.demo),...data];renderHome();
   data.filter(v=>v.status==="queued"||v.status==="processing").forEach(v=>drive(v.video_id));
 }
+/* Resolves once the page is visible and the browser reports a connection. */
+function back(){return new Promise(res=>{const ok=()=>!document.hidden&&navigator.onLine!==false;if(ok())return res();
+  const f=()=>{if(ok()){document.removeEventListener("visibilitychange",f);window.removeEventListener("online",f);res()}};
+  document.addEventListener("visibilitychange",f);window.addEventListener("online",f)})}
 async function fn(body){
   const {data:{session}}=await sb.auth.getSession();
   if(!session)return {error:"登入已過期，請重新登入。",fatal:true};
   let r;try{r=await fetch(CFG.supabaseUrl+"/functions/v1/ingest",{method:"POST",headers:{"content-type":"application/json",apikey:CFG.supabaseAnonKey,Authorization:"Bearer "+session.access_token},body:JSON.stringify(body)})}
-  catch(e){return {error:"連不上後端，檢查網路後會自動重試。",httpStatus:0}}
+  catch(e){return {error:"連不上後端，請檢查網路。",httpStatus:0}}
   const j=await r.json().catch(()=>({}));if(!r.ok&&!j.error)j.error="後端沒有回應（"+r.status+"）";j.httpStatus=r.status;return j;
 }
 /* Keeps asking the backend for the next unit until the video is ready. Safe to call again at any time:
@@ -786,6 +790,8 @@ async function drive(vid){
   if(driving.has(vid))return;driving.add(vid);let fails=0;
   try{while(true){
     const j=await fn({action:"step",video_id:vid});
+    if(j.error&&j.httpStatus===0){/* The request never arrived (offline, phone asleep, tab in the background): wait, never give up. */
+      setLib(vid,{note:"連線中斷，恢復後會自動接著處理"});await back();await sleep(5000);continue}
     if(j.error){fails++;if(j.fatal||fails>=4){setLib(vid,{status:"error",error:j.error,note:""});break}
       setLib(vid,{note:`遇到問題，第 ${fails} 次重試中：${j.error}`});await sleep(j.httpStatus===429?20000:3000*fails);continue}
     fails=0;setLib(vid,{title:j.title,status:j.status,progress:j.progress,error:j.error,note:""});
@@ -810,6 +816,7 @@ async function deepen(k){
   show("準備中…");let fails=0;
   while(true){
     const j=await fn({action:"deepen",video_id:vid,chapter:k});
+    if(j.error&&j.httpStatus===0){show("連線中斷，恢復後繼續…");await back();await sleep(5000);continue}
     if(j.error){fails++;if(j.fatal||fails>=4){delete ui.busy[g.id];if(VID===vid){renderRead();renderSide()}toast("精讀沒有完成："+j.error);return}
       show(`重試中（${fails}）…`);await sleep(j.httpStatus===429?20000:3000*fails);continue}
     fails=0;if(j.busy){await sleep(3000);continue}
