@@ -308,3 +308,4 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
 .redo{border-top:1px solid var(--line);padding-top:14px;display:grid;gap:10px}
 .redo .row{align-items:flex-start}
 .ch .take b{font-weight:500;font-size:13px;color:var(--mute);margin-right:8px}
+.ch .said{font-size:14.5px;color:var(--mute);border-left:2px solid var(--line);padding-left:10px;margin-left:2px}

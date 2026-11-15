@@ -98,7 +98,7 @@ const TRANSCRIPT_SCHEMA = {
 const STR = { type: "STRING" }, INT = { type: "INTEGER" };
 const LIST = (items) => ({ type: "ARRAY", items });
 const OBJ = (properties) => ({ type: "OBJECT", properties, required: Object.keys(properties) });
-const CHAPTER_ITEM = OBJ({ t: INT, en: STR, zh: STR, sum: STR, take: STR, insight: STR, worth: INT });
+const CHAPTER_ITEM = OBJ({ t: INT, en: STR, zh: STR, sum: STR, take: STR, conclusion: STR, quote: STR, worth: INT });
 const META = { lang: STR, title: STR, host: STR, thesis: STR, tldr: LIST(STR) };
 const SCHEMA = {
   outline: OBJ({ ...META, chapters: LIST(CHAPTER_ITEM) }),
@@ -156,7 +156,7 @@ export const DEFAULT_PROMPTS = {
   style: `怎麼寫（這一段最重要，寫完請逐句對照）：
 - 平鋪直敘。像做筆記，把事情講清楚就好。不要寫金句、口號、格言，不求好記、不求漂亮。
 - 用台灣人平常講話的字。短句，一句只講一件事。一句裡的逗號超過兩個就拆成兩句。
-- 寫具體的事：誰、做了什麼、數字多少。不要替講者歸納人生道理。
+- 寫具體的事：誰、做了什麼、數字多少。只能用講者自己講過的內容，不要替他歸納道理，不要加你自己的看法。
 - 用動詞講，不要把動作變成名詞。寫「他兩週就上線」，不要寫「進行快速的產品驗證」。
 - 這些詞不要用：透過、藉由、進而、從而、打造、賦能、極致、極簡、核心、關鍵、本質、痛點、心法、迷思、哲學、思維、底層邏輯、最大化、優化、落地、聚焦、洞察、驅動、建構、形塑、彰顯。
 - 少用「度、性、化」結尾的抽象名詞（自由度、可能性、最佳化）。「自動化」這種本來就是日常用詞的可以。
@@ -175,12 +175,11 @@ sum　 好：「他不拿創投，設計、程式、logo 全部自己來。點�
 take（做法）　好：「不募資，點子兩週內上線，確認有人付費才繼續做。」
 　　　好：「每個月上線一個產品，期限到了就發，公開寫在部落格上。」
 　　　不好：「點子有沒有用，看陌生人願不願意拿出信用卡。」（這是道理，不是做法）
-insight（洞見）　好：「他事先不知道哪個點子會成，所以每個都做得很小，兩週就丟出去看反應。」
-　　　好：「註冊不用花錢，所以他不看註冊數。有人願意付錢，他才相信真的有人需要。」
-　　　好：「登入系統晚一年才補上，用戶照樣付錢。很多覺得一定要有的功能，其實可以晚點做。」
-　　　不好：「付費是唯一誠實的訊號。」（格言）
-　　　不好：「治好迷惘最快的方法，就是強迫自己每個月交出一個作品。」（歸納成人生道理）
-　　　不好：「速度本身就是一種體驗。」（口號）
+conclusion（結論）　好：「他說大多數點子行不通，要有人掏信用卡付錢，才算驗證過。」
+　　　好：「他說 30 天裡最難的是搞清楚什麼不該做，因為沒有時間。」
+　　　不好：「很多覺得一定要有的功能，其實可以晚點做。」（這是你自己的推論，講者沒有這樣說）
+　　　不好：「付費是唯一誠實的訊號。」（講者沒講過這句，而且是格言）
+quote（原話）　conclusion 是根據哪一句話寫的，就把那一句從逐字稿原封不動抄過來，不要翻譯、不要改字。
 thesis 好：「Pieter Levels 一個人做了 70 幾個產品，賺錢的只有 4 個。他不募資，想到就做，兩週內上線，有人付錢才繼續。」
 　　　不好：「一個人不募資，靠很多次兩週就上線的小實驗，找出有人願意付錢的那一個，再用自動化讓它不必變成一家公司。」（一個長句塞四件事，沒有人、沒有數字）
 　　　不好：「他主張人必須相信當下的直覺，做自己真心熱愛的事，並用死亡的必然性甩開旁人的眼光。」（並列三件事）
@@ -206,7 +205,8 @@ counter 好：「壞了再修只適用在修得回來的錯誤。金流算錯、
   chapterTitle: `<10 字內的中文標題。用名詞短語，像筆記本的分類標籤，只說這一章在談什麼>`,
   chapterSum: `<兩三個短句，75 字內，講者實際說了或做了什麼，帶具體的數字、名稱、做法>`,
   chapterTake: `<做法。一行，40 字內。把這一章講者的做法照順序列出來，用逗號隔開，只寫動作和事實。純閒聊就留空字串>`,
-  chapterInsight: `<洞見。一到兩個普通的句子，55 字內。講他為什麼這樣做，或這一章讓人看懂的一件事。照他的情況具體講，用他的例子，不要寫成格言、口號或人生道理。沒有就留空字串>`,
+  chapterConclusion: `<結論。講者自己在這一章講出來的結論或判斷，一到兩句，55 字內。只能把他講過的話改寫成中文，不可以加你自己的推論、延伸或評價。他沒有下結論就留空字串>`,
+  chapterQuote: `<conclusion 根據的那一句原話，從逐字稿原封不動抄過來。conclusion 是空字串時這裡也留空>`,
   thesis: `<兩到三個短句，70 字內。第一句講這個人是誰、做了什麼，要有具體的數字或事實。後面只講他最主要的「一個」做法，照實寫，不要並列好幾個>`,
   segTitle: `<8 字內的中文標題。用名詞短語，只說這一章在談什麼>`,
   spark: `<14 字內，這一章講的最主要一件事，平鋪直敘>`,
@@ -292,7 +292,7 @@ export async function ingestStep(row, deps) {
   // Chapters are cut one hour of transcript at a time, so no single request grows with the length of the video.
   const CHAPTER_SPEC =
     `{"t":<這一章開始的秒數，必須是逐字稿裡某一行的秒數>,"en":"<原文語言的短標題>","zh":"${pr.chapterTitle}",` +
-    `"sum":"${pr.chapterSum}","take":"${pr.chapterTake}","insight":"${pr.chapterInsight}","worth":<1 到 3 的整數，3 是核心>}`;
+    `"sum":"${pr.chapterSum}","take":"${pr.chapterTake}","conclusion":"${pr.chapterConclusion}","quote":"${pr.chapterQuote}","worth":<1 到 3 的整數，3 是核心>}`;
   const CHAPTER_RULES =
     `- 依主題切章，一章只講一件事。20 分鐘以內的影片切 3 到 6 章；更長的影片每章大約 3 到 15 分鐘，任何一章都不要超過 15 分鐘，話題換了就切。\n` +
     `- worth 看的是「這一章對讀者有多少可以帶走的東西」：3 是核心論點或可以直接照做的方法，2 是有用的補充，1 是開場、閒聊、致謝這類可以跳過的。3 分最多佔三分之一。\n` +
@@ -302,7 +302,7 @@ export async function ingestStep(row, deps) {
   const cleanChapters = (list, starts) => {
     const snap = (t) => starts.reduce((best, x) => (Math.abs(x - t) < Math.abs(best - t) ? x : best), starts[0]);
     return (Array.isArray(list) ? list : [])
-      .map((c) => ({ t: snap(Number(c.t) || 0), en: String(c.en || ""), zh: String(c.zh || ""), sum: String(c.sum || ""), take: String(c.take || ""), insight: String(c.insight || ""), worth: Math.min(3, Math.max(1, Math.round(Number(c.worth) || 1))) }))
+      .map((c) => ({ t: snap(Number(c.t) || 0), en: String(c.en || ""), zh: String(c.zh || ""), sum: String(c.sum || ""), take: String(c.take || ""), conclusion: String(c.conclusion || ""), quote: String(c.quote || ""), worth: Math.min(3, Math.max(1, Math.round(Number(c.worth) || 1))) }))
       .sort((x, y) => x.t - y.t);
   };
   const finish = (meta, chapters) => {
@@ -310,6 +310,15 @@ export async function ingestStep(row, deps) {
     chapters = chapters.sort((x, y) => x.t - y.t).filter((c, i, arr) => i === 0 || c.t > arr[i - 1].t);
     if (!chapters.length) throw new Error("沒有產生章節，請重試。");
     chapters[0].t = starts[0];
+    const norm = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+    chapters.forEach((c, i) => {
+      const end = i + 1 < chapters.length ? chapters[i + 1].t : Infinity;
+      const said = norm(work.turns.filter((t) => t.t >= c.t && t.t < end).map((t) => t.text).join(" "));
+      const q = norm(c.quote);
+      // No matching sentence in this chapter means the conclusion is the model's own; drop it.
+      if (c.conclusion && !(q.length >= 12 && said.includes(q))) { c.conclusion = ""; c.quote = ""; }
+      if (!c.conclusion) c.quote = "";
+    });
     const segs = chapters.map((c, i) => {
       const end = i + 1 < chapters.length ? chapters[i + 1].t : Infinity;
       const turns = work.turns.filter((t) => t.t >= c.t && t.t < end)
