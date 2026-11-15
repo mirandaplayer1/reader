@@ -844,13 +844,15 @@ async function fetchContent(vid){
   if(cache[vid])return cache[vid];
   const {data,error}=await sb.from("videos").select("content").eq("video_id",vid).maybeSingle();
   if(error||!data||!data.content)return null;
-  return cache[vid]=data.content;
+  const c=data.content,half=!/^zh/i.test(c.lang||"")&&c.segs.some(g=>g.turns.some(t=>t.s.some(p=>p&&p[1]==null)));
+  if(!half)cache[vid]=c;   // still being translated: read it fresh next time
+  return c;
 }
 const STEP={meta:"讀取影片資訊",transcribe:"讀影片內容",outline:"整理章節和摘要",synth:"寫整支影片的總覽",ready:"完成"};
 function statusLine(it){const t=statusText(it);return it.demo||it.status==="ready"||it.status==="error"?t:t+" · 可以關掉頁面，會在背景跑完"}
 function statusText(it){
   if(it.demo)return "範例 · 只有 5 段節錄";
-  if(it.status==="ready")return "可以閱讀";
+  if(it.status==="ready"){const p=it.progress||{};return p.phase==="translate"?`可以閱讀 · 翻譯中 ${p.done||0} / ${p.total} 句`:"可以閱讀"}
   if(it.status==="error")return "沒有完成："+(it.error||"未知的問題");
   if(it.note)return it.note;
   const p=it.progress||{};

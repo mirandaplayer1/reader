@@ -192,11 +192,12 @@ ask　　好：「你手上哪個點子，其實兩週內就能放上一個付�
 　　　 不好：「你現在緊抓不放的既有想法或微小成果，是否正阻礙你像初學者一樣靈活探索新方向？」
 counter 好：「壞了再修只在錯誤可逆時成立。金流算錯、資料外洩，兩分鐘修不回來。你的產品裡哪些地方不可逆？」`;
 
-/* ---------- ingest: meta -> transcribe (chunk by chunk) -> outline -> ready ---------- */
+/* ---------- ingest: meta -> transcribe (chunk by chunk) -> outline -> ready (-> translate, in the background) ---------- */
 
 export async function ingestStep(row, deps) {
   const work = Object.assign({ phase: "meta", next: 0, turns: [], visuals: [] }, row.work || {});
   const url = "https://www.youtube.com/watch?v=" + row.video_id;
+  if (work.phase === "translate") return translateStep(row, work, deps);
 
   if (work.phase === "meta") {
     let title = row.title || "", channel = "";
@@ -298,7 +299,12 @@ export async function ingestStep(row, deps) {
       duration: work.duration, host: String(meta.host || ""), thesis: String(meta.thesis || ""),
       tldr: (Array.isArray(meta.tldr) ? meta.tldr : []).map(String).slice(0, 3), chapters, segs, visuals: work.visuals,
     };
-    return { status: "ready", title: content.title, content, work: { phase: "ready", channel: work.channel }, progress: { phase: "ready", done: 1, total: 1 }, error: null };
+    // Readable from here on. Translation carries on in the background unless the video is already in Chinese.
+    let total = 0, have = 0;
+    segs.forEach((g) => g.turns.forEach((tu) => tu.s.forEach((p) => { total++; if (p[1] != null) have++; })));
+    const more = !/^zh/i.test(content.lang) && have < total;
+    return { status: "ready", title: content.title, content, work: { phase: more ? "translate" : "ready", channel: work.channel },
+      progress: more ? { phase: "translate", done: have, total } : { phase: "ready", done: 1, total: 1 }, error: null };
   };
   const META_SPEC =
     `"lang":"<逐字稿語言的 BCP-47 代碼，例如 en、zh-TW、ja>","title":"<影片標題，看不出來就寫最貼切的一句>",` +
@@ -373,6 +379,41 @@ export function reprocessPatch(row, mode) {
   };
 }
 
+// Translates a list of consecutive sentences. Returns one translation per sentence, in order.
+async function translateList(deps, list, title) {
+  const prompt =
+    `把下面 ${list.length} 個句子翻成繁體中文（台灣用語）。它們是同一段訪談或演講裡連續的句子。\n` +
+    `輸出 JSON：{"zh":["<第 1 句的翻譯>", ...]}，陣列長度必須剛好是 ${list.length}，順序一一對應。\n` +
+    `規則：\n- 忠於原意，不要加原文沒有的內容，不要省略。\n- 翻成台灣人講話的樣子，像好的字幕。原文是口語就翻口語，短句就翻短句。\n- 不要書面連接詞（透過、藉由、進而、然而、此外），不要把動詞翻成名詞（「進行了討論」寫成「聊了」）。\n- 產品名、人名、技術名詞保留原文。「you know」「I mean」這類贅字可以順掉。\n\n` +
+    `這一章的主題：${title}\n\n` + list.map((x, i) => `${i + 1}. ${x}`).join("\n");
+  const out = await llmJSON(deps, prompt, 12000, SCHEMA.translate);
+  const zh = Array.isArray(out.zh) ? out.zh : [];
+  if (zh.length !== list.length) throw new Error("翻譯句數對不上（要 " + list.length + " 句，拿到 " + zh.length + " 句），請重試。");
+  return zh.map((z, i) => String(z || "").trim() || list[i]);
+}
+
+/* ---------- translate the whole video in the background, after it is already readable ---------- */
+
+const PARALLEL = 3;   // translation requests per step
+
+async function translateStep(row, work, deps) {
+  const content = row.content;
+  const finished = { work: { phase: "ready", channel: work.channel || "" }, progress: { phase: "ready", done: 1, total: 1 } };
+  if (!content || !Array.isArray(content.segs) || /^zh/i.test(content.lang || "")) return finished;
+  const todo = []; let total = 0;
+  content.segs.forEach((g) => g.turns.forEach((tu) => tu.s.forEach((p) => { total++; if (p[1] == null) todo.push({ p, title: g.title }); })));
+  if (!todo.length) return finished;
+  const batches = [];
+  for (let i = 0; i < PARALLEL && i * TRANSLATE_BATCH < todo.length; i++) batches.push(todo.slice(i * TRANSLATE_BATCH, (i + 1) * TRANSLATE_BATCH));
+  const res = await Promise.allSettled(batches.map((b) => translateList(deps, b.map((x) => x.p[0]), b[0].title)));
+  let ok = 0;
+  res.forEach((r, i) => { if (r.status === "fulfilled") { batches[i].forEach((x, j) => { x.p[1] = r.value[j]; }); ok += batches[i].length; } });
+  if (!ok) throw res[0].reason;            // keep whatever succeeded; fail the step only when nothing did
+  const left = todo.length - ok;
+  if (!left) return { content, ...finished };
+  return { content, work: { phase: "translate", channel: work.channel || "" }, progress: { phase: "translate", done: total - left, total } };
+}
+
 /* ---------- deepen one chapter on demand: translate in batches, then analyse ---------- */
 
 export async function deepenStep(row, k, deps) {
@@ -388,15 +429,8 @@ export async function deepenStep(row, k, deps) {
   const todo = sameLang ? [] : flat.filter((x) => x.p[1] == null);
   if (todo.length) {
     const batch = todo.slice(0, TRANSLATE_BATCH);
-    const prompt =
-      `把下面 ${batch.length} 個句子翻成繁體中文（台灣用語）。它們是同一段訪談或演講裡連續的句子。\n` +
-      `輸出 JSON：{"zh":["<第 1 句的翻譯>", ...]}，陣列長度必須剛好是 ${batch.length}，順序一一對應。\n` +
-      `規則：\n- 忠於原意，不要加原文沒有的內容，不要省略。\n- 翻成台灣人講話的樣子，像好的字幕。原文是口語就翻口語，短句就翻短句。\n- 不要書面連接詞（透過、藉由、進而、然而、此外），不要把動詞翻成名詞（「進行了討論」寫成「聊了」）。\n- 產品名、人名、技術名詞保留原文。「you know」「I mean」這類贅字可以順掉。\n\n` +
-      `這一章的主題：${seg.title}\n\n` + batch.map((x, i) => `${i + 1}. ${x.p[0]}`).join("\n");
-    const out = await llmJSON(deps, prompt, 12000, SCHEMA.translate);
-    const zh = Array.isArray(out.zh) ? out.zh : [];
-    if (zh.length !== batch.length) throw new Error("翻譯句數對不上（要 " + batch.length + " 句，拿到 " + zh.length + " 句），請重試。");
-    batch.forEach((x, i) => { x.p[1] = String(zh[i] || "").trim() || x.p[0]; });
+    const zh = await translateList(deps, batch.map((x) => x.p[0]), seg.title);
+    batch.forEach((x, i) => { x.p[1] = zh[i]; });
     const left = todo.length - batch.length;
     return { content, done: false, progress: { phase: "translate", done: total - left, total } };
   }
