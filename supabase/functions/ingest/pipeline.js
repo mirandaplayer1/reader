@@ -290,7 +290,7 @@ export async function ingestStep(row, deps) {
     const segs = chapters.map((c, i) => {
       const end = i + 1 < chapters.length ? chapters[i + 1].t : Infinity;
       const turns = work.turns.filter((t) => t.t >= c.t && t.t < end)
-        .map((t) => ({ sp: t.speaker, t: t.t, s: splitSentences(t.text).map((x) => [x, null]) }));
+        .map((t) => ({ sp: t.speaker, t: t.t, s: splitSentences(t.text).map((x) => [x, (work.zh && work.zh[x]) || null]) }));
       return { id: "c" + i, t: c.t, title: c.zh || c.en, deep: false, turns };
     });
     const content = {
@@ -348,6 +348,29 @@ export async function ingestStep(row, deps) {
   }
 
   return {};
+}
+
+/* ---------- reprocess: run a finished video again ---------- */
+
+// mode "text": keep the transcript and any translations, redo chapters, summaries and analysis.
+// mode "all":  start over from the video itself.
+export function reprocessPatch(row, mode) {
+  const c = row.content;
+  if (mode === "all" || !c || !Array.isArray(c.segs)) {
+    return { status: "queued", work: {}, progress: { phase: "meta", done: 0, total: null }, error: null };
+  }
+  const cjk = /^zh|^ja/i.test(c.lang || "");
+  const zh = {};
+  const turns = c.segs.flatMap((g) => g.turns.map((t) => {
+    t.s.forEach((p) => { if (p && p[1] && p[1] !== p[0]) zh[p[0]] = p[1]; });
+    const text = t.s.map((p) => p[0]).join(cjk ? "" : " ");
+    return { t: t.t, speaker: t.sp, text };
+  }));
+  return {
+    status: "processing", error: null,
+    work: { phase: "outline", turns, visuals: c.visuals || [], channel: c.channel || "", duration: c.duration, length: c.duration, zh },
+    progress: { phase: "outline", done: 0, total: null },
+  };
 }
 
 /* ---------- deepen one chapter on demand: translate in batches, then analyse ---------- */
