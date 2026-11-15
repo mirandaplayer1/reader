@@ -281,3 +281,24 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
 .mono .turn .en,.mono .rbar .seg3{display:none}
 @media (min-width:980px){ #home{grid-column:1/-1;grid-row:2/4} }
 #toast{max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis}
+
+/* player keeps a true 16:9 picture: sized by height, centred, never cropped */
+.pane.read{container-type:inline-size}
+.player{aspect-ratio:auto;max-height:none;height:min(38vh,56.25cqw);display:flex;justify-content:center}
+.player iframe,.player #yt{position:static;inset:auto;height:100%;width:auto;aspect-ratio:16/9;max-width:100%}
+#root.no-yt .player{height:100px}
+#root.p-min.yt-ok .player{height:0}
+.split{display:none}
+@media (min-width:980px){
+  .player{height:min(46vh,56.25cqw)}
+  #root{grid-template-columns:minmax(0,1fr) var(--side-w,520px)}
+  /* divider between the two columns */
+  .split{display:block;position:absolute;left:-5px;top:0;bottom:0;width:10px;cursor:col-resize;z-index:6;touch-action:none}
+  .split::after{content:"";position:absolute;left:4px;top:0;bottom:0;width:2px;background:transparent;transition:background .15s}
+  .split:hover::after,.split:focus-visible::after,body.resizing .split::after{background:var(--lav)}
+  body.resizing{cursor:col-resize;user-select:none} body.resizing iframe{pointer-events:none}
+  /* sheets become a centred dialog instead of sitting at the bottom edge */
+  #sheet{bottom:auto;top:50%;transform:translate(-50%,-50%);border-radius:12px;max-height:82vh;width:min(92vw,600px);animation:pop .16s ease-out}
+  @keyframes pop{from{transform:translate(-50%,-48%);opacity:0}to{transform:translate(-50%,-50%);opacity:1}}
+  #toast{bottom:28px}
+}
