@@ -262,7 +262,7 @@ function renderOverview(){
     <div class="row"><div class="eyebrow" style="flex:1">章節</div><div class="chips"><button data-core="0" aria-pressed="${!ui.coreOnly}">全部</button><button data-core="1" aria-pressed="${ui.coreOnly}">只看核心</button></div></div>
     <div class="chs">${list.map(({c,i,segs})=>`<article class="ch w${c.worth}">
       <header><b><span class="t">${esc(c.zh)}</span><small>${esc(c.en)}</small></b><span class="w w${c.worth}">${["","可跳過","值得看","核心"][c.worth]}</span>${tlink(c.t)}</header>
-      <p>${esc(c.sum)}</p>${c.conclusion!=null?`${c.take?`<p class="take"><b>做法</b>${esc(c.take)}</p>`:""}${c.conclusion?`<p class="take"><b>結論</b>${esc(c.conclusion)}</p><p class="said">「${esc(c.quote)}」</p>`:""}`:c.take?`<p class="take">→ ${esc(c.take)}</p>`:""}
+      <p>${esc(c.sum)}</p>${c.take?`<p class="take">→ ${esc(c.take)}</p>`:""}
       <div class="row">${segs.map(g=>isDeep(g)?`<button class="btn sm" data-seg="${g.id}">精讀「${esc(g.title)}」</button>`
         :`<button class="btn sm" data-deepen="${SEGS.indexOf(g)}" ${ui.busy[g.id]?"disabled":""}>${ui.busy[g.id]?esc(ui.busy[g.id]):"精讀這一章"}</button><button class="btn sm line" data-seg="${g.id}" data-raw>看原文</button>`).join("")
         ||`<a class="btn sm ghost" data-t="${c.t}" data-goread href="${yt(c.t)}" target="_blank" rel="noopener">播放這一章</a>`}</div>

@@ -68,15 +68,3 @@ begin
 end $$;
 revoke all on function public.reader_access() from public, anon;
 grant execute on function public.reader_access() to authenticated;
-
--- Optional overrides for the wording rules used when summaries and analysis are generated.
--- key "prompts" holds a JSON object; any of the keys in DEFAULT_PROMPTS (pipeline.js) may be set.
--- Readable by signed-in users, writable only from the dashboard or SQL editor.
-create table if not exists public.settings (
-  key        text primary key,
-  value      jsonb not null,
-  updated_at timestamptz not null default now()
-);
-alter table public.settings enable row level security;
-drop policy if exists "read settings" on public.settings;
-create policy "read settings" on public.settings for select to authenticated using (true);

@@ -40,13 +40,7 @@ Deno.serve(async (req) => {
       textModel: pick(body.text_model) || Deno.env.get("GEMINI_TEXT_MODEL") || Deno.env.get("GEMINI_VIDEO_MODEL") || "gemini-3.8-flash",
       anthropicKey: Deno.env.get("ANTHROPIC_API_KEY") || "",
       claudeModel: Deno.env.get("CLAUDE_MODEL") || "",
-      prompts: {} as Record<string, string>,
     };
-    // Optional wording overrides, editable in the Supabase table editor without a deploy.
-    try {
-      const { data: st } = await sb.from("settings").select("value").eq("key", "prompts").maybeSingle();
-      if (st && st.value && typeof st.value === "object") deps.prompts = st.value;
-    } catch (_) { /* defaults apply */ }
 
     const summary = (r: any) => ({ video_id: r.video_id, title: r.title, status: r.status, progress: r.progress, error: r.error });
 
