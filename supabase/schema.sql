@@ -30,6 +30,7 @@ create table if not exists public.videos (
   work       jsonb,
   content    jsonb,
   lock_until timestamptz,
+  fails      int    not null default 0,      -- failures in a row on the current step
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (user_id, video_id)
@@ -68,3 +69,16 @@ begin
 end $$;
 revoke all on function public.reader_access() from public, anon;
 grant execute on function public.reader_access() to authenticated;
+
+-- Background processing: every minute, if anything is waiting, wake the ingest function so videos finish with
+-- the page closed. The key below is the public anon key (the same one the web page ships with).
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+select cron.schedule('reader-tick', '* * * * *', $job$
+  select net.http_post(
+    url := 'https://azgtjxznqdppistljerl.supabase.co/functions/v1/ingest',
+    headers := jsonb_build_object('content-type', 'application/json', 'Authorization', 'Bearer <anon key>'),
+    body := '{"action":"tick"}'::jsonb,
+    timeout_milliseconds := 5000)
+  where exists (select 1 from public.videos where status in ('queued', 'processing'));
+$job$);
