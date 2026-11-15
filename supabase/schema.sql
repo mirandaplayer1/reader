@@ -31,6 +31,8 @@ create table if not exists public.videos (
   content    jsonb,
   lock_until timestamptz,
   fails      int    not null default 0,      -- failures in a row on the current step
+  list       text,                           -- name of the list this video is filed under, if any
+  seq        int,                            -- order inside that list
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (user_id, video_id)

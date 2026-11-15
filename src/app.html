@@ -399,7 +399,7 @@ const cache={};const driving=new Set();
 const canIngest=()=>!!(sb&&sbUser);
 function setLib(vid,patch){let it=LIB.find(x=>x.video_id===vid&&!x.demo);if(!it){it={video_id:vid,title:"",status:"queued"};LIB.splice(1,0,it)}Object.assign(it,patch);if(root.dataset.view==="home")renderHome()}
 async function loadLibrary(){if(!canIngest())return;
-  const {data,error}=await sb.from("videos").select("video_id,title,status,progress,error,updated_at").order("updated_at",{ascending:false});
+  const {data,error}=await sb.from("videos").select("video_id,title,status,progress,error,updated_at,list,seq").order("updated_at",{ascending:false});
   if(error)return;LIB=[LIB.find(x=>x.demo),...data];renderHome();
   data.filter(v=>v.status==="queued"||v.status==="processing").forEach(v=>drive(v.video_id));
 }
@@ -490,6 +490,38 @@ function statusText(it){
   if(p.phase==="outline"&&p.total>1)return `正在整理章節和摘要，${p.done||0} / ${p.total}`;
   return "正在"+(STEP[p.phase]||"排隊")+"…";
 }
+/* Videos grouped by list. A list is just a name on the video; videos without one sit under 未分類. */
+const lists=()=>[...new Set(LIB.map(it=>it.list).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"zh-Hant"));
+const shut=()=>{try{return JSON.parse(localStorage.getItem("reader-shut")||"[]")}catch(e){return []}};
+function itemHtml(it){return `<div class="item-row"><button class="item${it.status==="ready"?"":" wait"}" data-vid="${it.video_id}" data-status="${it.status}"${it.demo?" data-demo":""}>
+      <img alt="" src="${it.demo?THUMB:`https://i.ytimg.com/vi/${it.video_id}/mqdefault.jpg`}" onerror="this.style.visibility='hidden'">
+      <span><b>${esc(it.title||"（讀取中）"+it.video_id)}</b><small class="${it.status==="error"?"err":""}">${esc(statusLine(it))}</small>${it.status==="error"?`<em>點這裡從中斷的地方重試</em>`:""}</span></button>${it.demo||!canIngest()?"":`<button class="tolist" data-tolist="${it.video_id}" aria-label="放進清單" title="放進清單">清單</button>`}</div>`}
+function libHtml(){
+  const all=LIB.filter(it=>!(it.demo&&LIB.some(x=>!x.demo&&x.video_id===it.video_id))),names=lists(),closed=shut();
+  if(!names.length)return `<div class="lib">${all.map(itemHtml).join("")}</div>`;
+  const group=(name,items,key)=>items.length?`<details class="group" data-group="${esc(key)}"${closed.includes(key)?"":" open"}><summary><b>${esc(name)}</b><span>${items.length} 支</span></summary><div class="lib">${items.map(itemHtml).join("")}</div></details>`:"";
+  const inList=n=>all.filter(it=>it.list===n).sort((a,b)=>(a.seq??1e9)-(b.seq??1e9)||String(a.title).localeCompare(String(b.title),"zh-Hant",{numeric:true}));
+  return names.map(n=>group(n,inList(n),n)).join("")+group("未分類",all.filter(it=>!it.list),"");
+}
+async function setList(vid,name){
+  const it=LIB.find(x=>x.video_id===vid&&!x.demo);if(!it)return;
+  const list=(name||"").trim().slice(0,60)||null,was=it.list;
+  if(list===(was||null)){closeSheet();return}
+  const seq=list?Math.max(0,...LIB.filter(x=>x.list===list).map(x=>x.seq||0))+1:null;
+  Object.assign(it,{list,seq});closeSheet();renderHome();
+  const {error}=await sb.from("videos").update({list,seq}).eq("video_id",vid);
+  if(error){Object.assign(it,{list:was});renderHome();toast("沒有存到，請再試一次")}
+}
+function pickList(vid){
+  const it=LIB.find(x=>x.video_id===vid&&!x.demo);if(!it)return;
+  openSheet(`<div class="eyebrow">放進清單</div><p class="q-zh">${esc(it.title||vid)}</p>
+    <div class="row picks">${lists().map(n=>`<button class="btn sm${n===it.list?"":" line"}" data-pick="${esc(n)}">${esc(n)}</button>`).join("")}</div>
+    <form id="newlist" class="add"><input id="newlist-name" maxlength="60" placeholder="新清單的名字"><button class="btn">建立並放入</button></form>
+    <div class="row"><span class="sp"></span>${it.list?`<button class="btn line" id="unlist">移出清單</button>`:""}<button class="btn line" id="pl-no">取消</button></div>`);
+  sheetEl.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>setList(vid,b.dataset.pick));
+  $("#newlist").onsubmit=e=>{e.preventDefault();const v=$("#newlist-name").value.trim();if(v)setList(vid,v)};
+  $("#pl-no").onclick=closeSheet;const u=$("#unlist");if(u)u.onclick=()=>setList(vid,"");
+}
 function renderHome(){
   const why=window.claude?"這個預覽頁不能處理新影片，也不能嵌入播放器（平台會擋）。部署版才有這兩項。"
     :!(CFG.supabaseUrl&&CFG.supabaseAnonKey)?"後端還沒接上，目前只能看範例。"
@@ -501,15 +533,15 @@ function renderHome(){
     <p class="meta" id="add-msg">${why}</p>
     ${!window.claude&&sb&&!sbUser?`<div><button class="btn" id="home-login">登入</button></div>`:""}
     <div class="eyebrow">我的影片</div>
-    <div class="lib">${LIB.filter(it=>!(it.demo&&LIB.some(x=>!x.demo&&x.video_id===it.video_id))).map(it=>`<button class="item${it.status==="ready"?"":" wait"}" data-vid="${it.video_id}" data-status="${it.status}"${it.demo?" data-demo":""}>
-      <img alt="" src="${it.demo?THUMB:`https://i.ytimg.com/vi/${it.video_id}/mqdefault.jpg`}" onerror="this.style.visibility='hidden'">
-      <span><b>${esc(it.title||"（讀取中）"+it.video_id)}</b><small class="${it.status==="error"?"err":""}">${esc(statusLine(it))}</small>${it.status==="error"?`<em>點這裡從中斷的地方重試</em>`:""}</span></button>`).join("")}</div>
+    ${libHtml()}
   </div>`;
   if(keep)$("#add-url").value=keep;
   $("#add").onsubmit=e=>{e.preventDefault();addVideo($("#add-url").value.trim())};
   const hl=$("#home-login");if(hl)hl.onclick=()=>syncEl.click();
+  homeEl.querySelectorAll("details.group").forEach(d=>d.ontoggle=()=>{const k=d.dataset.group,c=shut().filter(x=>x!==k);if(!d.open)c.push(k);try{localStorage.setItem("reader-shut",JSON.stringify(c))}catch(e){}});
 }
 homeEl.addEventListener("click",async e=>{
+  const tl=e.target.closest("[data-tolist]");if(tl){pickList(tl.dataset.tolist);return}
   const b=e.target.closest("[data-vid]");if(!b)return;const vid=b.dataset.vid,st=b.dataset.status;
   if(b.dataset.demo!=null){openVideo(DEMO);return}
   if(st==="error"){setLib(vid,{status:"processing",error:null,note:"重新開始…"});drive(vid);return}
