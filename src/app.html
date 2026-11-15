@@ -20,7 +20,7 @@
       <div class="rbar"><div class="seg3" role="group" aria-label="顯示語言"><button data-mode="zh">中</button><button data-mode="both">中英</button><button data-mode="en">EN</button></div><span class="sp" style="flex:1"></span><button class="mini" id="pmin">收起影片</button></div>
       <div class="scroll" id="rscroll"></div>
     </section>
-    <section class="pane side"><div class="steps" id="steps" hidden></div><div class="scroll" id="side"></div></section>
+    <section class="pane side"><div class="split" id="split" role="separator" aria-orientation="vertical" aria-label="拖曳調整左右欄寬度" tabindex="0"></div><div class="steps" id="steps" hidden></div><div class="scroll" id="side"></div></section>
   </div>
   <nav class="tabs" id="tabs"><button data-tab="overview">總覽</button><button data-tab="read">閱讀</button><button data-tab="distill">淬煉 <b id="n-d"></b></button><button data-tab="cards">觀點卡 <b id="n-c"></b></button></nav>
 </div>
@@ -467,5 +467,21 @@ function openVideo(c){
 }
 function goHome(){closeSheet();try{if(player&&ytOK)player.pauseVideo()}catch(e){} root.dataset.view="home";$("#vt").textContent="";renderHome()}
 $("#gohome").onclick=goHome;
+/* wide screens: drag the divider to resize the two columns; double-click to reset */
+(function(){
+  const split=$("#split"),KEY="rd4:side-w",clamp=w=>Math.max(340,Math.min(innerWidth-420,w));
+  const apply=w=>{root.style.setProperty("--side-w",clamp(w)+"px")};
+  try{const w=+localStorage.getItem(KEY);if(w)apply(w)}catch(e){}
+  let on=false;
+  split.addEventListener("pointerdown",e=>{on=true;split.setPointerCapture(e.pointerId);document.body.classList.add("resizing");e.preventDefault()});
+  split.addEventListener("pointermove",e=>{if(on)apply(innerWidth-e.clientX)});
+  const end=()=>{if(!on)return;on=false;document.body.classList.remove("resizing");
+    try{localStorage.setItem(KEY,parseInt(getComputedStyle(root).getPropertyValue("--side-w"))||"")}catch(e){}
+    if(ui.side==="distill"&&root.dataset.view==="video")layoutDistill()};
+  split.addEventListener("pointerup",end);split.addEventListener("pointercancel",end);
+  split.addEventListener("dblclick",()=>{root.style.removeProperty("--side-w");try{localStorage.removeItem(KEY)}catch(e){} if(ui.side==="distill"&&root.dataset.view==="video")layoutDistill()});
+  split.addEventListener("keydown",e=>{if(e.key!=="ArrowLeft"&&e.key!=="ArrowRight")return;const cur=parseInt(getComputedStyle(root).getPropertyValue("--side-w"))||520;apply(cur+(e.key==="ArrowLeft"?24:-24));end.call(null);try{localStorage.setItem(KEY,clamp(cur+(e.key==="ArrowLeft"?24:-24)))}catch(x){}});
+  addEventListener("resize",()=>{const cur=parseInt(getComputedStyle(root).getPropertyValue("--side-w"));if(cur)apply(cur)});
+})();
 renderHome();
 </script>
