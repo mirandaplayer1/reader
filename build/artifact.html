@@ -321,6 +321,17 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
 .ch .take b{font-weight:500;font-size:13px;color:var(--mute);margin-right:8px}
 .ch .said{font-size:14.5px;color:var(--mute);border-left:2px solid var(--line);padding-left:10px;margin-left:2px}
 
+/* Part-of-a-sentence highlights and the bar that appears while text is selected */
+.s mark{color:var(--ink);border-radius:3px;padding:2px 0;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.s mark[data-hl="y"]{background:var(--hl-y)} .s mark[data-hl="p"]{background:var(--hl-p)} .s mark[data-hl="g"]{background:var(--hl-g)}
+.s[data-soft="y"]{box-shadow:inset 0 -2px 0 var(--edge-y)} .s[data-soft="p"]{box-shadow:inset 0 -2px 0 var(--edge-p)} .s[data-soft="g"]{box-shadow:inset 0 -2px 0 var(--edge-g)}
+#selbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:25;display:flex;gap:6px;align-items:center;
+  max-width:calc(100vw - 20px);padding:8px 10px;border-radius:12px;background:var(--surf);box-shadow:0 0 0 1px var(--line),0 8px 28px rgba(16,22,60,.22);font-size:15px;white-space:nowrap}
+#selbar[hidden]{display:none}
+#selbar span{color:var(--mute);padding:0 4px}
+#selbar button{display:flex;gap:6px;align-items:center;padding:9px 11px;border-radius:8px;color:var(--ink)} #selbar button:hover{background:var(--surf2)}
+#selbar i{width:14px;height:14px;border-radius:4px;box-shadow:inset 0 0 0 1px var(--line)}
+
 </style>
 
 <div id="root" data-m="side" data-view="home">
@@ -345,6 +356,7 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
   <nav class="tabs" id="tabs"><button data-tab="overview">總覽</button><button data-tab="read">閱讀</button><button data-tab="distill">淬煉 <b id="n-d"></b></button><button data-tab="cards">觀點卡 <b id="n-c"></b></button></nav>
 </div>
 <div id="scrim" hidden></div><div id="sheet" hidden></div><div id="toast" hidden></div>
+<div id="selbar" hidden role="toolbar" aria-label="畫重點"><span>畫成</span><button data-k="y"><i style="background:var(--hl-y)"></i>洞見</button><button data-k="p"><i style="background:var(--hl-p)"></i>疑問</button><button data-k="g"><i style="background:var(--hl-g)"></i>要去做</button><button data-k="">取消</button></div>
 
 <script>
 let VID="";
@@ -437,7 +449,7 @@ function indexContent(){SENT={};TURNS=[];const seen={};
 /* Older notes used chapter-based ids (c3-12-0). Convert them once, while the chapters are still the same. */
 function migrateIds(){if(!V||V.demo)return;let ch=false;
   const m=id=>{const r=/^c(\d+)-(\d+)-(\d+)$/.exec(id);if(!r)return id;const tu=SEGS[+r[1]]&&SEGS[+r[1]].turns[+r[2]];if(!tu)return id;ch=true;return `${tu._id}-${r[3]}`};
-  for(const k of ["hl","notes"]){const o={};for(const id in S[k])o[m(id)]=S[k][id];S[k]=o}
+  for(const k of ["hl","notes","rng"]){const o={};for(const id in S[k]||{})o[m(id)]=S[k][id];S[k]=o}
   S.claims.forEach(c=>c.ev=(c.ev||[]).map(m));S.cards.forEach(c=>c.ev=(c.ev||[]).map(m));
   if(ch)commit()}
 const isDeep=g=>g.deep!==false;
@@ -453,7 +465,7 @@ async function copyText(ta){try{await navigator.clipboard.writeText(ta.value);to
 
 /* ---------- state: local first, cloud when available ---------- */
 let LS="";
-const blank=()=>({hl:{},notes:{},refl:{},claims:[],cards:[],mode:"both",at:0});
+const blank=()=>({hl:{},notes:{},rng:{},refl:{},claims:[],cards:[],mode:"both",at:0});
 let S=blank();
 function loadState(){LS="rd4:"+VID;S=blank();try{Object.assign(S,JSON.parse(localStorage.getItem(LS))||{})}catch(e){}}
 const ui={side:"overview",m:"side",coreOnly:false,linkTo:null,fresh:null,open:new Set(),busy:{}};
@@ -585,7 +597,15 @@ $("#pmin").onclick=e=>{const m=root.classList.toggle("p-min");e.currentTarget.te
 document.addEventListener("click",e=>{const a=e.target.closest("a[data-t]");if(!a)return;if(seek(+a.dataset.t)){e.preventDefault();if(a.dataset.goread!=null)setTab("read");else if(ui.m!=="read")toast("從 "+fmt(+a.dataset.t)+" 播放中")}});
 
 /* ---------- read ---------- */
-const span=(id,lang)=>{const s=SENT[id];return `<span class="s${S.notes[id]?" has-note":""}" data-id="${id}" data-hl="${S.hl[id]||""}" role="button" tabindex="0">${esc(s[lang])}</span>`};
+/* A highlight covers a whole sentence, or just the part that was selected: S.rng[id] = {en:[from,to], zh:[from,to]}.
+   The language the selection was made in shows the exact part; the other one only gets an underline. */
+const RNG=()=>S.rng||(S.rng={});
+const part=(id,lang)=>{const r=S.hl[id]&&RNG()[id];return r&&r[lang]?r[lang]:null};
+const cut=(id,lang)=>{const r=part(id,lang),t=SENT[id][lang];return r?t.slice(r[0],r[1]):t};
+const picked=id=>{const r=S.hl[id]&&RNG()[id];return r?(r.zh?cut(id,"zh"):cut(id,"en")):SENT[id].zh};
+function sentLook(id,lang){const k=S.hl[id]||"",any=k&&RNG()[id],r=part(id,lang),t=SENT[id][lang];
+  return {hl:any?"":k,soft:any&&!r?k:"",html:r?esc(t.slice(0,r[0]))+`<mark data-hl="${k}">${esc(t.slice(r[0],r[1]))}</mark>`+esc(t.slice(r[1])):esc(t)}}
+const span=(id,lang)=>{const l=sentLook(id,lang);return `<span class="s${S.notes[id]?" has-note":""}" data-id="${id}" data-lang="${lang}" data-hl="${l.hl}" data-soft="${l.soft}" role="button" tabindex="0">${l.html}</span>`};
 function renderRead(){
   const top=rscroll.scrollTop,mono=/^zh/i.test(V.lang||"");
   root.classList.toggle("mono",mono);
@@ -607,23 +627,51 @@ function renderRead(){
   rscroll.scrollTop=top;nowId=null;
   $$("[data-mode]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===S.mode));
 }
-function markSent(id){$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>{e.dataset.hl=S.hl[id]||"";e.classList.toggle("has-note",!!S.notes[id])})}
+function markSent(id){$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>{const l=sentLook(id,e.dataset.lang||"zh");e.dataset.hl=l.hl;e.dataset.soft=l.soft;e.innerHTML=l.html;e.classList.toggle("has-note",!!S.notes[id])})}
 function sentSheet(id){
   const s=SENT[id];$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>e.classList.add("on"));
   openSheet(`<p class="q-zh">${esc(s.zh)}</p>${s.zh===s.en?"":`<p class="q-en">${esc(s.en)}</p>`}
     <div class="hl-row">${[["y","洞見","var(--hl-y)"],["p","疑問","var(--hl-p)"],["g","要去做","var(--hl-g)"],["","不畫","transparent"]].map(([k,l,c])=>`<button data-hl="${k}" aria-pressed="${(S.hl[id]||"")===k}"><i style="background:${c}"></i>${l}</button>`).join("")}</div>
+    ${S.hl[id]&&RNG()[id]?`<p class="meta" id="a-part">只畫了：「${esc(picked(id))}」 <button class="btn sm line" id="a-whole">改成整句</button></p>`:""}
     <textarea id="a-note" placeholder="這句讓你想到什麼？">${esc(S.notes[id]||"")}</textarea>
     <div class="ai-out" id="a-aiout" hidden></div>
     <div class="row">${tlink(s.t,"▶ 從這段播放 "+fmt(s.t))}<span class="sp"></span><button class="btn sm ghost ai-only" id="a-ask">請 AI 解釋這句</button><button class="btn sm" id="a-done">完成</button></div>`,
     ()=>{$$(".s.on",rscroll).forEach(e=>e.classList.remove("on"));if(ui.side!=="overview")renderSide()});
-  $$("[data-hl]",sheetEl).forEach(b=>b.onclick=()=>{const k=b.dataset.hl;if(k)S.hl[id]=k;else delete S.hl[id];commit();markSent(id);$$("[data-hl]",sheetEl).forEach(x=>x.setAttribute("aria-pressed",x===b))});
+  $$("[data-hl]",sheetEl).forEach(b=>b.onclick=()=>{const k=b.dataset.hl;if(k)S.hl[id]=k;else{delete S.hl[id];delete RNG()[id];const pp=$("#a-part");if(pp)pp.hidden=true}commit();markSent(id);$$("[data-hl]",sheetEl).forEach(x=>x.setAttribute("aria-pressed",x===b))});
   $("#a-note").oninput=e=>{const v=e.target.value;if(v.trim()){S.notes[id]=v;if(!S.hl[id])S.hl[id]="y"}else delete S.notes[id];commit();markSent(id)};
   $("#a-done").onclick=closeSheet;
+  const whole=$("#a-whole");if(whole)whole.onclick=()=>{delete RNG()[id];commit();markSent(id);$("#a-part").hidden=true};
   $("#a-ask").onclick=e=>askAI(`你是陪讀夥伴。讀者的母語是繁體中文，是一位創業者，正在讀一段英文訪談逐字稿。請用繁體中文、最多 90 個字，解釋下面這句話在上下文中的意思，並點出它背後的一個假設。直接講，不要開場白，不要條列。\n\n這段的主題：${s.seg.title}\n上下文：${s.turn.s.filter(Boolean).map(p=>p[0]).join(" ")}\n要解釋的句子：${s.en}`,$("#a-aiout"),e.currentTarget);
 }
 rscroll.addEventListener("click",e=>{const s=e.target.closest(".s"),o=e.target.closest("[data-open]"),d=e.target.closest("[data-deepen]");
+  if(s&&!getSelection().isCollapsed)return;
   if(s)sentSheet(s.dataset.id);else if(o){ui.open.add(o.dataset.open);renderRead()}else if(d)deepen(+d.dataset.deepen)});
 rscroll.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.classList.contains("s"))sentSheet(e.target.dataset.id)});
+/* Select text to highlight from any point to any point, inside one sentence or across several. */
+const selbar=$("#selbar");let selParts=[];
+function readSelection(){
+  const sel=getSelection();if(!sel.rangeCount||sel.isCollapsed)return [];
+  const rg=sel.getRangeAt(0);if(!rscroll.contains(rg.commonAncestorContainer))return [];
+  // Each turn shows the translation and then the original. A selection that runs across turns passes over the other
+  // language on the way, so only the language the selection starts in counts.
+  const out=[],hit=$$(".s",rscroll).filter(el=>rg.intersectsNode(el)),lang=hit.length?hit[0].dataset.lang:"";
+  hit.filter(el=>el.dataset.lang===lang).forEach(el=>{
+    const len=el.textContent.length,at=(node,off,dflt)=>{if(!el.contains(node))return dflt;const r=document.createRange();r.selectNodeContents(el);r.setEnd(node,off);return r.toString().length};
+    let a=at(rg.startContainer,rg.startOffset,0),b=at(rg.endContainer,rg.endOffset,len);const t=el.textContent;
+    while(a<b&&/\s/.test(t[a]))a++;while(b>a&&/\s/.test(t[b-1]))b--;
+    if(b-a<1)return;out.push({id:el.dataset.id,lang:el.dataset.lang,a,b,full:a===0&&b===len})});
+  return out;
+}
+let selT;document.addEventListener("selectionchange",()=>{clearTimeout(selT);selT=setTimeout(()=>{
+  if(root.dataset.view==="home"||!sheetEl.hidden){selbar.hidden=true;return}
+  const ps=readSelection();if(ps.length){selParts=ps;selbar.hidden=false}else selbar.hidden=true},180)});
+selbar.addEventListener("pointerdown",e=>e.preventDefault());   // keep the selection while the button is pressed
+selbar.addEventListener("click",e=>{const b=e.target.closest("[data-k]");if(!b)return;const k=b.dataset.k;
+  if(k){selParts.forEach(x=>{if(!SENT[x.id])return;S.hl[x.id]=k;
+      if(x.full){const r=RNG()[x.id];if(r){delete r[x.lang];if(!Object.keys(r).length)delete RNG()[x.id]}}
+      else RNG()[x.id]={...(RNG()[x.id]||{}),[x.lang]:[x.a,x.b]}});
+    commit();[...new Set(selParts.map(x=>x.id))].forEach(markSent);if(ui.side!=="overview")renderSide()}
+  getSelection().removeAllRanges();selbar.hidden=true;selParts=[]});
 rscroll.addEventListener("input",e=>{const k=e.target.dataset&&e.target.dataset.refl;if(k){S.refl[k]=e.target.value;commit()}});
 $$("[data-mode]").forEach(b=>b.onclick=()=>{S.mode=b.dataset.mode;commit();rscroll.className="scroll m-"+S.mode;$$("[data-mode]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
 
@@ -655,7 +703,7 @@ function renderOverview(){
 
 /* ---------- distill ---------- */
 function sparks(){const out=[];SEGS.forEach(g=>{const k=isDeep(g)?keyIds(g):[];if(k.length)out.push({id:"ai-"+g.id,seg:g,ai:true,text:g.spark,t:SENT[k[0]].t});
-  Object.keys(S.hl).filter(id=>SENT[id]&&SENT[id].seg===g).sort().forEach(id=>out.push({id,seg:g,text:SENT[id].zh,hl:S.hl[id],t:SENT[id].t}))});return out}
+  Object.keys(S.hl).filter(id=>SENT[id]&&SENT[id].seg===g).sort().forEach(id=>out.push({id,seg:g,text:picked(id),hl:S.hl[id],t:SENT[id].t}))});return out}
 const lvName=n=>n>=3?"樹":n===2?"芽":"種子";
 const liveEv=c=>{const ids=new Set(sparks().map(s=>s.id));return c.ev.filter(e=>ids.has(e))};
 function renderDistill(){
@@ -738,7 +786,7 @@ function renderCards(){
       <div class="row"><button class="btn" id="c-copy">複製</button><button class="btn ghost ai-only" id="c-polish">請 AI 順成一篇貼文</button></div>`:""}
     <details><summary>全部筆記（畫線 ${hl.length} · 回答 ${refl.length}）</summary><div style="display:grid;gap:8px;margin-top:10px">
       ${refl.map(g=>`<div class="ncard"><small>我對「${g.title}」的回答</small><span class="mine">${esc(S.refl[g.id])}</span></div>`).join("")}
-      ${hl.map(id=>{const s=SENT[id];return `<div class="ncard" data-hl="${S.hl[id]}"><small>${names[S.hl[id]]} · ${tlink(s.t)}</small><span>${esc(s.zh)}</span><span class="q-en" style="font-size:17px">${esc(s.en)}</span>${S.notes[id]?`<span class="mine">✎ ${esc(S.notes[id])}</span>`:""}</div>`}).join("")||""}
+      ${hl.map(id=>{const s=SENT[id];return `<div class="ncard" data-hl="${S.hl[id]}"><small>${names[S.hl[id]]} · ${tlink(s.t)}</small><span>${esc(RNG()[id]?picked(id):s.zh)}</span>${RNG()[id]?"":`<span class="q-en" style="font-size:17px">${esc(s.en)}</span>`}${S.notes[id]?`<span class="mine">✎ ${esc(S.notes[id])}</span>`:""}</div>`}).join("")||""}
     </div></details></div>`;
   ui.fresh=null;
 }
