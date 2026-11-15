@@ -17,7 +17,7 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "content-type": "application/json" } });
 
-const MAX_FAILS = 5;
+const MAX_FAILS = 3;   // tries per step before the video is given up on; nothing retries after that until the owner asks
 const ACTIVE = ["queued", "processing"];
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const mine = (q: any, row: any) => q.eq("user_id", row.user_id).eq("video_id", row.video_id);
@@ -30,9 +30,16 @@ async function claim(db: any, row: any) {
   return !!(data && data.length);
 }
 
-// Does the next unit and saves it. A failure keeps everything done so far, holds the video back for a while
-// (the lock doubles as the retry delay) and marks it failed after MAX_FAILS in a row.
+// Does the next unit and saves it. Every try is counted BEFORE the work starts, so a try that is killed half-way
+// (time limit, crash) still counts: a step can cost at most MAX_FAILS model calls, then the video is marked failed.
 async function runStep(db: any, row: any, deps: any) {
+  const tries = (row.fails || 0) + 1;
+  if (tries > MAX_FAILS) {
+    const msg = row.error || `同一段連續 ${MAX_FAILS} 次沒有完成，已停止。`;
+    await mine(db.from("videos").update({ status: "error", error: msg, lock_until: null }), row);
+    return { error: msg, dead: true, http: 502 };
+  }
+  await mine(db.from("videos").update({ fails: tries }), row);
   try {
     const patch = await ingestStep(row, deps);
     const updated_at = new Date().toISOString();
@@ -42,9 +49,9 @@ async function runStep(db: any, row: any, deps: any) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String((e as any)?.message || e);
     const limited = (e as any)?.status === 429;
-    const fails = (row.fails || 0) + 1, dead = fails >= MAX_FAILS;
-    const upd = dead ? { status: "error", error: msg, fails, lock_until: null }
-      : { fails, lock_until: new Date(Date.now() + (limited ? 60_000 : 15_000 * fails)).toISOString() };
+    const dead = tries >= MAX_FAILS;
+    const upd = dead ? { status: "error", error: `連續 ${MAX_FAILS} 次失敗，已停止：${msg}`, lock_until: null }
+      : { lock_until: new Date(Date.now() + (limited ? 60_000 : 20_000 * tries)).toISOString() };
     await mine(db.from("videos").update(upd), row);
     return { error: msg, dead, http: limited ? 429 : 502 };
   }
