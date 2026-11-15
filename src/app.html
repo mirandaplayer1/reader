@@ -19,6 +19,7 @@
       </div>
       <div class="rbar"><div class="seg3" role="group" aria-label="顯示語言"><button data-mode="zh">中</button><button data-mode="both">中英</button><button data-mode="en">EN</button></div><span class="sp" style="flex:1"></span><button class="mini" id="pmin">收起影片</button></div>
       <div class="scroll" id="rscroll"></div>
+      <button class="tonow" id="tonow" hidden>▶ 回到播放位置</button>
     </section>
     <section class="pane side"><div class="split" id="split" role="separator" aria-orientation="vertical" aria-label="拖曳調整左右欄寬度" tabindex="0"></div><div class="steps" id="steps" hidden></div><div class="scroll" id="side"></div></section>
   </div>
@@ -48,11 +49,21 @@ const fmtDur=t=>{const h=Math.floor(t/3600),m=Math.round(t%3600/60);return (h?h+
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const tlink=(t,label)=>`<a class="tlink" data-t="${t}" href="${yt(t)}" target="_blank" rel="noopener">${label||fmt(t)}</a>`;
 let SENT={},TURNS=[];
-function indexContent(){SENT={};TURNS=[];
-  SEGS.forEach(g=>g.turns.forEach((tu,ti)=>{TURNS.push({t:tu.t,id:`${g.id}-${ti}`});tu.s.forEach((p,si)=>{if(p)SENT[`${g.id}-${ti}-${si}`]={en:p[0],zh:p[1]||p[0],t:tu.t,seg:g,turn:tu}})}));
+/* Sentence ids are built from the turn's timestamp, so they survive re-chaptering.
+   The bundled sample keeps its original ids. */
+function indexContent(){SENT={};TURNS=[];const seen={};
+  SEGS.forEach(g=>g.turns.forEach((tu,ti)=>{
+    if(V.demo)tu._id=`${g.id}-${ti}`;else{const n=seen[tu.t]=(seen[tu.t]||0)+1;tu._id="t"+tu.t+(n>1?"."+n:"")}
+    TURNS.push({t:tu.t,id:tu._id,seg:g.id});tu.s.forEach((p,si)=>{if(p)SENT[`${tu._id}-${si}`]={en:p[0],zh:p[1]||p[0],t:tu.t,seg:g,turn:tu}})}));
   TURNS.sort((a,b)=>a.t-b.t)}
+/* Older notes used chapter-based ids (c3-12-0). Convert them once, while the chapters are still the same. */
+function migrateIds(){if(!V||V.demo)return;let ch=false;
+  const m=id=>{const r=/^c(\d+)-(\d+)-(\d+)$/.exec(id);if(!r)return id;const tu=SEGS[+r[1]]&&SEGS[+r[1]].turns[+r[2]];if(!tu)return id;ch=true;return `${tu._id}-${r[3]}`};
+  for(const k of ["hl","notes"]){const o={};for(const id in S[k])o[m(id)]=S[k][id];S[k]=o}
+  S.claims.forEach(c=>c.ev=(c.ev||[]).map(m));S.cards.forEach(c=>c.ev=(c.ev||[]).map(m));
+  if(ch)commit()}
 const isDeep=g=>g.deep!==false;
-const keyIds=g=>(g.key||[]).map(([a,b])=>`${g.id}-${a}-${b}`).filter(id=>SENT[id]);
+const keyIds=g=>(g.key||[]).map(([a,b])=>g.turns[a]?`${g.turns[a]._id}-${b}`:"").filter(id=>SENT[id]);
 const who=tu=>(V.speakers&&V.speakers[tu.sp])||tu.sp;
 const root=$("#root"),homeEl=$("#home"),sheetEl=$("#sheet"),scrimEl=$("#scrim"),toastEl=$("#toast"),side=$("#side"),rscroll=$("#rscroll");
 let onSheetClose=null;
@@ -114,6 +125,7 @@ syncEl.onclick=()=>{if(!sb){if(!window.claude)toast("後端還沒接上");return
     const {error}=await sb.auth.signInWithOtp({email:mail,options:{emailRedirectTo:location.origin+location.pathname}});
     msg.textContent=error?(rateMsg(error)||"沒有寄出："+error.message):"寄出了。到信箱點連結，回到這一頁就會登入。連結一小時內有效，只能用一次。";if(error)b.disabled=false}};
 function adopt(json){if(!VID)return;try{S=Object.assign(blank(),JSON.parse(json))}catch(e){return}try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}
+  migrateIds();
   if(document.activeElement&&document.activeElement.tagName==="TEXTAREA"){remoteWaiting=true;return}if(root.dataset.view==="video")renderAll()}
 document.addEventListener("focusout",()=>{if(remoteWaiting){remoteWaiting=false;setTimeout(()=>{if(!(document.activeElement&&document.activeElement.tagName==="TEXTAREA")&&root.dataset.view==="video")renderAll()},50)}});
 function bindCloud(){
@@ -162,16 +174,34 @@ function initYT(){
   setTimeout(()=>{if(!ytOK)noYT()},9000);
 }
 function seek(t){if(!ytOK)return false;try{player.seekTo(t,true);player.playVideo()}catch(e){return false}root.classList.remove("p-min");$("#pmin").textContent="收起影片";return true}
+let nowTurn=null;
 function follow(){
   let cur;try{cur=player.getCurrentTime()}catch(e){return}
   let hit=null;for(const tu of TURNS){if(tu.t<=cur+.3)hit=tu;else break}
   const i=hit?TURNS.indexOf(hit):-1,next=TURNS[i+1];
   if(hit&&!(next&&next.t-hit.t<150?cur<next.t:cur<hit.t+90))hit=null;
-  const id=hit?hit.id:null;if(id===nowId)return;nowId=id;
-  $$(".turn.now",rscroll).forEach(e=>e.classList.remove("now"));
-  if(!id)return;const el=$(`[data-turn="${id}"]`,rscroll);if(!el)return;el.classList.add("now");
-  if(Date.now()-lastUserScroll>4000)el.scrollIntoView({block:"center",behavior:"smooth"});
+  nowTurn=hit;const id=hit?hit.id:null;
+  if(id!==nowId){nowId=id;
+    $$(".turn.now",rscroll).forEach(e=>e.classList.remove("now"));
+    const el=id&&$(`[data-turn="${id}"]`,rscroll);
+    if(el){el.classList.add("now");if(Date.now()-lastUserScroll>4000)el.scrollIntoView({block:"center",behavior:"smooth"})}}
+  showToNow();
 }
+/* The button appears whenever the line being played is off screen or inside a collapsed chapter. */
+function showToNow(){
+  const b=$("#tonow");if(!nowTurn){b.hidden=true;return}
+  const el=$(`[data-turn="${nowTurn.id}"]`,rscroll);let off=true;
+  if(el){const r=el.getBoundingClientRect(),v=rscroll.getBoundingClientRect();off=r.bottom<v.top+8||r.top>v.bottom-8}
+  b.hidden=!off;
+}
+function goToNow(){
+  if(!nowTurn)return;
+  if(!$(`[data-turn="${nowTurn.id}"]`,rscroll)){ui.open.add(nowTurn.seg);renderRead()}
+  const el=$(`[data-turn="${nowTurn.id}"]`,rscroll);if(!el)return;
+  el.classList.add("now");nowId=nowTurn.id;lastUserScroll=0;el.scrollIntoView({block:"center",behavior:"smooth"});$("#tonow").hidden=true;
+}
+$("#tonow").onclick=goToNow;
+rscroll.addEventListener("scroll",()=>{if(nowTurn)showToNow()},{passive:true});
 ["wheel","touchmove"].forEach(ev=>rscroll.addEventListener(ev,()=>lastUserScroll=Date.now(),{passive:true}));
 $("#pmin").onclick=e=>{const m=root.classList.toggle("p-min");e.currentTarget.textContent=m?"顯示影片":"收起影片"};
 document.addEventListener("click",e=>{const a=e.target.closest("a[data-t]");if(!a)return;if(seek(+a.dataset.t)){e.preventDefault();if(a.dataset.goread!=null)setTab("read");else if(ui.m!=="read")toast("從 "+fmt(+a.dataset.t)+" 播放中")}});
@@ -183,10 +213,10 @@ function renderRead(){
   root.classList.toggle("mono",mono);
   rscroll.className="scroll m-"+S.mode;
   rscroll.innerHTML=`<div class="rin">`+SEGS.map((g,gi)=>{
-    const deep=isDeep(g),open=deep||ui.open.has(g.id),busy=ui.busy[g.id];
-    const body=!open?"":g.turns.map((tu,ti)=>{const ids=tu.s.map((p,si)=>p?`${g.id}-${ti}-${si}`:null);const line=l=>ids.map(id=>id?span(id,l):`<span class="gap">[…]</span>`).join(l==="en"?" ":"");
-      return `<div class="turn sp-${tu.sp===V.host?"L":"P"}" data-turn="${g.id}-${ti}"><div class="who"><b>${esc(who(tu)).toUpperCase()}</b>${tlink(tu.t)}</div><p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></div>`}).join("");
-    const tools=deep?"":`<div class="row segtools">${open?"":`<button class="btn sm line" data-open="${g.id}">顯示原文</button>`}<button class="btn sm" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):"精讀這一章（翻譯＋第一性原理）"}</button></div>`;
+    const deep=isDeep(g),hasZh=!deep&&g.turns.some(tu=>tu.s.some(p=>p&&p[1]&&p[1]!==p[0])),open=deep||hasZh||ui.open.has(g.id),busy=ui.busy[g.id];
+    const body=!open?"":g.turns.map((tu,ti)=>{const ids=tu.s.map((p,si)=>p?`${tu._id}-${si}`:null);const line=l=>ids.map(id=>id?span(id,l):`<span class="gap">[…]</span>`).join(l==="en"?" ":"");
+      return `<div class="turn sp-${tu.sp===V.host?"L":"P"}" data-turn="${tu._id}"><div class="who"><b>${esc(who(tu)).toUpperCase()}</b>${tlink(tu.t)}</div><p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></div>`}).join("");
+    const tools=deep?"":`<div class="row segtools">${open?"":`<button class="btn sm line" data-open="${g.id}">顯示原文</button>`}<button class="btn sm" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):hasZh?"補上摘要和第一性原理":"精讀這一章（翻譯＋第一性原理）"}</button></div>`;
     const absorb=!deep?"":`<div class="absorb">
       <div class="eyebrow">這一段在說什麼</div><ul>${(g.sum||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
       <div class="eyebrow">第一性原理</div><p class="core">${esc(g.core)}</p>
@@ -194,7 +224,7 @@ function renderRead(){
       <div class="eyebrow">換到你身上</div><p class="ask">${esc(g.ask)}</p>
       <textarea id="refl-${g.id}" data-refl="${g.id}" placeholder="寫一兩句就好">${esc(S.refl[g.id]||"")}</textarea>
     </div>`;
-    return `<section class="a-seg${deep?"":" raw"}" id="seg-${g.id}">
+    return `<section class="a-seg${deep||hasZh?"":" raw"}" id="seg-${g.id}">
     <header><i>第 ${gi+1} 段，共 ${SEGS.length} 段</i><h3>${esc(g.title)}</h3>${tlink(g.t)}</header>${tools}${body}${absorb}</section>`}).join("")+`</div>`;
   rscroll.scrollTop=top;nowId=null;
   $$("[data-mode]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===S.mode));
@@ -232,12 +262,17 @@ function renderOverview(){
     <div class="row"><div class="eyebrow" style="flex:1">章節</div><div class="chips"><button data-core="0" aria-pressed="${!ui.coreOnly}">全部</button><button data-core="1" aria-pressed="${ui.coreOnly}">只看核心</button></div></div>
     <div class="chs">${list.map(({c,i,segs})=>`<article class="ch w${c.worth}">
       <header><b><span class="t">${esc(c.zh)}</span><small>${esc(c.en)}</small></b><span class="w w${c.worth}">${["","可跳過","值得看","核心"][c.worth]}</span>${tlink(c.t)}</header>
-      <p>${esc(c.sum)}</p>${c.take?`<p class="take">→ ${esc(c.take)}</p>`:""}
+      <p>${esc(c.sum)}</p>${c.insight!=null?`${c.take?`<p class="take"><b>做法</b>${esc(c.take)}</p>`:""}${c.insight?`<p class="take"><b>洞見</b>${esc(c.insight)}</p>`:""}`:c.take?`<p class="take">→ ${esc(c.take)}</p>`:""}
       <div class="row">${segs.map(g=>isDeep(g)?`<button class="btn sm" data-seg="${g.id}">精讀「${esc(g.title)}」</button>`
         :`<button class="btn sm" data-deepen="${SEGS.indexOf(g)}" ${ui.busy[g.id]?"disabled":""}>${ui.busy[g.id]?esc(ui.busy[g.id]):"精讀這一章"}</button><button class="btn sm line" data-seg="${g.id}" data-raw>看原文</button>`).join("")
         ||`<a class="btn sm ghost" data-t="${c.t}" data-goread href="${yt(c.t)}" target="_blank" rel="noopener">播放這一章</a>`}</div>
     </article>`).join("")}</div>
-    <p class="meta">${V.demo?"這支範例只把 5 段展開成逐字稿。其餘章節的摘要讀的是完整逐字稿，可以直接播放。":`已精讀 ${nDeep} / ${SEGS.length} 章。還沒精讀的章節可以先看原文，或按「精讀」產生翻譯和第一性原理。`}</p></div>`;
+    <p class="meta">${V.demo?"這支範例只把 5 段展開成逐字稿。其餘章節的摘要讀的是完整逐字稿，可以直接播放。":`已精讀 ${nDeep} / ${SEGS.length} 章。還沒精讀的章節可以先看原文，或按「精讀」產生翻譯和第一性原理。`}</p>
+    ${V.demo?"":`<details class="redo"><summary>重新處理這支影片</summary>
+      <p class="meta">摘要寫得不好、或規則更新之後，可以重跑。</p>
+      <div class="row"><button class="btn sm line" data-redo="text">只重做章節和摘要</button><span class="meta" style="flex:1;min-width:12em">保留逐字稿、翻譯和畫線。精讀過的章節要再按一次精讀，才會有新的第一性原理。約 1 到 5 分鐘。</span></div>
+      <div class="row"><button class="btn sm line" data-redo="all">整支重跑</button><span class="meta" style="flex:1;min-width:12em">從影片重新讀起。時間戳可能有些微不同，這支影片的畫線和筆記可能對不上。每小時影片約 6 分鐘。</span></div>
+    </details>`}</div>`;
 }
 
 /* ---------- distill ---------- */
@@ -347,6 +382,7 @@ $("#tabs").onclick=e=>{const b=e.target.closest("[data-tab]");if(b)setTab(b.data
 side.addEventListener("click",e=>{
   const t=e.target.closest("button");if(!t)return;
   if(t.dataset.core!=null){ui.coreOnly=t.dataset.core==="1";renderOverview()}
+  else if(t.dataset.redo)reprocess(t.dataset.redo);
   else if(t.dataset.deepen!=null)deepen(+t.dataset.deepen);
   else if(t.dataset.seg){if(t.dataset.raw!=null){ui.open.add(t.dataset.seg);renderRead()}setTab("read");const el=$("#seg-"+t.dataset.seg);el&&el.scrollIntoView({block:"start"});lastUserScroll=Date.now()}
   else if(t.id==="d-done"){ui.linkTo=null;renderDistill()}
@@ -414,6 +450,18 @@ async function deepen(k){
   const c=await fetchContent(vid);
   if(c&&VID===vid){V=c;SEGS=c.segs;CH=c.chapters;indexContent();renderAll();toast("這一章精讀好了")}
 }
+async function reprocess(mode){
+  if(!canIngest()){toast("先登入才能重新處理");return}
+  const vid=VID,title=V.title;
+  openSheet(`<div class="eyebrow">重新處理</div><p class="q-zh">${mode==="all"?"整支重跑":"只重做章節和摘要"}：${esc(title)}</p>
+    <p style="margin:0;color:var(--mute)">${mode==="all"?"會從影片重新讀起。處理完之前這支影片先不能打開。":"逐字稿和翻譯會留著。處理完之前這支影片先不能打開。"}</p>
+    <div class="row"><span class="sp"></span><button class="btn line" id="rp-no">取消</button><button class="btn" id="rp-go">開始</button></div>`);
+  $("#rp-no").onclick=closeSheet;
+  $("#rp-go").onclick=async e=>{e.currentTarget.disabled=true;
+    const j=await fn({action:"reprocess",video_id:vid,mode});
+    if(j.error){closeSheet();toast("沒有開始："+j.error);return}
+    closeSheet();delete cache[vid];goHome();setLib(vid,{title:j.title||title,status:j.status,progress:j.progress,error:null,note:""});drive(vid)};
+}
 async function fetchContent(vid){
   if(cache[vid])return cache[vid];
   const {data,error}=await sb.from("videos").select("content").eq("video_id",vid).maybeSingle();
@@ -422,7 +470,7 @@ async function fetchContent(vid){
 }
 const STEP={meta:"讀取影片資訊",transcribe:"讀影片內容",outline:"整理章節和摘要",synth:"寫整支影片的總覽",ready:"完成"};
 function statusLine(it){
-  if(it.demo)return "範例 · 已處理好";
+  if(it.demo)return "範例 · 只有 5 段節錄";
   if(it.status==="ready")return "可以閱讀";
   if(it.status==="error")return "沒有完成："+(it.error||"未知的問題");
   if(it.note)return it.note;
@@ -442,7 +490,7 @@ function renderHome(){
     <p class="meta" id="add-msg">${why}</p>
     ${!window.claude&&sb&&!sbUser?`<div><button class="btn" id="home-login">登入</button></div>`:""}
     <div class="eyebrow">我的影片</div>
-    <div class="lib">${LIB.map(it=>`<button class="item${it.status==="ready"?"":" wait"}" data-vid="${it.video_id}" data-status="${it.status}"${it.demo?" data-demo":""}>
+    <div class="lib">${LIB.filter(it=>!(it.demo&&LIB.some(x=>!x.demo&&x.video_id===it.video_id))).map(it=>`<button class="item${it.status==="ready"?"":" wait"}" data-vid="${it.video_id}" data-status="${it.status}"${it.demo?" data-demo":""}>
       <img alt="" src="${it.demo?THUMB:`https://i.ytimg.com/vi/${it.video_id}/mqdefault.jpg`}" onerror="this.style.visibility='hidden'">
       <span><b>${esc(it.title||"（讀取中）"+it.video_id)}</b><small class="${it.status==="error"?"err":""}">${esc(statusLine(it))}</small>${it.status==="error"?`<em>點這裡從中斷的地方重試</em>`:""}</span></button>`).join("")}</div>
   </div>`;
@@ -460,7 +508,7 @@ homeEl.addEventListener("click",async e=>{
 });
 function openVideo(c){
   V=c;VID=c.vid;SEGS=c.segs||[];CH=c.chapters||[];THESIS=c.thesis||"";TLDR=c.tldr||[];
-  indexContent();loadState();bindCloud();pull();
+  indexContent();loadState();migrateIds();bindCloud();pull();
   $("#vt").textContent=c.title+(c.channel?" · "+c.channel:"");
   ui.side="overview";ui.m="side";ui.linkTo=null;ui.open=new Set();
   root.dataset.view="video";renderAll();initYT();rscroll.scrollTop=0;side.scrollTop=0;

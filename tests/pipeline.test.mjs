@@ -21,7 +21,7 @@ const fetchStub=async(url,opt)=>{calls++;
   else{const p=parts[0].text;
     if(p.includes('"worth":[<'))out={lang:'en',title:'x',host:'Lex Fridman',thesis:'主旨',tldr:['a','b','c'],worth:p.match(/^\d+\. \[/gm).map((_,i)=>i===1?3:1)};
     else if(p.includes('"chapters"')&&p.includes('部分（共'))out={chapters:(()=>{const ts=[...p.matchAll(/^\[(\d+)\]/gm)].map(m=>+m[1]);return [{t:ts[0],en:'A',zh:'甲',sum:'s',take:'',worth:2},{t:ts[Math.floor(ts.length/2)],en:'B',zh:'乙',sum:'s',take:'t',worth:3}]})()};
-    else if(p.includes('"chapters"'))out={lang:'en',title:'x',host:'Lex Fridman',thesis:'主旨',tldr:['a','b','c'],chapters:[{t:0,en:'Intro',zh:'開場',sum:'s',take:'',worth:1},{t:125,en:'Philosophy',zh:'哲學',sum:'s',take:'t',worth:3},{t:9234,en:'Ship fast',zh:'快速上線',sum:'s',take:'t',worth:3}]};
+    else if(p.includes('"chapters"'))out={lang:'en',title:'x',host:'Lex Fridman',thesis:'主旨',tldr:['a','b','c'],chapters:[{t:0,en:'Intro',zh:'開場',sum:'s',take:'',insight:'',worth:1},{t:125,en:'Philosophy',zh:'哲學',sum:'s',take:'t',worth:3},{t:9234,en:'Ship fast',zh:'快速上線',sum:'s',take:'t',worth:3}]};
     else if(p.includes('"zh":['))out={zh:p.split('\n').filter(l=>/^\d+\. /.test(l)).map(l=>'譯:'+l.slice(0,12))};
     else out={title:'標題',spark:'火花',sum:['1','2','3'],core:'核心',chain:['a','b','c','d'],ask:'問?',key:[3,4],counter:'反方?'}}
   return {ok:true,json:async()=>({candidates:[{content:{parts:[{text:'```json\n'+JSON.stringify(out)+'\n```'}]}}]})}};

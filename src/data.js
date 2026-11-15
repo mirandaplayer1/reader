@@ -1,5 +1,5 @@
 const SEGS=[
-{id:"s1",t:123,title:"先收錢，再相信",spark:"有人掏信用卡，才算驗證",
+{id:"s1",t:123,title:"驗證點子的方法",spark:"用付費驗證點子",
  turns:[
  {sp:"L",t:123,s:[["You’ve launched a lot of companies and built a lot of products.","你推出過很多公司、做過很多產品。"],["As you say, most failed, but some succeeded.","就像你說的，大部分失敗了，但有些成功。"],["What’s your philosophy behind building the startups that you did?","你做這些新創，背後的哲學是什麼？"]]},
  {sp:"P",t:134,s:[["I think my philosophy is very different than most people in startups, because most people in startups, they build a company and they raise money and they hire people and then they build a product and they find something that makes money.","我的哲學跟大多數做新創的人很不一樣。多數人是先開公司、募資、請人，然後做產品，再去找能賺錢的東西。"],["And I don’t really raise money. I don’t use VC funding, I do everything myself.","我不募資，不拿創投的錢，所有事都自己來。"],["I’m a designer, I’m the developer, I make everything, I make the logo.","我是設計師、也是工程師，什麼都自己做，連 logo 也是。"],["So for me, I’m much more scrappy. And because I don’t have funding, I need to go fast. I need to make things fast to see if an idea works.","所以我的做法土砲得多。因為沒有資金，我必須快，必須很快把東西做出來，才知道點子行不行。"],["I have an idea in my mind and I build it like a mini startup, and I launch it very quickly, within two weeks or something, of building it.","我腦中有個點子，就把它當成迷你新創來做，大概兩週內就上線。"],["And I check if there’s demand and if people actually sign up and not just sign up, but if people actually pay money.","然後我看有沒有需求：有沒有人真的註冊。而且不只是註冊，是有沒有人真的付錢。"],["They need to take out their credit cards, pay me money, and then I can see if the idea is validated.","他們得掏出信用卡、付錢給我，我才算驗證了這個點子。"],["And most ideas don’t work, as you say, most fail.","而大多數點子行不通。就像你說的，多數會失敗。"]]},
@@ -10,7 +10,7 @@ const SEGS=[
  ask:"你手上哪個點子，其實兩週內就能放上一個付款按鈕？你一直沒放，是在保護什麼？",
  q:"Pieter 不募資、一個人做。你猜他用什麼標準判斷一個點子「成立」？",opts:["很多人註冊試用","朋友和同行都說讚","陌生人掏錢付費","被科技媒體報導"],ans:2,key:[[1,5],[1,6]],
  counter:"「付錢才算驗證」對低單價工具成立。如果你的產品要靠信任累積才賣得動（顧問、社群、高單價），兩週內沒人付錢，可能只代表信任還沒到。你要怎麼分辨這兩種「沒人買」？"},
-{id:"s2",t:325,title:"鏟沙",spark:"低潮時先去搬沙",
+{id:"s2",t:325,title:"低潮時的做法",spark:"低潮時先做體力活",
  turns:[
  {sp:"P",t:325,s:[null,["And he taught me, when I’m depressed for something, he says, “Get a big mountain of sand or something from construction, and just get a shovel and bring it to the other side and just do physical labor, do hard work, and do something, Set a goal, do something.”","我爸教我，心情低落的時候，他說：「去弄一大堆沙，工地那種，拿把鏟子把它鏟到另一邊。做體力活、做苦工、做點什麼。訂個目標，做點什麼。」"],["And I did that with startups too.","我做新創也是這樣。"]]},
  {sp:"P",t:374,s:[null,["But I think it’s very metaphorical for work, because I also … I never stop work.","我覺得這很像工作的隱喻，因為我也從不停工。"],["I go to the next website or I make a new one or I make a new startup.","我會去做下一個網站，或開一個新的，或再做一個新創。"],["It gives you something to wake up in the morning and have coffee and kiss your girlfriend and then you have a goal, “Today I’m going to fix this feature,” or “Today I’m going to fix this bug,” or something.","它讓你早上有理由起床：喝杯咖啡、親一下女友，然後你有個目標，「今天我要修好這個功能」或「今天我要解掉這個 bug」。"],["“I’m going to do something.” You have something to wake up to.","「我要做點什麼。」你有個值得醒來的東西。"],null]},
@@ -22,7 +22,7 @@ const SEGS=[
  ask:"你今天的「那堆沙」是什麼？小到不必想清楚就能開始的那一件。",
  q:"27 歲的 Pieter 月收 500 美元，躺在飯店看天花板，覺得自己是魯蛇。他爸給了什麼建議？",opts:["找個人好好聊一聊","回家休息一陣子","拿鏟子去搬沙，做體力活","先訂一個五年計畫"],ans:2,key:[[0,1]],
  counter:"「先動再說」對卡住的人有效。但對本來就動太多的人，它可能變成逃避：一直搬沙，就不必決定該搬哪一堆。你的問題是動不了，還是停不下來選？"},
-{id:"s3",t:440,title:"不想當 CEO",spark:"募到幾億的人想學他",
+{id:"s3",t:440,title:"不募資的理由",spark:"募資後創辦人變成管理者",
  turns:[
  {sp:"L",t:440,s:[["But the interesting thing is you built a lot of successful products and you never really wanted to take it to that level where you scale real big and sell it to a company or something like this.","有趣的是，你做出很多成功的產品，卻從沒想把它推到那個層級：做到超大，再賣給某家公司之類的。"]]},
  {sp:"P",t:452,s:[null,["But I never raised funding for it. And I think because I don’t like the stressful life that comes with it.","我從沒為它募過資。我想是因為我不喜歡隨之而來的高壓生活。"],["I have a lot of founder friends and they tell me secretly, with hundreds of millions of dollars in funding and stuff, and they tell me, “Next time, if I’m going to do it, I’m going to do it like you, because it’s more fun, it’s more indie, it’s more chill, it’s more creative.”","我有很多創辦人朋友，募了幾億美元那種，他們私下跟我說：「下次如果再做，我要像你那樣做，因為更好玩、更獨立、更自在、更有創造力。」"],["They don’t like this. They don’t like to be manager, where you become a CEO, you become a manager.","他們不喜歡現在這樣。他們不喜歡當管理者。你當上 CEO，就變成了管理者。"],["And I think a lot of people that start startups, when they become a CEO, they don’t like that job actually, but they can’t really exit it, but they like to do the groundwork, the coding.","我覺得很多創業的人當上 CEO 之後，其實不喜歡那份工作，卻又抽不了身。他們喜歡的是第一線的活，是寫程式。"],["So I think that keeps you happy, doing something creative.","所以我想，讓你快樂的是持續做有創造性的事。"]]}],
@@ -32,7 +32,7 @@ const SEGS=[
  ask:"如果你的產品明年大成功，你每天的行事曆會長什麼樣子？你想要那份行事曆嗎？",
  q:"募到上億美元的創辦人朋友，私下對 Pieter 說了什麼？",opts:["你該募資把它做大","下次我想照你的方式做","你這樣賺不到大錢","一個人撐不了多久"],ans:1,key:[[1,2]],
  counter:"這是倖存者的視角。Pieter 能不募資，是因為他的產品邊際成本接近零，一個人寫得完。如果你的想法需要硬體、庫存或業務團隊，「保持小」可能等於做不成。你的點子屬於哪一種？"},
-{id:"s4",t:920,title:"一個月的牆",spark:"難的是決定不做什麼",
+{id:"s4",t:920,title:"30 天做一個產品",spark:"30 天內決定不做哪些功能",
  turns:[
  {sp:"P",t:920,s:[null,["It was a good idea to … every month launch a startup, so I could learn to code, learn basic stuff.","每個月推出一個新創是個好主意，這樣我可以學寫程式、學基本功。"],["But it was still very scrappy, which is on purpose, because I didn’t have time to spend a lot of … I had a month to do something, so I couldn’t spend more than a month and I was pretty strict about that.","但東西還是很粗糙，這是故意的。我只有一個月做一件事，所以不能超過一個月，這點我守得很嚴。"],["And I published it as a blog post. I think I put it on Hacker News and people would check, “Oh, did you actually …”","我把這個計畫寫成部落格文章發出去，好像還貼上了 Hacker News，大家會來看「欸，你真的有做嗎…」"],["I felt accountability because I put it public, that I actually had to do it.","因為公開了，我感受到責任，我真的得做到。"]]},
  {sp:"L",t:1104,s:[null,["What’s it take to build a thing in 30 days? At that time, how hard was that?","要在 30 天內做出一個東西，需要什麼？在當時，這有多難？"]]},
@@ -44,7 +44,7 @@ const SEGS=[
  ask:"你正在做的東西，哪個部分是你的「登入系統」：感覺一定要有，拿掉卻不影響別人付錢？",
  q:"30 天做出一個產品。Pieter 說最難的部分是什麼？",opts:["學會需要的技術","想到一個好點子","決定什麼不要做","找到第一批用戶"],ans:2,key:[[2,0]],
  counter:"一直砍，會不會砍出一堆半成品？12 個產品裡活下來的是少數。快的代價是，你可能在第 3 週放棄一個第 8 週才看得出價值的東西。哪一類點子不適合 30 天？"},
-{id:"s5",t:9424,title:"兩分鐘修好",spark:"有人回報 bug，他按碼表",
+{id:"s5",t:9424,title:"部署流程",spark:"直接部署到正式環境",
  turns:[
  {sp:"L",t:9424,s:[["You often deploy it to production? You don’t have a testing ground?","你常常直接部署到正式環境？沒有測試環境？"]]},
  {sp:"P",t:9428,s:[["No. So, I’m famous for this because I’m too lazy to set up a staging server on my laptop every time.","沒有。我就是以這個出名的，因為我懶得每次都在筆電上架測試伺服器。"],["So, nowadays, I just deploy to production and man, I’m going to be canceled for this. But it works very well for me.","所以現在我就是直接部署到正式環境。天啊，講這個我會被罵翻。但這對我非常有效。"],null,["So, I don’t deploy, but literally, I have like 37,000 Git commits in the last 12 months or something.","說真的，過去 12 個月我大概有 37,000 次 Git commit。"],null]},

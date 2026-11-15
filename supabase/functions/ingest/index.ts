@@ -2,10 +2,11 @@
 //   { action: "start",  url }                -> registers the video
 //   { action: "step",   video_id }           -> does the next unit (meta / one transcript chunk / outline)
 //   { action: "deepen", video_id, chapter }  -> translates one batch or writes the analysis for a chapter
+//   { action: "reprocess", video_id, mode }  -> "text" redoes chapters and summaries, "all" starts over
 // Secrets: GEMINI_API_KEY (required), ANTHROPIC_API_KEY (optional, used for the text stages when present),
 //          GEMINI_VIDEO_MODEL / GEMINI_TEXT_MODEL / CLAUDE_MODEL (optional overrides).
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { deepenStep, ingestStep, parseVideoId } from "./pipeline.js";
+import { deepenStep, ingestStep, parseVideoId, reprocessPatch } from "./pipeline.js";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -39,7 +40,13 @@ Deno.serve(async (req) => {
       textModel: pick(body.text_model) || Deno.env.get("GEMINI_TEXT_MODEL") || Deno.env.get("GEMINI_VIDEO_MODEL") || "gemini-3.8-flash",
       anthropicKey: Deno.env.get("ANTHROPIC_API_KEY") || "",
       claudeModel: Deno.env.get("CLAUDE_MODEL") || "",
+      prompts: {} as Record<string, string>,
     };
+    // Optional wording overrides, editable in the Supabase table editor without a deploy.
+    try {
+      const { data: st } = await sb.from("settings").select("value").eq("key", "prompts").maybeSingle();
+      if (st && st.value && typeof st.value === "object") deps.prompts = st.value;
+    } catch (_) { /* defaults apply */ }
 
     const summary = (r: any) => ({ video_id: r.video_id, title: r.title, status: r.status, progress: r.progress, error: r.error });
 
@@ -66,6 +73,13 @@ Deno.serve(async (req) => {
     const { data: row, error: loadErr } = await sb.from("videos").select("*").eq("video_id", vid).maybeSingle();
     if (loadErr) throw loadErr;
     if (!row) return json({ error: "找不到這支影片。" }, 404);
+
+    if (body.action === "reprocess") {
+      const patch = reprocessPatch(row, body.mode === "all" ? "all" : "text");
+      const { error } = await sb.from("videos").update({ ...patch, lock_until: null, updated_at: new Date().toISOString() }).eq("video_id", vid);
+      if (error) throw error;
+      return json(summary({ ...row, ...patch }));
+    }
 
     // One worker at a time per video: a second tab or a retry waits instead of doing the same chunk twice.
     const now = Date.now();

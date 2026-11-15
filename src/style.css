@@ -302,3 +302,9 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
   @keyframes pop{from{transform:translate(-50%,-48%);opacity:0}to{transform:translate(-50%,-50%);opacity:1}}
   #toast{bottom:28px}
 }
+
+/* back to the line being played */
+.tonow{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:4;background:var(--indigo);color:#fff;font-size:14.5px;font-weight:500;padding:9px 16px;border-radius:999px;box-shadow:0 4px 14px rgba(16,22,60,.28);white-space:nowrap}
+.redo{border-top:1px solid var(--line);padding-top:14px;display:grid;gap:10px}
+.redo .row{align-items:flex-start}
+.ch .take b{font-weight:500;font-size:13px;color:var(--mute);margin-right:8px}

@@ -98,7 +98,7 @@ const TRANSCRIPT_SCHEMA = {
 const STR = { type: "STRING" }, INT = { type: "INTEGER" };
 const LIST = (items) => ({ type: "ARRAY", items });
 const OBJ = (properties) => ({ type: "OBJECT", properties, required: Object.keys(properties) });
-const CHAPTER_ITEM = OBJ({ t: INT, en: STR, zh: STR, sum: STR, take: STR, worth: INT });
+const CHAPTER_ITEM = OBJ({ t: INT, en: STR, zh: STR, sum: STR, take: STR, insight: STR, worth: INT });
 const META = { lang: STR, title: STR, host: STR, thesis: STR, tldr: LIST(STR) };
 const SCHEMA = {
   outline: OBJ({ ...META, chapters: LIST(CHAPTER_ITEM) }),
@@ -150,51 +150,74 @@ async function llmJSON(deps, prompt, maxTokens = 16000, schema = null) {
 
 // The voice every generated line is held to. Written as concrete do / don't pairs because a bare
 // "write naturally" does nothing: the examples are what move the output.
-const STYLE = `怎麼寫（這一段最重要，寫完請逐句對照）：
-- 像你看完影片後講給朋友聽。用台灣人平常講話的字。短句，一句只講一件事。一句裡的逗號超過兩個就拆成兩句。
-- 不要想用一句話把所有重點講完。寧可只講最重要的一件，講清楚。
-- 先講具體的事：誰、做了什麼、數字多少。道理放後面，而且用講者自己的例子講。
+// Every piece can be overridden without a deploy: put a JSON object with the same keys in
+// public.settings under key "prompts" (see schema.sql). Missing keys fall back to these defaults.
+export const DEFAULT_PROMPTS = {
+  style: `怎麼寫（這一段最重要，寫完請逐句對照）：
+- 平鋪直敘。像做筆記，把事情講清楚就好。不要寫金句、口號、格言，不求好記、不求漂亮。
+- 用台灣人平常講話的字。短句，一句只講一件事。一句裡的逗號超過兩個就拆成兩句。
+- 寫具體的事：誰、做了什麼、數字多少。不要替講者歸納人生道理。
 - 用動詞講，不要把動作變成名詞。寫「他兩週就上線」，不要寫「進行快速的產品驗證」。
 - 這些詞不要用：透過、藉由、進而、從而、打造、賦能、極致、極簡、核心、關鍵、本質、痛點、心法、迷思、哲學、思維、底層邏輯、最大化、優化、落地、聚焦、洞察、驅動、建構、形塑、彰顯。
 - 少用「度、性、化」結尾的抽象名詞（自由度、可能性、最佳化）。「自動化」這種本來就是日常用詞的可以。
-- 不要四個字四個字地排，不要成語連發。不要用「並」「且」「並且」把好幾件事串成一句，也不要一次並列三樣東西。
-- 口語，但不要網路用語和火星文（免費仔、寫扣、鎂、神器、狂、超扯）。
-- 不要「不是 X，而是 Y」，不要勵志口吻，不要破折號，不要 emoji，不要在句尾補一句總結。除了本來就要你提問的欄位，不要用問句。
-- 產品名、人名、技術名詞保留原文。只能寫內容裡有的事實，不可以編數字或主張。`;
+- 不要四個字四個字地排，不要成語連發。不要用「並」「且」「並且」把好幾件事串成一句。
+- 不要「X 才 Y」「先 X，再 Y」「不是 X，而是 Y」這類對仗或押節奏的句型。
+- 口語，但不要網路用語（免費仔、寫扣、鎂、神器、狂、超扯）。
+- 不要勵志口吻，不要破折號，不要 emoji，不要在句尾補一句總結。除了本來就要你提問的欄位，不要用問句。
+- 產品名、人名、技術名詞保留原文。只能寫內容裡有的事實，不可以編數字或主張。`,
 
-const EX_CHAPTER = `寫法對照：
-標題　好：「先收錢，再相信」「鏟沙」「不想當 CEO」「一個月的牆」「兩分鐘修好」
-　　　不好：「極簡創業與付費驗證」「潛意識醞釀與極簡記錄」（兩個抽象名詞用「與」並列，沒有畫面）
-sum　 好：「他不拿創投，設計、程式、logo 全部自己來。點子兩週內上線，有人刷卡才算數。」
+  exChapter: `寫法對照：
+標題　好：「驗證點子的方法」「低潮時的做法」「不募資的理由」「30 天做一個產品」「部署流程」
+　　　不好：「有人刷卡才算數」「先收錢，再相信」（裝金句）
+　　　不好：「極簡創業與付費驗證」（兩個抽象名詞用「與」並列）
+sum　 好：「他不拿創投，設計、程式、logo 全部自己來。點子兩週內上線。有人付錢他才繼續做。」
 　　　不好：「分享不拿創投的獨立開發模式，將點子做成微型產品並在兩週內上線，直接用用戶刷卡付款驗證需求。」
-take　好：「卡住的時候，給自己一個每月要上線一次的期限。」
-　　　不好：「陷入停滯時設定固定週期的上線挑戰，用強制發布逼迫自己持續產出。」
-thesis 好：「Pieter Levels 一個人做了 70 幾個產品，賺錢的只有 4 個。他不募資，想到就做，兩週內上線，有人刷卡才繼續。」
-　　　不好：「一個人不募資，靠很多次兩週就上線的小實驗，找出有人願意付錢的那一個，再用自動化讓它不必變成一家公司。」（一個長句塞四件事，沒有人、沒有數字，像機器寫的摘要）
-　　　不好：「一人創業者應捨棄募資與複雜架構，透過市場付費訊號快速驗證點子。」
-　　　不好：「他主張人必須相信當下的直覺，做自己真心熱愛的事，並用死亡的必然性甩開旁人的眼光。」（並列三件事，還有「必然性」這種抽象名詞）
-　　　改成：「他每天早上照鏡子問自己：如果今天是最後一天，我還想做今天要做的事嗎？」
-tldr　好：「怎麼知道點子行不行：看有沒有陌生人付錢。註冊、按讚都不算。」
-　　　不好：「打造微型產品並在兩週內串接 Stripe 收費，以信用卡實際付款作為驗證需求的唯一標準。」`;
+take（做法）　好：「不募資，點子兩週內上線，確認有人付費才繼續做。」
+　　　好：「每個月上線一個產品，期限到了就發，公開寫在部落格上。」
+　　　不好：「點子有沒有用，看陌生人願不願意拿出信用卡。」（這是道理，不是做法）
+insight（洞見）　好：「他事先不知道哪個點子會成，所以每個都做得很小，兩週就丟出去看反應。」
+　　　好：「註冊不用花錢，所以他不看註冊數。有人願意付錢，他才相信真的有人需要。」
+　　　好：「登入系統晚一年才補上，用戶照樣付錢。很多覺得一定要有的功能，其實可以晚點做。」
+　　　不好：「付費是唯一誠實的訊號。」（格言）
+　　　不好：「治好迷惘最快的方法，就是強迫自己每個月交出一個作品。」（歸納成人生道理）
+　　　不好：「速度本身就是一種體驗。」（口號）
+thesis 好：「Pieter Levels 一個人做了 70 幾個產品，賺錢的只有 4 個。他不募資，想到就做，兩週內上線，有人付錢才繼續。」
+　　　不好：「一個人不募資，靠很多次兩週就上線的小實驗，找出有人願意付錢的那一個，再用自動化讓它不必變成一家公司。」（一個長句塞四件事，沒有人、沒有數字）
+　　　不好：「他主張人必須相信當下的直覺，做自己真心熱愛的事，並用死亡的必然性甩開旁人的眼光。」（並列三件事）
+tldr　好：「他看有沒有陌生人付錢來判斷點子。註冊和按讚不算。」
+　　　不好：「打造微型產品並在兩週內串接 Stripe 收費，以信用卡實際付款作為驗證需求的唯一標準。」`,
 
-const EX_ANALYSIS = `寫法對照：
-title　好：「先收錢，再相信」「鏟沙」「不想當 CEO」　不好：「被蘋果開除後歸零」「連續轉型與純手動驗證」
-spark　好：「有人掏信用卡，才算驗證」「難的是決定不做什麼」
-sum　　好：「判斷標準是有人付錢。註冊和稱讚都不算。」
+  exAnalysis: `寫法對照：
+title　好：「驗證點子的方法」「低潮時的做法」「部署流程」　不好：「有人刷卡才算數」「被蘋果開除後歸零」
+spark　好：「用付費驗證點子」「30 天內決定不做哪些功能」　不好：「難的是決定不做什麼」（金句）
+sum　　好：「他看有沒有人付錢來判斷。註冊和稱讚他不算。」
 　　　 不好：「意識到自己依然熱愛這份工作，於是卸下成功包袱創辦了 NeXT 與 Pixar。」
-core　 好：「動機是行動的副產品。等有動機才行動，順序反了。」
-　　　 好：「流程存在的理由是降低出錯的代價。出錯的代價本來就低的時候，流程只剩下成本。」
+core　 好：「沒人能事先知道哪個點子會成，他自己也說多數失敗。所以他把每次嘗試的成本壓低，多試幾次。」
+　　　 好：「測試環境和審核是用來防大損失的。他一個人的產品壞兩分鐘損失很小，所以這些流程對他只是多花時間。」
+　　　 不好：「動機是行動的副產品。等有動機才行動，順序反了。」（金句）
 　　　 不好：「失去既有成功的沉重包袱，能讓人重獲初學者的自由度去探索高創造力的全新嘗試。」
 chain　好：「沒有人能事先知道哪個點子會成。他自己也說多數失敗。」
-　　　 好：「註冊和稱讚不花對方任何成本，所以幾乎不帶資訊。付錢要花成本，所以是誠實的訊號。」
+　　　 好：「註冊和稱讚不花對方任何成本。付錢要花成本。所以付錢比較能代表對方真的需要。」
 　　　 不好：「維持既有成功需要承擔維護現狀的沉重負擔，限制了冒險空間。」
-ask　　好：「你手上哪個點子，其實兩週內就能放上一個付款按鈕？你一直沒放，是在保護什麼？」
+ask　　好：「你手上哪個點子，兩週內可以放上付款按鈕？還沒放的原因是什麼？」
 　　　 不好：「你現在緊抓不放的既有想法或微小成果，是否正阻礙你像初學者一樣靈活探索新方向？」
-counter 好：「壞了再修只在錯誤可逆時成立。金流算錯、資料外洩，兩分鐘修不回來。你的產品裡哪些地方不可逆？」`;
+counter 好：「壞了再修只適用在修得回來的錯誤。金流算錯、資料外洩，兩分鐘修不回來。你的產品裡哪些地方出錯就修不回來？」`,
+
+  chapterTitle: `<10 字內的中文標題。用名詞短語，像筆記本的分類標籤，只說這一章在談什麼>`,
+  chapterSum: `<兩三個短句，75 字內，講者實際說了或做了什麼，帶具體的數字、名稱、做法>`,
+  chapterTake: `<做法。一行，40 字內。把這一章講者的做法照順序列出來，用逗號隔開，只寫動作和事實。純閒聊就留空字串>`,
+  chapterInsight: `<洞見。一到兩個普通的句子，55 字內。講他為什麼這樣做，或這一章讓人看懂的一件事。照他的情況具體講，用他的例子，不要寫成格言、口號或人生道理。沒有就留空字串>`,
+  thesis: `<兩到三個短句，70 字內。第一句講這個人是誰、做了什麼，要有具體的數字或事實。後面只講他最主要的「一個」做法，照實寫，不要並列好幾個>`,
+  segTitle: `<8 字內的中文標題。用名詞短語，只說這一章在談什麼>`,
+  spark: `<14 字內，這一章講的最主要一件事，平鋪直敘>`,
+  core: `<第一性原理：這個做法為什麼行得通。用一到兩個普通的句子把原因講清楚，不要寫成格言>`,
+};
+const P = (deps) => Object.assign({}, DEFAULT_PROMPTS, (deps && deps.prompts) || {});
 
 /* ---------- ingest: meta -> transcribe (chunk by chunk) -> outline -> ready ---------- */
 
 export async function ingestStep(row, deps) {
+  const pr = P(deps);
   const work = Object.assign({ phase: "meta", next: 0, turns: [], visuals: [] }, row.work || {});
   const url = "https://www.youtube.com/watch?v=" + row.video_id;
 
@@ -268,18 +291,18 @@ export async function ingestStep(row, deps) {
 
   // Chapters are cut one hour of transcript at a time, so no single request grows with the length of the video.
   const CHAPTER_SPEC =
-    `{"t":<這一章開始的秒數，必須是逐字稿裡某一行的秒數>,"en":"<原文語言的短標題>","zh":"<10 字內的中文標題，像人會講的一句話，有畫面>",` +
-    `"sum":"<兩三個短句，75 字內，講者實際說了或做了什麼，帶具體的數字、名稱、做法>","take":"<一句 40 字內可帶走的原則；純閒聊、或內容本身沒有可帶走的道理就留空字串，不要硬湊>","worth":<1 到 3 的整數，3 是核心>}`;
+    `{"t":<這一章開始的秒數，必須是逐字稿裡某一行的秒數>,"en":"<原文語言的短標題>","zh":"${pr.chapterTitle}",` +
+    `"sum":"${pr.chapterSum}","take":"${pr.chapterTake}","insight":"${pr.chapterInsight}","worth":<1 到 3 的整數，3 是核心>}`;
   const CHAPTER_RULES =
     `- 依主題切章，一章只講一件事。20 分鐘以內的影片切 3 到 6 章；更長的影片每章大約 3 到 15 分鐘，任何一章都不要超過 15 分鐘，話題換了就切。\n` +
     `- worth 看的是「這一章對讀者有多少可以帶走的東西」：3 是核心論點或可以直接照做的方法，2 是有用的補充，1 是開場、閒聊、致謝這類可以跳過的。3 分最多佔三分之一。\n` +
-    `- 講者是 "On screen" 的段落是畫面描述，照樣整理進章節。\n\n${STYLE}\n\n${EX_CHAPTER}`;
+    `- 講者是 "On screen" 的段落是畫面描述，照樣整理進章節。\n\n${pr.style}\n\n${pr.exChapter}`;
   const READER = `一位正在找 product-market fit 的一人創業者`;
   const WINDOW = 3600;
   const cleanChapters = (list, starts) => {
     const snap = (t) => starts.reduce((best, x) => (Math.abs(x - t) < Math.abs(best - t) ? x : best), starts[0]);
     return (Array.isArray(list) ? list : [])
-      .map((c) => ({ t: snap(Number(c.t) || 0), en: String(c.en || ""), zh: String(c.zh || ""), sum: String(c.sum || ""), take: String(c.take || ""), worth: Math.min(3, Math.max(1, Math.round(Number(c.worth) || 1))) }))
+      .map((c) => ({ t: snap(Number(c.t) || 0), en: String(c.en || ""), zh: String(c.zh || ""), sum: String(c.sum || ""), take: String(c.take || ""), insight: String(c.insight || ""), worth: Math.min(3, Math.max(1, Math.round(Number(c.worth) || 1))) }))
       .sort((x, y) => x.t - y.t);
   };
   const finish = (meta, chapters) => {
@@ -290,7 +313,7 @@ export async function ingestStep(row, deps) {
     const segs = chapters.map((c, i) => {
       const end = i + 1 < chapters.length ? chapters[i + 1].t : Infinity;
       const turns = work.turns.filter((t) => t.t >= c.t && t.t < end)
-        .map((t) => ({ sp: t.speaker, t: t.t, s: splitSentences(t.text).map((x) => [x, null]) }));
+        .map((t) => ({ sp: t.speaker, t: t.t, s: splitSentences(t.text).map((x) => [x, (work.zh && work.zh[x]) || null]) }));
       return { id: "c" + i, t: c.t, title: c.zh || c.en, deep: false, turns };
     });
     const content = {
@@ -302,7 +325,7 @@ export async function ingestStep(row, deps) {
   };
   const META_SPEC =
     `"lang":"<逐字稿語言的 BCP-47 代碼，例如 en、zh-TW、ja>","title":"<影片標題，看不出來就寫最貼切的一句>",` +
-    `"host":"<訪問者或主持人的 speaker 標籤，沒有就寫空字串>","thesis":"<兩到三個短句，70 字內。第一句講這個人是誰、做了什麼讓人想聽他講，要有具體的數字或事實。後面只講他最主要的「一個」做法或主張，用他自己的例子講，不要並列好幾個>","tldr":["<重點 1，一到兩個短句>","<重點 2>","<重點 3>"]`;
+    `"host":"<訪問者或主持人的 speaker 標籤，沒有就寫空字串>","thesis":"${pr.thesis}","tldr":["<重點 1，一到兩個短句>","<重點 2>","<重點 3>"]`;
 
   if (work.phase === "outline") {
     const first = work.turns[0].t, last = work.turns[work.turns.length - 1].t;
@@ -340,7 +363,7 @@ export async function ingestStep(row, deps) {
     const prompt =
       `下面是一支長影片的章節清單（已經整理好），以及影片開頭的一小段逐字稿。請幫${READER}寫出整支影片的總覽。\n\n` +
       `輸出 JSON：{${META_SPEC},"worth":[<依章節順序，每一章 1 到 3 的整數>]}\n\n` +
-      `規則：\n- thesis 和 tldr 要從整支影片挑最重要的講，不要只看開頭，也不要每一章都點到。\n- worth 是把所有章節放在一起重新評：3 是整支影片的核心，最多佔三分之一；1 是可以跳過的。陣列長度必須是 ${chapters.length}。\n\n${STYLE}\n\n${EX_CHAPTER}\n\n章節：\n${list}\n\n開頭逐字稿：\n${opening}`;
+      `規則：\n- thesis 和 tldr 要從整支影片挑最重要的講，不要只看開頭，也不要每一章都點到。\n- worth 是把所有章節放在一起重新評：3 是整支影片的核心，最多佔三分之一；1 是可以跳過的。陣列長度必須是 ${chapters.length}。\n\n${pr.style}\n\n${pr.exChapter}\n\n章節：\n${list}\n\n開頭逐字稿：\n${opening}`;
     const out = await llmJSON(deps, prompt, 4000, SCHEMA.synth);
     if (Array.isArray(out.worth) && out.worth.length === chapters.length)
       chapters.forEach((c, i) => { c.worth = Math.min(3, Math.max(1, Math.round(Number(out.worth[i]) || c.worth))); });
@@ -350,9 +373,33 @@ export async function ingestStep(row, deps) {
   return {};
 }
 
+/* ---------- reprocess: run a finished video again ---------- */
+
+// mode "text": keep the transcript and any translations, redo chapters, summaries and analysis.
+// mode "all":  start over from the video itself.
+export function reprocessPatch(row, mode) {
+  const c = row.content;
+  if (mode === "all" || !c || !Array.isArray(c.segs)) {
+    return { status: "queued", work: {}, progress: { phase: "meta", done: 0, total: null }, error: null };
+  }
+  const cjk = /^zh|^ja/i.test(c.lang || "");
+  const zh = {};
+  const turns = c.segs.flatMap((g) => g.turns.map((t) => {
+    t.s.forEach((p) => { if (p && p[1] && p[1] !== p[0]) zh[p[0]] = p[1]; });
+    const text = t.s.map((p) => p[0]).join(cjk ? "" : " ");
+    return { t: t.t, speaker: t.sp, text };
+  }));
+  return {
+    status: "processing", error: null,
+    work: { phase: "outline", turns, visuals: c.visuals || [], channel: c.channel || "", duration: c.duration, length: c.duration, zh },
+    progress: { phase: "outline", done: 0, total: null },
+  };
+}
+
 /* ---------- deepen one chapter on demand: translate in batches, then analyse ---------- */
 
 export async function deepenStep(row, k, deps) {
+  const pr = P(deps);
   const content = row.content;
   const seg = content && content.segs && content.segs[k];
   if (!seg) throw new Error("找不到這一章。");
@@ -381,12 +428,12 @@ export async function deepenStep(row, k, deps) {
   const numbered = flat.map((x, i) => `${i}. ${seg.turns[x.ti].sp}: ${x.p[0]}`).join("\n");
   const prompt =
     `下面是影片其中一章的逐字稿，每句前面有編號。請幫一位正在找 product-market fit 的一人創業者讀懂它。\n\n` +
-    `輸出 JSON：\n{"title":"<8 字內的中文標題，具體、有畫面>","spark":"<14 字內，這一章最值得記住的一句話>",` +
-    `"sum":["<這段在說什麼 1>","<2>","<3>"],"core":"<第一性原理：這個做法為什麼成立的最根本理由。一到兩個短句>",` +
+    `輸出 JSON：\n{"title":"${pr.segTitle}","spark":"${pr.spark}",` +
+    `"sum":["<這段在說什麼 1>","<2>","<3>"],"core":"${pr.core}",` +
     `"chain":["<推理第 1 步：最基本的前提>","<第 2 步>","<第 3 步>","<第 4 步：結論>"],` +
     `"ask":"<一個把這個原理換到讀者自己身上的問題>","key":[<最能代表這一章的 1 到 2 個句子編號，要相鄰>],` +
     `"counter":"<站在反方，指出這個結論最弱的一個環節或不適用的情況，用一個問題結尾，100 字內>"}\n\n` +
-    `規則：\n- core 和 chain 要從前提一步步推到結論，每一步都能獨立成立，不要只是換句話重複摘要。\n- 照內容本身的道理寫。如果這一章跟創業或做產品無關（例如故事、動畫、純示範），就講它本身的道理，ask 也問一般性的問題，不要硬套到創業上。\n- ask 和 counter 本來就要用問句，其他欄位不要。\n\n${STYLE}\n\n${EX_ANALYSIS}\n\n這一章的主題：${seg.title}\n\n${numbered}`;
+    `規則：\n- core 和 chain 要從前提一步步推到結論，每一步都能獨立成立，不要只是換句話重複摘要。\n- 照內容本身的道理寫。如果這一章跟創業或做產品無關（例如故事、動畫、純示範），就講它本身的道理，ask 也問一般性的問題，不要硬套到創業上。\n- ask 和 counter 本來就要用問句，其他欄位不要。\n\n${pr.style}\n\n${pr.exAnalysis}\n\n這一章的主題：${seg.title}\n\n${numbered}`;
   const out = await llmJSON(deps, prompt, 6000, SCHEMA.analysis);
   const keyIdx = (Array.isArray(out.key) ? out.key : []).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < total).slice(0, 2);
   const key = (keyIdx.length ? keyIdx : [0]).map((n) => [flat[n].ti, flat[n].si]);
