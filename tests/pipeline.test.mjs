@@ -31,6 +31,15 @@ while(row.status!=='ready'){row={...row,...await ingestStep(row,deps)};steps++;a
 const c=row.content;console.log('ingest ok: steps',steps,'chapters',c.chapters.length,'segs',c.segs.length,'turns',c.segs.reduce((a,g)=>a+g.turns.length,0),'duration',c.duration);
 const kept=c.segs.flatMap(g=>g.turns.flatMap(t=>t.s.map(p=>p[0]))).join(' ').replace(/\s+/g,' ');const want=[...real].sort((p,q)=>p.t-q.t).map(t=>t.text).join(' ').replace(/\s+/g,' ');assert(kept===want,'every word kept once, in order');assert(c.duration===13409,'duration from token count');
 assert(c.chapters.length===8&&c.chapters[1].worth===3&&c.chapters[0].worth===1,'windowed outline: 4 windows x 2 chapters, re-rated');assert(c.thesis==='主旨','synth');
+// background translation: starts once readable, does every sentence, keeps going when one of three parallel requests fails
+assert(row.work.phase==='translate'&&row.progress.phase==='translate','translation queued once readable');
+{const snap=JSON.stringify(row);let tr=JSON.parse(snap),k=0,flaky=0;
+ const flakyDeps={...deps,fetch:async(u,o)=>{if(++flaky%4===0)return {ok:false,status:503,json:async()=>({error:{message:'overloaded'}})};return fetchStub(u,o)}};
+ while(tr.work.phase==='translate'){tr={...tr,...await ingestStep(tr,flakyDeps)};k++;assert(k<200,'runaway translate');assert(tr.status==='ready','stays readable')}
+ const all=tr.content.segs.flatMap(g=>g.turns.flatMap(t=>t.s));assert(all.every(p=>p[1]&&p[1].startsWith('譯:')),'every sentence translated');
+ assert(all.every(p=>p[0].startsWith(p[1].slice(2).replace(/^\d+\. /,''))),'each translation sits on its own sentence');
+ const dead={...deps,fetch:async()=>({ok:false,status:503,json:async()=>({error:{message:'overloaded'}})})};let t2=false;try{await ingestStep(JSON.parse(snap),dead)}catch(e){t2=e.message==='overloaded'}assert(t2,'all requests failing fails the step');
+ console.log('translate ok: steps',k,'sentences',all.length)}
 let d=0,r;do{r=await deepenStep(row,1,deps);if(r.content)row.content=r.content;d++;assert(d<200,'runaway deepen')}while(!r.done);
 const g=row.content.segs[1];assert(g.deep&&g.turns.every(t=>t.s.every(p=>p[1])),'translated');assert(g.key.length===2&&g.chain.length===4,'analysis');
 console.log('deepen ok: calls',d,'sentences',g.turns.reduce((a,t)=>a+t.s.length,0),'key',JSON.stringify(g.key));

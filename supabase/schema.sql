@@ -80,5 +80,5 @@ select cron.schedule('reader-tick', '* * * * *', $job$
     headers := jsonb_build_object('content-type', 'application/json', 'Authorization', 'Bearer <anon key>'),
     body := '{"action":"tick"}'::jsonb,
     timeout_milliseconds := 5000)
-  where exists (select 1 from public.videos where status in ('queued', 'processing'));
+  where exists (select 1 from public.videos where status in ('queued', 'processing') or work->>'phase' = 'translate');
 $job$);
