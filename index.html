@@ -469,7 +469,7 @@ function setUser(u){const was=sbUser&&sbUser.id;sbUser=u||null;if(!u){badge("登
   sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey);
   const {data}=await sb.auth.getSession();setUser(data.session&&data.session.user);
   sb.auth.onAuthStateChange((_e,ses)=>setUser(ses&&ses.user));
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()});
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden){pull();loadLibrary()}});
 }catch(e){badge("同步服務載入失敗，內容仍在這台裝置","warn")}})();
 const rateMsg=e=>(e&&(e.status===429||/rate limit/i.test(e.message||"")))?"寄信額度用完了：整個專案每小時只能寄幾封登入信。等一小時再試，或改用密碼登入。":null;
 syncEl.onclick=()=>{if(!sb){if(!window.claude)toast("後端還沒接上");return}
@@ -792,7 +792,7 @@ async function drive(vid){
     const j=await fn({action:"step",video_id:vid});
     if(j.error&&j.httpStatus===0){/* The request never arrived (offline, phone asleep, tab in the background): wait, never give up. */
       setLib(vid,{note:"連線中斷，恢復後會自動接著處理"});await back();await sleep(5000);continue}
-    if(j.error){fails++;if(j.fatal||fails>=4){setLib(vid,{status:"error",error:j.error,note:""});break}
+    if(j.error){fails++;if(j.fatal||j.status==="error"||fails>=8){setLib(vid,{status:"error",error:j.error,note:""});break}
       setLib(vid,{note:`遇到問題，第 ${fails} 次重試中：${j.error}`});await sleep(j.httpStatus===429?20000:3000*fails);continue}
     fails=0;setLib(vid,{title:j.title,status:j.status,progress:j.progress,error:j.error,note:""});
     if(j.busy){await sleep(4000);continue}
@@ -846,7 +846,8 @@ async function fetchContent(vid){
   return cache[vid]=data.content;
 }
 const STEP={meta:"讀取影片資訊",transcribe:"讀影片內容",outline:"整理章節和摘要",synth:"寫整支影片的總覽",ready:"完成"};
-function statusLine(it){
+function statusLine(it){const t=statusText(it);return it.demo||it.status==="ready"||it.status==="error"?t:t+" · 可以關掉頁面，會在背景跑完"}
+function statusText(it){
   if(it.demo)return "範例 · 只有 5 段節錄";
   if(it.status==="ready")return "可以閱讀";
   if(it.status==="error")return "沒有完成："+(it.error||"未知的問題");
@@ -879,7 +880,7 @@ homeEl.addEventListener("click",async e=>{
   const b=e.target.closest("[data-vid]");if(!b)return;const vid=b.dataset.vid,st=b.dataset.status;
   if(b.dataset.demo!=null){openVideo(DEMO);return}
   if(st==="error"){setLib(vid,{status:"processing",error:null,note:"重新開始…"});drive(vid);return}
-  if(st!=="ready"){toast("還在處理中，完成後會通知你");return}
+  if(st!=="ready"){toast("還在處理中。可以先離開，後端會接著跑完");return}
   const c=await fetchContent(vid);if(!c){toast("讀不到這支影片的內容，請稍後再試");return}
   openVideo(c);
 });
