@@ -222,10 +222,10 @@ function renderRead(){
   root.classList.toggle("mono",mono);
   rscroll.className="scroll m-"+S.mode;
   rscroll.innerHTML=`<div class="rin">`+SEGS.map((g,gi)=>{
-    const deep=isDeep(g),hasZh=!deep&&g.turns.some(tu=>tu.s.some(p=>p&&p[1]&&p[1]!==p[0])),open=deep||hasZh||ui.open.has(g.id),busy=ui.busy[g.id];
+    const deep=isDeep(g),hasZh=!deep&&g.turns.some(tu=>tu.s.some(p=>p&&p[1]&&p[1]!==p[0])),open=true,busy=ui.busy[g.id];
     const body=!open?"":g.turns.map((tu,ti)=>{const ids=tu.s.map((p,si)=>p?`${tu._id}-${si}`:null);const line=l=>ids.map(id=>id?span(id,l):`<span class="gap">[…]</span>`).join(l==="en"?" ":"");
       return `<div class="turn sp-${tu.sp===V.host?"L":"P"}" data-turn="${tu._id}"><div class="who"><b>${esc(who(tu)).toUpperCase()}</b>${tlink(tu.t)}</div><p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></div>`}).join("");
-    const tools=deep?"":`<div class="row segtools">${open?"":`<button class="btn sm line" data-open="${g.id}">顯示原文</button>`}<button class="btn sm" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):hasZh?"補上摘要和第一性原理":"精讀這一章（翻譯＋第一性原理）"}</button></div>`;
+    const tools=deep?"":`<div class="row segtools">${open?"":`<button class="btn sm line" data-open="${g.id}">顯示原文</button>`}<button class="btn sm" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):hasZh||mono?"補上摘要和第一性原理":"精讀這一章（翻譯＋第一性原理）"}</button></div>`;
     const absorb=!deep?"":`<div class="absorb">
       <div class="eyebrow">這一段在說什麼</div><ul>${(g.sum||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
       <div class="eyebrow">第一性原理</div><p class="core">${esc(g.core)}</p>
@@ -233,7 +233,7 @@ function renderRead(){
       <div class="eyebrow">換到你身上</div><p class="ask">${esc(g.ask)}</p>
       <textarea id="refl-${g.id}" data-refl="${g.id}" placeholder="寫一兩句就好">${esc(S.refl[g.id]||"")}</textarea>
     </div>`;
-    return `<section class="a-seg${deep||hasZh?"":" raw"}" id="seg-${g.id}">
+    return `<section class="a-seg${deep||hasZh||mono?"":" raw"}" id="seg-${g.id}">
     <header><i>第 ${gi+1} 段，共 ${SEGS.length} 段</i><h3>${esc(g.title)}</h3>${tlink(g.t)}</header>${tools}${body}${absorb}</section>`}).join("")+`</div>`;
   rscroll.scrollTop=top;nowId=null;
   $$("[data-mode]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===S.mode));
