@@ -39,7 +39,15 @@ assert(row.work.phase==='translate'&&row.progress.phase==='translate','translati
  const all=tr.content.segs.flatMap(g=>g.turns.flatMap(t=>t.s));assert(all.every(p=>p[1]&&p[1].startsWith('譯:')),'every sentence translated');
  assert(all.every(p=>p[0].startsWith(p[1].slice(2).replace(/^\d+\. /,''))),'each translation sits on its own sentence');
  const dead={...deps,fetch:async()=>({ok:false,status:503,json:async()=>({error:{message:'overloaded'}})})};let t2=false;try{await ingestStep(JSON.parse(snap),dead)}catch(e){t2=e.message==='overloaded'}assert(t2,'all requests failing fails the step');
- console.log('translate ok: steps',k,'sentences',all.length)}
+ console.log('translate ok: steps',k,'sentences',all.length);
+ // chapter notes follow on their own; one chapter that always fails is given up on after three tries and the rest still finish
+ assert(tr.work.phase==='analyse','notes queued after translation');let n=0,aCalls=0;
+ const sick={...deps,fetch:async(u,o)=>{const t=JSON.parse(o.body).contents[0].parts[0].text||'';if(t.includes('"chain"')){aCalls++;if(t.includes('這一章的主題：'+tr.content.segs[2].title+'\n'))return {ok:false,status:503,json:async()=>({error:{message:'overloaded'}})}}return fetchStub(u,o)}};
+ const same=tr.content.segs.filter(g=>g.title===tr.content.segs[2].title).length;
+ let fl=0;while(tr.work.phase==='analyse'){try{tr={...tr,...await ingestStep(JSON.parse(JSON.stringify(tr)),sick)};fl=0}catch(e){if(++fl>=3)tr.work={...tr.work,phase:'ready'}}n++;assert(n<60,'runaway analyse');assert(tr.status==='ready','stays readable')}   // the catch mirrors runStep in index.ts
+ const deepN=tr.content.segs.filter(g=>g.deep!==false).length;assert(tr.work.phase==='ready','ends');assert(deepN===tr.content.segs.length-same,'all healthy chapters done: '+deepN);
+ assert(aCalls<=tr.content.segs.length-same+6*same,'failing chapter is bounded: '+aCalls);
+ console.log('analyse ok: steps',n,'chapters done',deepN,'of',tr.content.segs.length,'analysis calls',aCalls)}
 let d=0,r;do{r=await deepenStep(row,1,deps);if(r.content)row.content=r.content;d++;assert(d<200,'runaway deepen')}while(!r.done);
 const g=row.content.segs[1];assert(g.deep&&g.turns.every(t=>t.s.every(p=>p[1])),'translated');assert(g.key.length===2&&g.chain.length===4,'analysis');
 console.log('deepen ok: calls',d,'sentences',g.turns.reduce((a,t)=>a+t.s.length,0),'key',JSON.stringify(g.key));

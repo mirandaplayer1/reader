@@ -192,12 +192,13 @@ ask　　好：「你手上哪個點子，其實兩週內就能放上一個付�
 　　　 不好：「你現在緊抓不放的既有想法或微小成果，是否正阻礙你像初學者一樣靈活探索新方向？」
 counter 好：「壞了再修只在錯誤可逆時成立。金流算錯、資料外洩，兩分鐘修不回來。你的產品裡哪些地方不可逆？」`;
 
-/* ---------- ingest: meta -> transcribe (chunk by chunk) -> outline -> ready (-> translate, in the background) ---------- */
+/* ---------- ingest: meta -> transcribe (chunk by chunk) -> outline -> ready (-> translate -> analyse, in the background) ---------- */
 
 export async function ingestStep(row, deps) {
   const work = Object.assign({ phase: "meta", next: 0, turns: [], visuals: [] }, row.work || {});
   const url = "https://www.youtube.com/watch?v=" + row.video_id;
   if (work.phase === "translate") return translateStep(row, work, deps);
+  if (work.phase === "analyse") return analyseStep(row, work, deps);
 
   if (work.phase === "meta") {
     let title = row.title || "", channel = "";
@@ -299,12 +300,13 @@ export async function ingestStep(row, deps) {
       duration: work.duration, host: String(meta.host || ""), thesis: String(meta.thesis || ""),
       tldr: (Array.isArray(meta.tldr) ? meta.tldr : []).map(String).slice(0, 3), chapters, segs, visuals: work.visuals,
     };
-    // Readable from here on. Translation carries on in the background unless the video is already in Chinese.
+    // Readable from here on. In the background: translation (unless the video is already in Chinese), then the
+    // summary and first-principles notes for every chapter.
     let total = 0, have = 0;
     segs.forEach((g) => g.turns.forEach((tu) => tu.s.forEach((p) => { total++; if (p[1] != null) have++; })));
     const more = !/^zh/i.test(content.lang) && have < total;
-    return { status: "ready", title: content.title, content, work: { phase: more ? "translate" : "ready", channel: work.channel },
-      progress: more ? { phase: "translate", done: have, total } : { phase: "ready", done: 1, total: 1 }, error: null };
+    return { status: "ready", title: content.title, content, work: { phase: more ? "translate" : "analyse", channel: work.channel },
+      progress: more ? { phase: "translate", done: have, total } : { phase: "analyse", done: 0, total: segs.length }, error: null };
   };
   const META_SPEC =
     `"lang":"<逐字稿語言的 BCP-47 代碼，例如 en、zh-TW、ja>","title":"<影片標題，看不出來就寫最貼切的一句>",` +
@@ -398,7 +400,8 @@ const PARALLEL = 3;   // translation requests per step
 
 async function translateStep(row, work, deps) {
   const content = row.content;
-  const finished = { work: { phase: "ready", channel: work.channel || "" }, progress: { phase: "ready", done: 1, total: 1 } };
+  const chapters = content && Array.isArray(content.segs) ? content.segs.length : 0;
+  const finished = { work: { phase: "analyse", channel: work.channel || "" }, progress: { phase: "analyse", done: 0, total: chapters } };
   if (!content || !Array.isArray(content.segs) || /^zh/i.test(content.lang || "")) return finished;
   const todo = []; let total = 0;
   content.segs.forEach((g) => g.turns.forEach((tu) => tu.s.forEach((p) => { total++; if (p[1] == null) todo.push({ p, title: g.title }); })));
@@ -412,6 +415,30 @@ async function translateStep(row, work, deps) {
   const left = todo.length - ok;
   if (!left) return { content, ...finished };
   return { content, work: { phase: "translate", channel: work.channel || "" }, progress: { phase: "translate", done: total - left, total } };
+}
+
+/* ---------- summary and first-principles notes for every chapter, in the background ---------- */
+
+const CHAPTER_TRIES = 3;   // a chapter that keeps failing is left for the button in the reader
+
+async function analyseStep(row, work, deps) {
+  const content = row.content, channel = work.channel || "";
+  const finished = { work: { phase: "ready", channel }, progress: { phase: "ready", done: 1, total: 1 } };
+  if (!content || !Array.isArray(content.segs)) return finished;
+  const tries = Object.assign({}, work.tries);
+  const open = content.segs.map((g, i) => (g.deep === false && (tries[i] || 0) < CHAPTER_TRIES ? i : -1)).filter((i) => i >= 0);
+  if (!open.length) return finished;
+  // Chapters tried least go first, so one that keeps failing cannot hold up the ones after it.
+  const ks = open.sort((x, y) => (tries[x] || 0) - (tries[y] || 0) || x - y).slice(0, PARALLEL);
+  ks.forEach((k) => { tries[k] = (tries[k] || 0) + 1; });
+  const res = await Promise.allSettled(ks.map((k) => deepenStep(row, k, deps)));
+  if (!res.some((r) => r.status === "fulfilled")) throw res[0].reason;
+  // A chapter that still had sentences to translate only moved forward: that try does not count against it.
+  res.forEach((r, i) => { if (r.status === "fulfilled" && !r.value.done) tries[ks[i]]--; });
+  const total = content.segs.length, done = content.segs.filter((g) => g.deep !== false).length;
+  const left = content.segs.some((g, i) => g.deep === false && (tries[i] || 0) < CHAPTER_TRIES);
+  if (!left) return { content, ...finished };
+  return { content, work: { phase: "analyse", channel, tries }, progress: { phase: "analyse", done, total } };
 }
 
 /* ---------- deepen one chapter on demand: translate in batches, then analyse ---------- */

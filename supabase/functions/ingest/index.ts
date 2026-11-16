@@ -19,9 +19,9 @@ const json = (body: unknown, status = 200) =>
 
 const MAX_FAILS = 3;   // tries per step before the video is given up on; nothing retries after that until the owner asks
 const ACTIVE = ["queued", "processing"];
-// Waiting for background work: still being read, or readable and still being translated.
-const WAITING = "status.in.(queued,processing),work->>phase.eq.translate";
-const waiting = (r: any) => ACTIVE.includes(r.status) || r.work?.phase === "translate";
+// Waiting for background work: still being read, or readable with translation or chapter notes still to do.
+const WAITING = "status.in.(queued,processing),work->>phase.in.(translate,analyse)";
+const waiting = (r: any) => ACTIVE.includes(r.status) || ["translate", "analyse"].includes(r.work?.phase);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const mine = (q: any, row: any) => q.eq("user_id", row.user_id).eq("video_id", row.video_id);
 
@@ -37,7 +37,7 @@ async function claim(db: any, row: any) {
 // (time limit, crash) still counts: a step can cost at most MAX_FAILS model calls, then the video is marked failed.
 async function runStep(db: any, row: any, deps: any) {
   const tries = (row.fails || 0) + 1;
-  // A video that is already readable stays readable: giving up only stops the background translation.
+  // A video that is already readable stays readable: giving up only stops the background work.
   const stop = (msg: string) => row.status === "ready"
     ? { work: { ...row.work, phase: "ready" }, progress: { phase: "ready", done: 1, total: 1 }, fails: 0, lock_until: null }
     : { status: "error", error: msg, lock_until: null };
