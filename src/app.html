@@ -79,7 +79,7 @@ let LS="";
 const blank=()=>({hl:{},notes:{},rng:{},refl:{},claims:[],cards:[],mode:"both",at:0});
 let S=blank();
 function loadState(){LS="rd4:"+VID;S=blank();try{Object.assign(S,JSON.parse(localStorage.getItem(LS))||{})}catch(e){}}
-const ui={side:"overview",m:"side",coreOnly:false,linkTo:null,fresh:null,open:new Set(),busy:{}};
+const ui={side:"overview",m:"side",coreOnly:false,linkTo:null,fresh:null,open:new Set(),busy:{},list:null};
 let cloud=null,cloudBase=null,cloudOff=null,sb=null,sbUser=null,pushT=null,remoteWaiting=false;
 const canSync=()=>!!(cloud||(sb&&sbUser));
 const syncEl=$("#sync");
@@ -436,7 +436,7 @@ const cache={};const driving=new Set();
 const canIngest=()=>!!(sb&&sbUser);
 function setLib(vid,patch){let it=LIB.find(x=>x.video_id===vid&&!x.demo);if(!it){it={video_id:vid,title:"",status:"queued"};LIB.splice(1,0,it)}Object.assign(it,patch);if(root.dataset.view==="home")renderHome()}
 async function loadLibrary(){if(!canIngest())return;
-  const {data,error}=await sb.from("videos").select("video_id,title,status,progress,error,updated_at,list,seq").order("updated_at",{ascending:false});
+  const {data,error}=await sb.from("videos").select("video_id,title,status,progress,error,updated_at,list,seq,duration:content->>duration").order("updated_at",{ascending:false});
   if(error)return;LIB=[LIB.find(x=>x.demo),...data];renderHome();
   data.filter(v=>v.status==="queued"||v.status==="processing").forEach(v=>drive(v.video_id));
 }
@@ -469,13 +469,14 @@ async function drive(vid){
     if(j.status==="error")break;
   }}finally{driving.delete(vid)}
 }
-async function addVideo(url){
+async function addVideo(url,list){
   const msg=$("#add-msg");
   if(!/(youtube\.com|youtu\.be)/.test(url)){msg.textContent="請貼上 YouTube 影片的網址。";return}
   if(!canIngest()){msg.textContent="先登入才能加入影片。";syncEl.click();return}
   msg.textContent="加入中…";const j=await fn({action:"start",url});
   if(j.error){msg.textContent="沒有加入："+j.error;return}
   msg.textContent="";$("#add-url").value="";setLib(j.video_id,j);
+  if(list)setList(j.video_id,list);
   if(j.status!=="ready")drive(j.video_id);
 }
 async function deepen(k){
@@ -527,64 +528,124 @@ function statusText(it){
   if(p.phase==="outline"&&p.total>1)return `正在整理章節和摘要，${p.done||0} / ${p.total}`;
   return "正在"+(STEP[p.phase]||"排隊")+"…";
 }
-/* Videos grouped by list. A list is just a name on the video; videos without one sit under 未分類. */
-const lists=()=>[...new Set(LIB.map(it=>it.list).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"zh-Hant"));
-const shut=()=>{try{return JSON.parse(localStorage.getItem("reader-shut")||"[]")}catch(e){return []}};
-function itemHtml(it){return `<div class="item-row"><button class="item${it.status==="ready"?"":" wait"}" data-vid="${it.video_id}" data-status="${it.status}"${it.demo?" data-demo":""}>
-      <img alt="" src="${it.demo?THUMB:`https://i.ytimg.com/vi/${it.video_id}/mqdefault.jpg`}" onerror="this.style.visibility='hidden'">
-      <span><b>${esc(it.title||"（讀取中）"+it.video_id)}</b><small class="${it.status==="error"?"err":""}">${esc(statusLine(it))}</small>${it.status==="error"?`<em>點這裡從中斷的地方重試</em>`:""}</span></button>${it.demo||!canIngest()?"":`<button class="tolist" data-tolist="${it.video_id}" aria-label="放進清單" title="放進清單">清單</button>`}</div>`}
+/* Lists, the way YouTube and Spotify do them: the home screen shows one card per list, a list opens to its own page
+   (cover, totals, progress, one main button, numbered rows), and everything you can do to a video sits behind its ⋯ button. */
+const lists=()=>[...new Set(LIB.map(it=>it.list).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"zh-Hant",{numeric:true}));
+const inList=n=>LIB.filter(it=>!it.demo&&it.list===n).sort((a,b)=>(a.seq??1e9)-(b.seq??1e9)||String(a.title).localeCompare(String(b.title),"zh-Hant",{numeric:true}));
+const seenMap=()=>{try{return JSON.parse(localStorage.getItem("reader-seen")||"{}")}catch(e){return {}}};
+const markSeen=vid=>{const m=seenMap();m[vid]=Date.now();try{localStorage.setItem("reader-seen",JSON.stringify(m))}catch(e){}};
+const dur=s=>{s=+s||0;if(!s)return "";const h=Math.floor(s/3600),m=Math.round(s%3600/60);return h?`${h} 小時 ${m} 分`:`${m} 分`};
+const thumb=it=>it.demo?THUMB:`https://i.ytimg.com/vi/${it.video_id}/mqdefault.jpg`;
+function itemHtml(it,n){const seen=!it.demo&&seenMap()[it.video_id],d=it.status==="ready"?dur(it.duration):"";
+  return `<div class="item-row">${n?`<i class="idx">${n}</i>`:""}<button class="item${it.status==="ready"?"":" wait"}" data-vid="${it.video_id}" data-status="${it.status}"${it.demo?" data-demo":""}>
+      <img alt="" src="${thumb(it)}" onerror="this.style.visibility='hidden'">
+      <span><b>${esc(it.title||"（讀取中）"+it.video_id)}</b><small class="${it.status==="error"?"err":""}">${esc(d&&statusLine(it)==="可以閱讀"?d:statusLine(it)+(d?" · "+d:""))}${seen?` · <u>讀過</u>`:""}</small>${it.status==="error"?`<em>點這裡從中斷的地方重試</em>`:""}</span></button>${it.demo||!canIngest()?"":`<button class="more" data-more="${it.video_id}" aria-label="更多">⋯</button>`}</div>`}
+function listStats(name){const items=inList(name),seen=seenMap(),total=items.reduce((a,it)=>a+(+it.duration||0),0),read=items.filter(it=>seen[it.video_id]).length;
+  return {items,read,total,line:[`${items.length} 支`,dur(total),read?`讀過 ${read}`:""].filter(Boolean).join(" · ")}}
+function listCard(name){const st=listStats(name);return `<button class="lcard" data-list="${esc(name)}">
+    <span class="cover">${st.items[0]?`<img alt="" src="${thumb(st.items[0])}" onerror="this.style.visibility='hidden'">`:""}<i>${st.items.length}</i></span>
+    <span><b>${esc(name)}</b><small>${esc(st.line)}</small></span></button>`}
 function libHtml(){
-  const all=LIB.filter(it=>!(it.demo&&LIB.some(x=>!x.demo&&x.video_id===it.video_id))),names=lists(),closed=shut();
-  if(!names.length)return `<div class="lib">${all.map(itemHtml).join("")}</div>`;
-  const group=(name,items,key)=>items.length?`<details class="group" data-group="${esc(key)}"${closed.includes(key)?"":" open"}><summary><b>${esc(name)}</b><span>${items.length} 支</span></summary><div class="lib">${items.map(itemHtml).join("")}</div></details>`:"";
-  const inList=n=>all.filter(it=>it.list===n).sort((a,b)=>(a.seq??1e9)-(b.seq??1e9)||String(a.title).localeCompare(String(b.title),"zh-Hant",{numeric:true}));
-  return names.map(n=>group(n,inList(n),n)).join("")+group("未分類",all.filter(it=>!it.list),"");
+  const all=LIB.filter(it=>!(it.demo&&LIB.some(x=>!x.demo&&x.video_id===it.video_id))),names=lists(),loose=all.filter(it=>!it.list);
+  if(!names.length)return `<div class="eyebrow">我的影片</div><div class="lib">${all.map(it=>itemHtml(it)).join("")}</div>`;
+  return `<div class="eyebrow">清單</div><div class="lists">${names.map(listCard).join("")}</div>
+    ${loose.length?`<div class="eyebrow">其他影片</div><div class="lib">${loose.map(it=>itemHtml(it)).join("")}</div>`:""}`;
 }
+function nextInList(name){const st=listStats(name),seen=seenMap(),ready=st.items.filter(it=>it.status==="ready");
+  return ready.find(it=>!seen[it.video_id])||ready.slice().sort((a,b)=>(seen[b.video_id]||0)-(seen[a.video_id]||0))[0]||null}
+function listHtml(name,why){const st=listStats(name),pct=st.items.length?Math.round(st.read/st.items.length*100):0;
+  return `<div class="pad home lpage">
+    <div><button class="btn sm line" id="l-back">‹ 全部</button></div>
+    <div class="lhead"><span class="cover big">${st.items[0]?`<img alt="" src="${thumb(st.items[0])}" onerror="this.style.visibility='hidden'">`:""}</span>
+      <div><div class="eyebrow">清單</div><h2>${esc(name)}</h2><p class="meta">${esc([`${st.items.length} 支`,dur(st.total)].filter(Boolean).join(" · "))}</p>
+        <div class="pbar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div><p class="meta">讀過 ${st.read} 支，共 ${st.items.length} 支</p></div></div>
+    <div class="row"><button class="btn" id="l-go" ${nextInList(name)?"":"disabled"}>${st.read?"繼續閱讀":"開始閱讀"}</button><button class="btn line" id="l-add">加入影片</button><span class="sp"></span><button class="btn line" id="l-more" aria-label="清單選項">⋯</button></div>
+    <form id="add" class="add" hidden><input id="add-url" type="url" inputmode="url" placeholder="貼上 YouTube 網址，加進這個清單"><button class="btn">加入</button></form>
+    <p class="meta" id="add-msg">${why}</p>
+    <div class="lib">${st.items.map((it,k)=>itemHtml(it,k+1)).join("")}</div>
+  </div>`}
+async function saveSeq(items){   // number a list 1..n in the given order, writing only the rows that changed
+  const jobs=[];items.forEach((it,k)=>{if(it.seq!==k+1){it.seq=k+1;jobs.push(sb.from("videos").update({seq:k+1}).eq("video_id",it.video_id))}});
+  renderHome();const rs=await Promise.all(jobs);if(rs.some(r=>r.error))toast("順序沒有存到，請再試一次")}
+function moveInList(vid,by){const it=LIB.find(x=>x.video_id===vid&&!x.demo);if(!it||!it.list)return;
+  const items=inList(it.list),a=items.indexOf(it),b=a+by;if(b<0||b>=items.length)return;[items[a],items[b]]=[items[b],items[a]];closeSheet();saveSeq(items)}
 async function setList(vid,name){
   const it=LIB.find(x=>x.video_id===vid&&!x.demo);if(!it)return;
-  const list=(name||"").trim().slice(0,60)||null,was=it.list;
+  const list=(name||"").trim().slice(0,60)||null,was=it.list,wasSeq=it.seq;
   if(list===(was||null)){closeSheet();return}
   const seq=list?Math.max(0,...LIB.filter(x=>x.list===list).map(x=>x.seq||0))+1:null;
   Object.assign(it,{list,seq});closeSheet();renderHome();
   const {error}=await sb.from("videos").update({list,seq}).eq("video_id",vid);
-  if(error){Object.assign(it,{list:was});renderHome();toast("沒有存到，請再試一次")}
+  if(error){Object.assign(it,{list:was,seq:wasSeq});renderHome();toast("沒有存到，請再試一次")}
 }
-function pickList(vid){
+async function renameList(old,name){name=(name||"").trim().slice(0,60);if(!name||name===old){closeSheet();return}
+  const base=Math.max(0,...LIB.filter(x=>x.list===name).map(x=>x.seq||0)),items=inList(old);   // renaming onto an existing list appends to it
+  items.forEach((it,k)=>Object.assign(it,{list:name,seq:base+k+1}));if(ui.list===old)ui.list=name;closeSheet();renderHome();
+  const rs=await Promise.all(items.map(it=>sb.from("videos").update({list:it.list,seq:it.seq}).eq("video_id",it.video_id)));
+  if(rs.some(r=>r.error))toast("改名沒有全部存到，請重新整理後再試")}
+async function dropList(name){const items=inList(name);items.forEach(it=>Object.assign(it,{list:null,seq:null}));if(ui.list===name)ui.list=null;closeSheet();renderHome();
+  const {error}=await sb.from("videos").update({list:null,seq:null}).eq("list",name);if(error)toast("沒有存到，請重新整理後再試")}
+function listMenu(name){
+  openSheet(`<div class="eyebrow">清單</div><p class="q-zh">${esc(name)}</p>
+    <form id="rn" class="add"><input id="rn-name" maxlength="60" value="${esc(name)}"><button class="btn">改名</button></form>
+    <div class="row"><button class="btn line" id="rm-list">解散這個清單</button><span class="sp"></span><button class="btn line" id="lm-no">關閉</button></div>
+    <p class="meta" style="margin:0;color:var(--mute)">解散只是拿掉分組，裡面的影片、畫線和筆記都會留著。</p>`);
+  $("#rn").onsubmit=e=>{e.preventDefault();renameList(name,$("#rn-name").value)};
+  $("#rm-list").onclick=()=>dropList(name);$("#lm-no").onclick=closeSheet;
+}
+function videoMenu(vid){
   const it=LIB.find(x=>x.video_id===vid&&!x.demo);if(!it)return;
-  openSheet(`<div class="eyebrow">放進清單</div><p class="q-zh">${esc(it.title||vid)}</p>
-    <div class="row picks">${lists().map(n=>`<button class="btn sm${n===it.list?"":" line"}" data-pick="${esc(n)}">${esc(n)}</button>`).join("")}</div>
+  const items=it.list?inList(it.list):[],at=items.indexOf(it),others=lists().filter(n=>n!==it.list);
+  openSheet(`<p class="q-zh">${esc(it.title||vid)}</p>
+    ${it.list?`<div class="eyebrow">在「${esc(it.list)}」裡，第 ${at+1} 支</div>
+      <div class="row picks"><button class="btn sm line" id="mv-up" ${at>0?"":"disabled"}>往前移</button><button class="btn sm line" id="mv-down" ${at<items.length-1?"":"disabled"}>往後移</button><button class="btn sm line" id="unlist">移出清單</button></div>`:""}
+    <div class="eyebrow">${it.list?"改放到別的清單":"放進清單"}</div>
+    ${others.length?`<div class="row picks">${others.map(n=>`<button class="btn sm line" data-pick="${esc(n)}">${esc(n)}</button>`).join("")}</div>`:""}
     <form id="newlist" class="add"><input id="newlist-name" maxlength="60" placeholder="新清單的名字"><button class="btn">建立並放入</button></form>
-    <div class="row"><span class="sp"></span>${it.list?`<button class="btn line" id="unlist">移出清單</button>`:""}<button class="btn line" id="pl-no">取消</button></div>`);
+    <div class="row"><span class="sp"></span><button class="btn line" id="pl-no">關閉</button></div>`);
   sheetEl.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>setList(vid,b.dataset.pick));
   $("#newlist").onsubmit=e=>{e.preventDefault();const v=$("#newlist-name").value.trim();if(v)setList(vid,v)};
-  $("#pl-no").onclick=closeSheet;const u=$("#unlist");if(u)u.onclick=()=>setList(vid,"");
+  $("#pl-no").onclick=closeSheet;
+  if(it.list){$("#unlist").onclick=()=>setList(vid,"");$("#mv-up").onclick=()=>moveInList(vid,-1);$("#mv-down").onclick=()=>moveInList(vid,1)}
 }
 function renderHome(){
   const why=window.claude?"這個預覽頁不能處理新影片，也不能嵌入播放器（平台會擋）。部署版才有這兩項。"
     :!(CFG.supabaseUrl&&CFG.supabaseAnonKey)?"後端還沒接上，目前只能看範例。"
     :!sbUser?"先登入，才能加入影片並跨裝置同步。":"";
-  const keep=$("#add-url")?$("#add-url").value:"";
+  const keep=$("#add-url")?$("#add-url").value:"",onList=!!$(".lpage"),adding=onList&&!$("#add").hidden;
+  if(ui.list&&!lists().includes(ui.list))ui.list=null;
+  if(ui.list){
+    homeEl.innerHTML=listHtml(ui.list,why);
+    $("#l-back").onclick=()=>{ui.list=null;renderHome();homeEl.scrollTop=0};
+    $("#l-more").onclick=()=>listMenu(ui.list);
+    $("#l-add").onclick=()=>{if(!canIngest()){syncEl.click();return}$("#add").hidden=false;$("#add-url").focus()};
+    $("#l-go").onclick=()=>{const it=nextInList(ui.list);if(it)openItem(it.video_id,it.status,false)};
+    if(onList&&(keep||adding)){$("#add").hidden=false;$("#add-url").value=keep}
+    $("#add").onsubmit=e=>{e.preventDefault();addVideo($("#add-url").value.trim(),ui.list)};
+    return;
+  }
   homeEl.innerHTML=`<div class="pad home">
     <div><h2>把看過的影片變成自己的觀點</h2><p class="meta">貼上網址，先看摘要決定值不值得細看，再精讀、畫線、淬煉成最多三張觀點卡。</p></div>
     <form id="add" class="add"><input id="add-url" type="url" inputmode="url" placeholder="貼上 YouTube 網址" ${canIngest()?"":"disabled"}><button class="btn" ${canIngest()?"":"disabled"}>加入</button></form>
     <p class="meta" id="add-msg">${why}</p>
     ${!window.claude&&sb&&!sbUser?`<div><button class="btn" id="home-login">登入</button></div>`:""}
-    <div class="eyebrow">我的影片</div>
     ${libHtml()}
   </div>`;
   if(keep)$("#add-url").value=keep;
   $("#add").onsubmit=e=>{e.preventDefault();addVideo($("#add-url").value.trim())};
   const hl=$("#home-login");if(hl)hl.onclick=()=>syncEl.click();
-  homeEl.querySelectorAll("details.group").forEach(d=>d.ontoggle=()=>{const k=d.dataset.group,c=shut().filter(x=>x!==k);if(!d.open)c.push(k);try{localStorage.setItem("reader-shut",JSON.stringify(c))}catch(e){}});
 }
-homeEl.addEventListener("click",async e=>{
-  const tl=e.target.closest("[data-tolist]");if(tl){pickList(tl.dataset.tolist);return}
-  const b=e.target.closest("[data-vid]");if(!b)return;const vid=b.dataset.vid,st=b.dataset.status;
-  if(b.dataset.demo!=null){openVideo(DEMO);return}
+async function openItem(vid,st,demo){
+  if(demo){openVideo(DEMO);return}
   if(st==="error"){setLib(vid,{status:"processing",error:null,note:"重新開始…"});drive(vid);return}
   if(st!=="ready"){toast("還在處理中。可以先離開，後端會接著跑完");return}
   const c=await fetchContent(vid);if(!c){toast("讀不到這支影片的內容，請稍後再試");return}
-  openVideo(c);
+  markSeen(vid);openVideo(c);
+}
+homeEl.addEventListener("click",e=>{
+  const m=e.target.closest("[data-more]");if(m){videoMenu(m.dataset.more);return}
+  const l=e.target.closest("[data-list]");if(l){ui.list=l.dataset.list;renderHome();homeEl.scrollTop=0;window.scrollTo(0,0);return}
+  const b=e.target.closest("[data-vid]");if(b)openItem(b.dataset.vid,b.dataset.status,b.dataset.demo!=null);
 });
 function openVideo(c){
   V=c;VID=c.vid;SEGS=c.segs||[];CH=c.chapters||[];THESIS=c.thesis||"";TLDR=c.tldr||[];
@@ -594,7 +655,7 @@ function openVideo(c){
   root.dataset.view="video";renderAll();initYT();rscroll.scrollTop=0;side.scrollTop=0;
 }
 function goHome(){closeSheet();try{if(player&&ytOK)player.pauseVideo()}catch(e){} root.dataset.view="home";$("#vt").textContent="";renderHome()}
-$("#gohome").onclick=goHome;
+$("#gohome").onclick=()=>{if(root.dataset.view==="home")ui.list=null;goHome()};
 /* wide screens: drag the divider to resize the two columns; double-click to reset */
 (function(){
   const split=$("#split"),KEY="rd4:side-w",clamp=w=>Math.max(340,Math.min(innerWidth-420,w));
