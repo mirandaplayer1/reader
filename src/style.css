@@ -328,3 +328,21 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
 #selbar span{color:var(--mute);padding:0 4px}
 #selbar button{display:flex;gap:6px;align-items:center;padding:9px 11px;border-radius:8px;color:var(--ink)} #selbar button:hover{background:var(--surf2)}
 #selbar i{width:14px;height:14px;border-radius:4px;box-shadow:inset 0 0 0 1px var(--line)}
+
+/* Lists: cards on the home screen, a page per list */
+.lists{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.lcard{display:grid;gap:9px;text-align:left;align-content:start} .lcard>span:last-child{display:grid;gap:2px;min-width:0}
+.lcard b{font-size:16.5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden} .lcard small{font-size:14px;color:var(--mute)}
+.cover{position:relative;display:block;aspect-ratio:16/9;border-radius:8px;background:var(--surf2);margin-top:8px;
+  box-shadow:0 -4px 0 -1px var(--surf),0 -5px 0 0 var(--lav),0 -9px 0 -3px var(--surf),0 -10px 0 -2px var(--lav-2)}
+.cover img{width:100%;height:100%;object-fit:cover;border-radius:8px;display:block}
+.cover i{position:absolute;right:6px;bottom:6px;font-style:normal;font-size:13px;font-weight:600;color:#fff;background:rgba(16,22,60,.78);padding:2px 8px;border-radius:5px}
+.lcard:hover .cover img{filter:brightness(.94)}
+.lhead{display:grid;grid-template-columns:minmax(120px,240px) 1fr;gap:18px;align-items:center} .lhead h2{margin:2px 0 4px} .lhead .meta{margin:0}
+.cover.big{margin-top:10px}
+.pbar{height:6px;border-radius:3px;background:var(--surf2);overflow:hidden;margin:10px 0 6px;max-width:320px} .pbar i{display:block;height:100%;background:var(--link);border-radius:3px}
+.idx{flex:none;width:22px;align-self:center;text-align:center;font-style:normal;font-size:14.5px;color:var(--mute);font-variant-numeric:tabular-nums}
+.more{flex:none;width:40px;border-radius:8px;font-size:20px;line-height:1;color:var(--mute)} .more:hover{background:var(--hover);color:var(--ink)}
+.item small u{text-decoration:none;color:var(--link)}
+@media (max-width:560px){.lists{grid-template-columns:1fr 1fr;gap:12px} .lhead{grid-template-columns:1fr} .cover.big{max-width:280px} .more{width:34px} .idx{width:16px}}
+.add[hidden]{display:none}
