@@ -923,7 +923,7 @@ async function fetchContent(vid){
   if(!half)cache[vid]=c;   // background work still going: read it fresh next time
   return c;
 }
-const STEP={meta:"讀取影片資訊",transcribe:"讀影片內容",outline:"整理章節和摘要",synth:"寫整支影片的總覽",ready:"完成"};
+const STEP={meta:"讀取影片資訊",transcribe:"讀影片內容",outline:"整理章節和摘要",seams:"檢查整點的章節接縫",synth:"寫整支影片的總覽",ready:"完成"};
 function statusLine(it){const t=statusText(it);return it.demo||it.status==="ready"||it.status==="error"?t:t+" · 可以關掉頁面，會在背景跑完"}
 function statusText(it){
   if(it.demo)return "範例 · 只有 5 段節錄";

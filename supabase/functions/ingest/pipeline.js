@@ -192,7 +192,7 @@ ask　　好：「你手上哪個點子，其實兩週內就能放上一個付�
 　　　 不好：「你現在緊抓不放的既有想法或微小成果，是否正阻礙你像初學者一樣靈活探索新方向？」
 counter 好：「壞了再修只在錯誤可逆時成立。金流算錯、資料外洩，兩分鐘修不回來。你的產品裡哪些地方不可逆？」`;
 
-/* ---------- ingest: meta -> transcribe (chunk by chunk) -> outline -> ready (-> translate -> analyse, in the background) ---------- */
+/* ---------- ingest: meta -> transcribe (chunk by chunk) -> outline (-> seams -> synth for long videos) -> ready (-> translate -> analyse, in the background) ---------- */
 
 export async function ingestStep(row, deps) {
   const work = Object.assign({ phase: "meta", next: 0, turns: [], visuals: [] }, row.work || {});
@@ -273,7 +273,7 @@ export async function ingestStep(row, deps) {
     `{"t":<這一章開始的秒數，必須是逐字稿裡某一行的秒數>,"en":"<原文語言的短標題>","zh":"<10 字內的中文標題，像人會講的一句話，有畫面>",` +
     `"sum":"<兩三個短句，75 字內，講者實際說了或做了什麼，帶具體的數字、名稱、做法>","take":"<一句 40 字內可帶走的原則；純閒聊、或內容本身沒有可帶走的道理就留空字串，不要硬湊>","worth":<1 到 3 的整數，3 是核心>}`;
   const CHAPTER_RULES =
-    `- 依主題切章，一章只講一件事。20 分鐘以內的影片切 3 到 6 章；更長的影片每章大約 3 到 15 分鐘，任何一章都不要超過 15 分鐘，話題換了就切。\n` +
+    `- 只照內容切章，一章只講一件事。話題換了才切；一個話題還沒講完就不要切，不管它講了多久。不要為了讓每一章差不多長而切，也不要為了湊章數而切。\n` +
     `- worth 看的是「這一章對讀者有多少可以帶走的東西」：3 是核心論點或可以直接照做的方法，2 是有用的補充，1 是開場、閒聊、致謝這類可以跳過的。3 分最多佔三分之一。\n` +
     `- 講者是 "On screen" 的段落是畫面描述，照樣整理進章節。\n\n${STYLE}\n\n${EX_CHAPTER}`;
   const READER = `一位正在找 product-market fit 的一人創業者`;
@@ -337,8 +337,36 @@ export async function ingestStep(row, deps) {
       work.chapters = (work.chapters || []).concat(cleanChapters(out.chapters, part.map((t) => t.t)));
     }
     work.ow = w + 1;
-    if (work.ow >= windows) work.phase = "synth";
+    if (work.ow >= windows) { work.phase = "seams"; work.seam = 1; }
     return { status: "processing", work, progress: { phase: "outline", done: work.ow, total: windows } };
+  }
+
+  // The hourly windows put a chapter break at every hour mark whether or not the topic changed there.
+  // For each mark, the chapter before it and the chapter after it are handed back as one stretch and cut again by content.
+  if (work.phase === "seams") {
+    const first = work.turns[0].t, last = work.turns[work.turns.length - 1].t;
+    const windows = Math.max(1, Math.ceil((last - first + 1) / WINDOW));
+    const w = work.seam || 1;
+    const chapters = (work.chapters || []).slice().sort((x, y) => x.t - y.t);
+    if (w < windows) {
+      const edge = work.turns.find((t) => t.t >= first + w * WINDOW);
+      const k = edge ? chapters.findIndex((c) => c.t === edge.t) : -1;
+      if (k > 0) {
+        const a = chapters[k - 1].t, b = k + 1 < chapters.length ? chapters[k + 1].t : Infinity;
+        const part = work.turns.filter((t) => t.t >= a && t.t < b);
+        const lines = part.map((t) => `[${t.t}] ${t.speaker}: ${t.text}`).join("\n");
+        const prompt =
+          `下面是一支長影片裡連續的一段逐字稿，每一行開頭的方括號是該段開始的秒數。這一段原本在 [${edge.t}] 被切成兩章，但那一刀只是因為影片太長、要分批處理才切的，不代表話題在那裡換了。請幫${READER}只看內容，把這一段重新切成章節。\n\n` +
+          `輸出 JSON：{"chapters":[${CHAPTER_SPEC}]}\n\n規則：\n- 第一章從這一段第一行的秒數開始。\n- 如果整段都在講同一件事，就只給一章。如果話題確實換了，切在話題真正換的那一行，不一定是 [${edge.t}]。\n${CHAPTER_RULES}\n\n逐字稿：\n${lines}`;
+        const out = await llmJSON(deps, prompt, 12000, SCHEMA.window);
+        const fresh = cleanChapters(out.chapters, part.map((t) => t.t)).filter((c, i, arr) => i === 0 || c.t > arr[i - 1].t);
+        if (fresh.length) { fresh[0].t = a; chapters.splice(k - 1, 2, ...fresh); }
+      }
+      work.chapters = chapters;
+      work.seam = w + 1;
+    }
+    if (work.seam >= windows) work.phase = "synth";
+    return { status: "processing", work, progress: { phase: "seams", done: Math.min(w, windows - 1), total: windows - 1 } };
   }
 
   if (work.phase === "synth") {
