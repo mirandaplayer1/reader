@@ -105,7 +105,7 @@ const SCHEMA = {
   window: OBJ({ chapters: LIST(CHAPTER_ITEM) }),
   synth: OBJ({ ...META, worth: LIST(INT) }),
   translate: OBJ({ zh: LIST(STR) }),
-  analysis: OBJ({ title: STR, spark: STR, sum: LIST(STR), core: STR, chain: LIST(STR), ask: STR, key: LIST(INT), counter: STR }),
+  analysis: OBJ({ spark: STR, sum: LIST(STR), core: STR, chain: LIST(STR), ask: STR, key: LIST(INT), counter: STR }),
 };
 
 async function gemini(deps, model, parts, maxTokens = 32768, schema = null) {
@@ -162,9 +162,48 @@ const STYLE = `怎麼寫（這一段最重要，寫完請逐句對照）：
 - 不要「不是 X，而是 Y」，不要勵志口吻，不要破折號，不要 emoji，不要在句尾補一句總結。除了本來就要你提問的欄位，不要用問句。
 - 產品名、人名、技術名詞保留原文。只能寫內容裡有的事實，不可以編數字或主張。`;
 
-const EX_CHAPTER = `寫法對照：
-標題　好：「先收錢，再相信」「鏟沙」「不想當 CEO」「一個月的牆」「兩分鐘修好」
-　　　不好：「極簡創業與付費驗證」「潛意識醞釀與極簡記錄」（兩個抽象名詞用「與」並列，沒有畫面）
+// How a chapter title is written. The owner's own rules: a title is a conclusion note, "concept: concrete example".
+const TITLES = `標題怎麼下（zh 欄位）：
+標題要能當結論筆記用：讀者只看所有標題，就能知道這一章在講什麼。
+
+格式：「概念：具體例子」，兩個半句都要有。
+
+前半句：概念
+1. 寫出這段的結論或核心觀念，6 到 10 字。
+2. 寫答案，不要只寫問題。「經濟學在問什麼」只丟出問題，讀者還是不知道答案；「經濟學的三個層次」直接把答案框出來。
+3. 用講者實際使用的概念名稱，像稀少性、機會成本、沉沒成本，方便讀者之後查找。
+4. 不要繞口或文字遊戲，例如「看似不理性的理性」。
+
+後半句：例子
+1. 選最能代表整段論點的例子，5 到 10 字。不要挑段尾順帶一提的小例子。
+2. 例子要具體、有畫面，讓讀者一看就想起內容。
+3. 如果這段的重點是框架或分類，例子不足以代表整段，後半句可以改寫框架本身，例如「個人、互動、整體」。
+
+自我檢查：寫完每個標題後問自己兩件事。任一題答案是否定的，就重寫。
+- 沒聽過這堂課的人，只看標題能不能說出這段的結論？
+- 例子是不是這段花最多篇幅、最能撐起論點的那個？
+
+好與壞的例子：
+- 壞：經濟學在問什麼：教室擠了老師高興
+  好：經濟學的三個層次：個人、互動、整體
+  原因：前半句只有問題沒有答案，例子也只對應三個層次中的一個。
+- 壞：人們面臨取捨：印鈔機也有成本
+  好：人們面臨取捨：接六個家教就沒空念書
+  原因：印鈔機是段尾的小例子，這段主要在講個人時間的取捨。
+- 壞：誘因藏在意想不到處：不戴套的價差
+  好：補償夠高就願意冒險：不戴套的價差
+  原因：前半句沒說出誘因怎麼運作。
+- 好：稀少性與選擇：賣牛丼還是咖哩飯
+- 好：理性與最適化：考第九名剛剛好
+- 好：為什麼要忽略沉沒成本：沉下去的一千塊
+
+標題的語氣：
+- 用口語、直白的說法。
+- 不用驚嘆號、引號，也不用「揭秘」「真相」「你不知道的」這類標題黨字眼。
+- 同一份逐字稿的例子半句之間，不要重複句型。
+- 標題裡出現講者用的概念名稱（例如「核心」「最適化」這類詞本來就是他講的），照用，不受下面「這些詞不要用」的限制。`;
+
+const EX_CHAPTER = `寫法對照（標題以外的欄位）：
 sum　 好：「他不拿創投，設計、程式、logo 全部自己來。點子兩週內上線，有人刷卡才算數。」
 　　　不好：「分享不拿創投的獨立開發模式，將點子做成微型產品並在兩週內上線，直接用用戶刷卡付款驗證需求。」
 take　好：「卡住的時候，給自己一個每月要上線一次的期限。」
@@ -178,7 +217,6 @@ tldr　好：「怎麼知道點子行不行：看有沒有陌生人付錢。註�
 　　　不好：「打造微型產品並在兩週內串接 Stripe 收費，以信用卡實際付款作為驗證需求的唯一標準。」`;
 
 const EX_ANALYSIS = `寫法對照：
-title　好：「先收錢，再相信」「鏟沙」「不想當 CEO」　不好：「被蘋果開除後歸零」「連續轉型與純手動驗證」
 spark　好：「有人掏信用卡，才算驗證」「難的是決定不做什麼」
 sum　　好：「判斷標準是有人付錢。註冊和稱讚都不算。」
 　　　 不好：「意識到自己依然熱愛這份工作，於是卸下成功包袱創辦了 NeXT 與 Pixar。」
@@ -270,12 +308,14 @@ export async function ingestStep(row, deps) {
 
   // Chapters are cut one hour of transcript at a time, so no single request grows with the length of the video.
   const CHAPTER_SPEC =
-    `{"t":<這一章開始的秒數，必須是逐字稿裡某一行的秒數>,"en":"<原文語言的短標題>","zh":"<10 字內的中文標題，像人會講的一句話，有畫面>",` +
+    `{"t":<這一章開始的秒數，必須是逐字稿裡某一行的秒數>,"en":"<原文語言的短標題>","zh":"<中文標題，格式是「概念：具體例子」，照下面「標題怎麼下」的規則寫>",` +
     `"sum":"<兩三個短句，75 字內，講者實際說了或做了什麼，帶具體的數字、名稱、做法>","take":"<一句 40 字內可帶走的原則；純閒聊、或內容本身沒有可帶走的道理就留空字串，不要硬湊>","worth":<1 到 3 的整數，3 是核心>}`;
   const CHAPTER_RULES =
-    `- 依主題切章，一章只講一件事。20 分鐘以內的影片切 3 到 6 章；更長的影片每章大約 3 到 15 分鐘，任何一章都不要超過 15 分鐘，話題換了就切。\n` +
+    `- 依講者的論點切換來分段，不要依時間平均切。\n` +
+    `- 一段只講一個主要論點，通常是 3 到 10 分鐘的內容。任何一章都不要超過 15 分鐘。\n` +
+    `- 講者舉例、離題或回答問題時，如果還在支撐同一個論點，就歸在同一段。\n` +
     `- worth 看的是「這一章對讀者有多少可以帶走的東西」：3 是核心論點或可以直接照做的方法，2 是有用的補充，1 是開場、閒聊、致謝這類可以跳過的。3 分最多佔三分之一。\n` +
-    `- 講者是 "On screen" 的段落是畫面描述，照樣整理進章節。\n\n${STYLE}\n\n${EX_CHAPTER}`;
+    `- 講者是 "On screen" 的段落是畫面描述，照樣整理進章節。\n\n${TITLES}\n\n${STYLE}\n\n${EX_CHAPTER}`;
   const READER = `一位正在找 product-market fit 的一人創業者`;
   const WINDOW = 3600;
   const cleanChapters = (list, starts) => {
@@ -493,7 +533,7 @@ export async function deepenStep(row, k, deps) {
   const numbered = flat.map((x, i) => `${i}. ${seg.turns[x.ti].sp}: ${x.p[0]}`).join("\n");
   const prompt =
     `下面是影片其中一章的逐字稿，每句前面有編號。請幫一位正在找 product-market fit 的一人創業者讀懂它。\n\n` +
-    `輸出 JSON：\n{"title":"<8 字內的中文標題，具體、有畫面>","spark":"<14 字內，這一章最值得記住的一句話>",` +
+    `輸出 JSON：\n{"spark":"<14 字內，這一章最值得記住的一句話>",` +
     `"sum":["<這段在說什麼 1>","<2>","<3>"],"core":"<第一性原理：這個做法為什麼成立的最根本理由。一到兩個短句>",` +
     `"chain":["<推理第 1 步：最基本的前提>","<第 2 步>","<第 3 步>","<第 4 步：結論>"],` +
     `"ask":"<一個把這個原理換到讀者自己身上的問題>","key":[<最能代表這一章的 1 到 2 個句子編號，要相鄰>],` +
@@ -503,7 +543,7 @@ export async function deepenStep(row, k, deps) {
   const keyIdx = (Array.isArray(out.key) ? out.key : []).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < total).slice(0, 2);
   const key = (keyIdx.length ? keyIdx : [0]).map((n) => [flat[n].ti, flat[n].si]);
   Object.assign(seg, {
-    deep: true, title: String(out.title || seg.title), spark: String(out.spark || seg.title),
+    deep: true, spark: String(out.spark || seg.title),   // the chapter keeps the title it was given when it was cut
     sum: (Array.isArray(out.sum) ? out.sum : []).map(String).slice(0, 4), core: String(out.core || ""),
     chain: (Array.isArray(out.chain) ? out.chain : []).map(String).slice(0, 5), ask: String(out.ask || ""),
     key, counter: String(out.counter || ""),
