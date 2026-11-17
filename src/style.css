@@ -346,3 +346,8 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
 .item small u{text-decoration:none;color:var(--link)}
 @media (max-width:560px){.lists{grid-template-columns:1fr 1fr;gap:12px} .lhead{grid-template-columns:1fr} .cover.big{max-width:280px} .more{width:34px} .idx{width:16px}}
 .add[hidden]{display:none}
+
+/* Overview: the argument of the whole video */
+.brief-p{display:grid;gap:4px} .brief-p p{margin:0;font-size:17.5px;line-height:1.75}
+.brief-g{display:grid;gap:6px} .brief-g h3{margin:0;font-size:17px;font-weight:700} .brief-g li b{font-weight:600}
+.brief-r{margin:0;padding:12px 14px;border-radius:8px;background:var(--lav-l);font-size:17px;line-height:1.6} .brief-r b{display:block;font-size:14px;font-weight:500;color:var(--mute);margin-bottom:2px}

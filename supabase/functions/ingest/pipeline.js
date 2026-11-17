@@ -99,7 +99,7 @@ const STR = { type: "STRING" }, INT = { type: "INTEGER" };
 const LIST = (items) => ({ type: "ARRAY", items });
 const OBJ = (properties) => ({ type: "OBJECT", properties, required: Object.keys(properties) });
 const CHAPTER_ITEM = OBJ({ t: INT, en: STR, zh: STR, sum: STR, take: STR, worth: INT });
-const META = { lang: STR, title: STR, host: STR, thesis: STR, tldr: LIST(STR) };
+const META = { lang: STR, title: STR, host: STR, headline: STR, principle: STR, groups: LIST(OBJ({ title: STR, points: LIST(STR) })), reminder: STR };
 const SCHEMA = {
   outline: OBJ({ ...META, chapters: LIST(CHAPTER_ITEM) }),
   window: OBJ({ chapters: LIST(CHAPTER_ITEM) }),
@@ -193,18 +193,40 @@ const TITLES = `標題怎麼下（zh 欄位）：
 - 不用驚嘆號、引號，也不用「揭秘」「真相」「你不知道的」這類標題黨字眼。
 - 同一份逐字稿的例子半句之間，不要重複句型。`;
 
+// The page a reader sees first: the argument of the whole video, not a chapter-by-chapter recap.
+const BRIEF = `總覽怎麼寫（headline、principle、groups、reminder 四個欄位）：
+目標：讀者只讀這一頁，就能掌握整支影片的論證骨架，之後讀到任何一章都知道它在整體裡的位置。這不是流水帳，不要照時間順序一章一章講，也不要介紹講者是誰。
+
+headline：一到兩個短句，40 字內。講整支影片最根本的一個道理，要有因果：因為什麼，所以什麼。讀者只看這一句，就知道這支影片教了什麼。不要寫「本片探討」「講者分享」這種開頭。
+
+principle：第一性原理。兩到三句，100 字內。從一個不能再往下追問的事實出發，一步一步推到 headline 的結論。每一步用「所以」「就」接起來，中間不能跳步。它是 headline 的展開，要多出推理的過程，不是換句話再講一次。
+
+groups：把內容整理成 3 到 5 組，照論證的順序排，不是照影片的時間順序。
+- 常見的骨架是：起點（整套想法建立在哪個前提上）→ 主要的原則或方法 → 講者怎麼回應質疑 → 延伸出來的概念。這只是常見的骨架。組名要照這支影片實際的內容取，內容裡沒有的組不要硬湊。
+- title：組名，10 字內。能點出主題或數量最好，例如「起點：稀少性」「四條決策原則」。
+- points：每組 1 到 4 點。每點一到兩個短句，45 字內。
+  - 講概念的點，寫成「概念名稱：一句話把它講清楚」。概念名稱用講者實際用的詞，方便讀者之後查找。
+  - 講主張的點，直接寫成一句完整的結論。
+  - 每一點都要是讀者能拿去用、或拿去檢驗的內容。不要寫「講者舉了很多例子」這種空話。例子只在能讓意思更清楚時才放，而且要短。
+
+reminder：一句話，25 字內。看完整支影片後最該帶走的一個習慣，或一個要常問自己的問題。
+
+範例（一堂經濟學原理的課，講十大原理的前四條）：
+{"headline":"資源有限，所以每個選擇都有代價。看懂代價和誘因，就能預測人的行為。",
+ "principle":"資源有限，欲望卻沒有上限，所以人一定得做選擇，取捨放棄的東西就是代價。人會拿代價跟好處比，再決定怎麼做，所以只要代價或好處變了，行為就會跟著變。",
+ "groups":[
+  {"title":"起點：稀少性","points":["資源有限而欲望無窮，個人、廠商和政府都必須做選擇。"]},
+  {"title":"四條決策原則","points":["取捨：拿去做 A 就不能做 B。社會最大的取捨是效率和公平，過度重分配會讓整塊餅縮小。","機會成本：指放棄的選項裡最有價值的那一個，少賺的收入也要算進去。","邊際思考：每多做一步都比較好處和成本，兩者相等時就停。","誘因：成本或好處一變，行為就跟著變。"]},
+  {"title":"為「理性」辯護","points":["只要多數人在多數時候理性，推論就比亂猜準。","不理性的人會被市場淘汰。","看似瘋狂的行為，常常是當下條件裡的最佳策略。","經濟學只要求偏好有遞移性。行為經濟學能補充，但解釋範圍有限。"]},
+  {"title":"延伸概念","points":["沉沒成本不該影響現在的決策。","政策的非預期後果常比預期後果大。","人命價格可以從風險溢價反推。"]}],
+ "reminder":"永遠要問這件事的代價是什麼。"}
+這個範例示範的是結構和密度。用字、組名和內容都要來自你手上這支影片，不要套用範例的句子。`;
+
 const EX_CHAPTER = `寫法對照（標題以外的欄位）：
 sum　 好：「他不拿創投，設計、程式、logo 全部自己來。點子兩週內上線，有人刷卡才算數。」
 　　　不好：「分享不拿創投的獨立開發模式，將點子做成微型產品並在兩週內上線，直接用用戶刷卡付款驗證需求。」
 take　好：「卡住的時候，給自己一個每月要上線一次的期限。」
-　　　不好：「陷入停滯時設定固定週期的上線挑戰，用強制發布逼迫自己持續產出。」
-thesis 好：「Pieter Levels 一個人做了 70 幾個產品，賺錢的只有 4 個。他不募資，想到就做，兩週內上線，有人刷卡才繼續。」
-　　　不好：「一個人不募資，靠很多次兩週就上線的小實驗，找出有人願意付錢的那一個，再用自動化讓它不必變成一家公司。」（一個長句塞四件事，沒有人、沒有數字，像機器寫的摘要）
-　　　不好：「一人創業者應捨棄募資與複雜架構，透過市場付費訊號快速驗證點子。」
-　　　不好：「他主張人必須相信當下的直覺，做自己真心熱愛的事，並用死亡的必然性甩開旁人的眼光。」（並列三件事，還有「必然性」這種抽象名詞）
-　　　改成：「他每天早上照鏡子問自己：如果今天是最後一天，我還想做今天要做的事嗎？」
-tldr　好：「怎麼知道點子行不行：看有沒有陌生人付錢。註冊、按讚都不算。」
-　　　不好：「打造微型產品並在兩週內串接 Stripe 收費，以信用卡實際付款作為驗證需求的唯一標準。」`;
+　　　不好：「陷入停滯時設定固定週期的上線挑戰，用強制發布逼迫自己持續產出。」`;
 
 const EX_ANALYSIS = `寫法對照：
 spark　好：「有人掏信用卡，才算驗證」「難的是決定不做什麼」
@@ -327,8 +349,14 @@ export async function ingestStep(row, deps) {
     });
     const content = {
       vid: row.video_id, lang: String(meta.lang || "en"), title: row.title || String(meta.title || ""), channel: work.channel || "",
-      duration: work.duration, host: String(meta.host || ""), thesis: String(meta.thesis || ""),
-      tldr: (Array.isArray(meta.tldr) ? meta.tldr : []).map(String).slice(0, 3), chapters, segs, visuals: work.visuals,
+      duration: work.duration, host: String(meta.host || ""), thesis: String(meta.headline || ""), tldr: [],
+      brief: {
+        principle: String(meta.principle || ""), reminder: String(meta.reminder || ""),
+        groups: (Array.isArray(meta.groups) ? meta.groups : []).slice(0, 6)
+          .map((g) => ({ title: String((g && g.title) || ""), points: (Array.isArray(g && g.points) ? g.points : []).map(String).filter(Boolean).slice(0, 6) }))
+          .filter((g) => g.points.length),
+      },
+      chapters, segs, visuals: work.visuals,
     };
     // Readable from here on. In the background: translation (unless the video is already in Chinese), then the
     // summary and first-principles notes for every chapter.
@@ -340,7 +368,8 @@ export async function ingestStep(row, deps) {
   };
   const META_SPEC =
     `"lang":"<逐字稿語言的 BCP-47 代碼，例如 en、zh-TW、ja>","title":"<影片標題，看不出來就寫最貼切的一句>",` +
-    `"host":"<訪問者或主持人的 speaker 標籤，沒有就寫空字串>","thesis":"<兩到三個短句，70 字內。第一句講這個人是誰、做了什麼讓人想聽他講，要有具體的數字或事實。後面只講他最主要的「一個」做法或主張，用他自己的例子講，不要並列好幾個>","tldr":["<重點 1，一到兩個短句>","<重點 2>","<重點 3>"]`;
+    `"host":"<訪問者或主持人的 speaker 標籤，沒有就寫空字串>",` +
+    `"headline":"<整支影片最根本的一個道理>","principle":"<第一性原理>","groups":[{"title":"<組名>","points":["<要點>"]}],"reminder":"<核心提醒>"`;
 
   if (work.phase === "outline") {
     const first = work.turns[0].t, last = work.turns[work.turns.length - 1].t;
@@ -351,7 +380,7 @@ export async function ingestStep(row, deps) {
       const lines = work.turns.map((t) => `[${t.t}] ${t.speaker}: ${t.text}`).join("\n");
       const prompt =
         `下面是一支影片的完整逐字稿，每一行開頭的方括號是該段開始的秒數。請幫${READER}整理這支影片，讓他能很快判斷值不值得細看。\n\n` +
-        `輸出 JSON：\n{${META_SPEC},"chapters":[${CHAPTER_SPEC}]}\n\n規則：\n- 第一章從第一行的秒數開始。整支影片最重要的那一章一定要是 3。\n${CHAPTER_RULES}\n\n逐字稿：\n${lines}${visLines(0, Infinity)}`;
+        `輸出 JSON：\n{${META_SPEC},"chapters":[${CHAPTER_SPEC}]}\n\n規則：\n- 第一章從第一行的秒數開始。整支影片最重要的那一章一定要是 3。\n${CHAPTER_RULES}\n\n${BRIEF}\n\n逐字稿：\n${lines}${visLines(0, Infinity)}`;
       const out = await llmJSON(deps, prompt, 16000, SCHEMA.outline);
       return finish(out, cleanChapters(out.chapters, work.turns.map((t) => t.t)));
     }
@@ -401,13 +430,13 @@ export async function ingestStep(row, deps) {
 
   if (work.phase === "synth") {
     const chapters = work.chapters || [];
-    const list = chapters.map((c, i) => `${i}. [${clock(c.t)}] ${c.zh}（${c.en}）：${c.sum}${c.take ? " → " + c.take : ""}`).join("\n");
-    const opening = work.turns.slice(0, 12).map((t) => `${t.speaker}: ${t.text}`).join("\n").slice(0, 3000);
+    const list = chapters.map((c, i) => `${i}. [${clock(c.t)}] ${c.zh}：${c.sum}${c.take ? " → " + c.take : ""}`).join("\n");
+    const all = work.turns.map((t) => `${t.speaker}: ${t.text}`).join("\n").slice(0, 600000);
     const prompt =
-      `下面是一支長影片的章節清單（已經整理好），以及影片開頭的一小段逐字稿。請幫${READER}寫出整支影片的總覽。\n\n` +
+      `下面是一支長影片的章節清單（已經整理好）和完整逐字稿。請幫${READER}寫出整支影片的總覽。\n\n` +
       `輸出 JSON：{${META_SPEC},"worth":[<依章節順序，每一章 1 到 3 的整數>]}\n\n` +
-      `規則：\n- thesis 和 tldr 要從整支影片挑最重要的講，不要只看開頭，也不要每一章都點到。\n- worth 是把所有章節放在一起重新評：3 是整支影片的核心，最多佔三分之一；1 是可以跳過的。陣列長度必須是 ${chapters.length}。\n\n${STYLE}\n\n${EX_CHAPTER}\n\n章節：\n${list}\n\n開頭逐字稿：\n${opening}`;
-    const out = await llmJSON(deps, prompt, 4000, SCHEMA.synth);
+      `規則：\n- 總覽要看完整支影片再寫，不要只看開頭。\n- worth 是把所有章節放在一起重新評：3 是整支影片的核心，最多佔三分之一；1 是可以跳過的。陣列長度必須是 ${chapters.length}。\n\n${BRIEF}\n\n${STYLE}\n\n章節：\n${list}\n\n逐字稿：\n${all}`;
+    const out = await llmJSON(deps, prompt, 8000, SCHEMA.synth);
     if (Array.isArray(out.worth) && out.worth.length === chapters.length)
       chapters.forEach((c, i) => { c.worth = Math.min(3, Math.max(1, Math.round(Number(out.worth[i]) || c.worth))); });
     return finish(out, chapters);

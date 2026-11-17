@@ -288,6 +288,13 @@ $$("[data-mode]").forEach(b=>b.onclick=()=>{S.mode=b.dataset.mode;commit();rscro
 
 /* ---------- overview ---------- */
 const segsIn=i=>SEGS.filter(g=>g.t>=CH[i].t&&(i===CH.length-1||g.t<CH[i+1].t));
+/* The top of the overview: the argument of the whole video. Older videos only have three bullet points. */
+function briefHtml(){const b=V.brief;
+  if(!b||!(b.principle||(b.groups||[]).length))return `<ul>${TLDR.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`;
+  const point=x=>{const m=/^([^：:，。]{1,12})[：:]\s*(.+)$/.exec(x);return m?`<li><b>${esc(m[1])}</b>：${esc(m[2])}</li>`:`<li>${esc(x)}</li>`};
+  return `${b.principle?`<div class="brief-p"><div class="eyebrow">第一性原理</div><p>${esc(b.principle)}</p></div>`:""}
+    ${(b.groups||[]).map(g=>`<section class="brief-g"><h3>${esc(g.title)}</h3><ul>${(g.points||[]).map(point).join("")}</ul></section>`).join("")}
+    ${b.reminder?`<p class="brief-r"><b>核心提醒</b>${esc(b.reminder)}</p>`:""}`}
 function renderOverview(){
   const list=CH.map((c,i)=>({c,i,segs:segsIn(i)})).filter(x=>!ui.coreOnly||x.c.worth===3);
   const nDeep=SEGS.filter(isDeep).length;
@@ -295,7 +302,7 @@ function renderOverview(){
     <div class="eyebrow">${V.duration?fmtDur(V.duration)+" · ":""}${CH.length} 個章節${V.channel?" · "+esc(V.channel):""}</div>
     <p class="thesis">${esc(THESIS)}</p>
     <h2>${esc(V.title)}</h2>
-    <ul>${TLDR.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+    ${briefHtml()}
     <div class="row"><div class="eyebrow" style="flex:1">章節</div><div class="chips"><button data-core="0" aria-pressed="${!ui.coreOnly}">全部</button><button data-core="1" aria-pressed="${ui.coreOnly}">只看核心</button></div></div>
     <div class="chs">${list.map(({c,i,segs})=>`<article class="ch w${c.worth}">
       <header><b><span class="t">${esc(c.zh)}</span><small>${esc(c.en)}</small></b><span class="w w${c.worth}">${["","可跳過","值得看","核心"][c.worth]}</span>${tlink(c.t)}</header>
