@@ -9,7 +9,7 @@ let n=0;for(const s of segs){const parts=splitSentences(s.x);assert(parts.join('
 console.log('split ok:',segs.length,'turns ->',n,'sentences');
 // state machine with a stubbed model, fed the real transcript in 10-minute chunks
 const real=[];let sp='Lex Fridman';for(const s of segs){if(s.sp)sp=s.sp;real.push({t:s.t,speaker:sp,text:s.x})}
-let calls=0;
+let calls=0,seamCalls=0;
 const mmss=t=>Math.floor(t/3600)+':'+String(Math.floor(t%3600/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
 const fetchStub=async(url,opt)=>{calls++;
   if(url.includes(':countTokens')){const vm=JSON.parse(opt.body).contents[0].parts[0].video_metadata;return {ok:true,json:async()=>({promptTokensDetails:[{modality:'AUDIO',tokenCount:vm?60*32:13409*32}]})}}
@@ -19,9 +19,12 @@ const fetchStub=async(url,opt)=>{calls++;
     // every third chunk answers with clip-relative times, to exercise the offset repair
     const rel=(a/300)%3===2;out={turns:turns.map(t=>({ts:mmss(rel?t.t-a:t.t),speaker:t.speaker,text:t.text})),visuals:[],reached_end:true}}
   else{const p=parts[0].text;
-    if(p.includes('"worth":[<'))out={lang:'en',title:'x',host:'Lex Fridman',thesis:'主旨',tldr:['a','b','c'],worth:p.match(/^\d+\. \[/gm).map((_,i)=>i===1?3:1)};
+    if(p.includes('"worth":[<'))out={lang:'en',title:'x',host:'Lex Fridman',headline:'主旨',principle:'原理',groups:[{title:'起點',points:['甲：一','二']},{title:'空',points:[]}],reminder:'提醒',worth:p.match(/^\d+\. \[/gm).map((_,i)=>i===1?3:1)};
+    else if(p.includes('重新切成章節')){seamCalls++;const ts=[...p.matchAll(/^\[(\d+)\]/gm)].map(m=>+m[1]);
+      // first seam: same topic, one chapter. Later seams: the topic really changes, a few lines after the hour mark.
+      out=seamCalls===1?{chapters:[{t:ts[0],en:'M',zh:'合',sum:'s',take:'',worth:2}]}:{chapters:[{t:ts[0],en:'P',zh:'前',sum:'s',take:'',worth:2},{t:ts[Math.floor(ts.length/2)+3],en:'Q',zh:'後',sum:'s',take:'',worth:2}]}}
     else if(p.includes('"chapters"')&&p.includes('部分（共'))out={chapters:(()=>{const ts=[...p.matchAll(/^\[(\d+)\]/gm)].map(m=>+m[1]);return [{t:ts[0],en:'A',zh:'甲',sum:'s',take:'',worth:2},{t:ts[Math.floor(ts.length/2)],en:'B',zh:'乙',sum:'s',take:'t',worth:3}]})()};
-    else if(p.includes('"chapters"'))out={lang:'en',title:'x',host:'Lex Fridman',thesis:'主旨',tldr:['a','b','c'],chapters:[{t:0,en:'Intro',zh:'開場',sum:'s',take:'',worth:1},{t:125,en:'Philosophy',zh:'哲學',sum:'s',take:'t',worth:3},{t:9234,en:'Ship fast',zh:'快速上線',sum:'s',take:'t',worth:3}]};
+    else if(p.includes('"chapters"'))out={lang:'en',title:'x',host:'Lex Fridman',headline:'主旨',principle:'原理',groups:[{title:'起點',points:['甲：一','二']},{title:'空',points:[]}],reminder:'提醒',chapters:[{t:0,en:'Intro',zh:'開場',sum:'s',take:'',worth:1},{t:125,en:'Philosophy',zh:'哲學',sum:'s',take:'t',worth:3},{t:9234,en:'Ship fast',zh:'快速上線',sum:'s',take:'t',worth:3}]};
     else if(p.includes('"zh":['))out={zh:p.split('\n').filter(l=>/^\d+\. /.test(l)).map(l=>'譯:'+l.slice(0,12))};
     else out={title:'標題',spark:'火花',sum:['1','2','3'],core:'核心',chain:['a','b','c','d'],ask:'問?',key:[3,4],counter:'反方?'}}
   return {ok:true,json:async()=>({candidates:[{content:{parts:[{text:'```json\n'+JSON.stringify(out)+'\n```'}]}}]})}};
@@ -30,7 +33,9 @@ let row={video_id:'oFtjKbXKqbg',url:'u',title:'',status:'queued',work:{},content
 while(row.status!=='ready'){row={...row,...await ingestStep(row,deps)};steps++;assert(steps<80,'runaway');assert(row.status!=='error',row.error)}
 const c=row.content;console.log('ingest ok: steps',steps,'chapters',c.chapters.length,'segs',c.segs.length,'turns',c.segs.reduce((a,g)=>a+g.turns.length,0),'duration',c.duration);
 const kept=c.segs.flatMap(g=>g.turns.flatMap(t=>t.s.map(p=>p[0]))).join(' ').replace(/\s+/g,' ');const want=[...real].sort((p,q)=>p.t-q.t).map(t=>t.text).join(' ').replace(/\s+/g,' ');assert(kept===want,'every word kept once, in order');assert(c.duration===13409,'duration from token count');
-assert(c.chapters.length===8&&c.chapters[1].worth===3&&c.chapters[0].worth===1,'windowed outline: 4 windows x 2 chapters, re-rated');assert(c.thesis==='主旨','synth');
+assert(c.chapters.length===7&&c.chapters[1].worth===3&&c.chapters[0].worth===1,'windowed outline, seams re-cut, re-rated: '+c.chapters.length);
+assert(seamCalls===3&&c.chapters.map(x=>x.zh).join('')==='甲合前後前後乙','every hour mark re-cut by content: '+c.chapters.map(x=>x.zh).join(''));
+{const first=real.slice().sort((p,q)=>p.t-q.t)[0].t,marks=[1,2,3].map(w=>real.slice().sort((p,q)=>p.t-q.t).find(t=>t.t>=first+w*3600).t);assert(!c.chapters.some(x=>marks.includes(x.t)),'no chapter starts on an hour mark any more')}assert(c.thesis==='主旨'&&c.brief.principle==='原理'&&c.brief.reminder==='提醒'&&c.brief.groups.length===1&&c.brief.groups[0].points.length===2,'overview: headline, principle, groups without empty ones, reminder');
 // background translation: starts once readable, does every sentence, keeps going when one of three parallel requests fails
 assert(row.work.phase==='translate'&&row.progress.phase==='translate','translation queued once readable');
 {const snap=JSON.stringify(row);let tr=JSON.parse(snap),k=0,flaky=0;
