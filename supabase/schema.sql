@@ -31,6 +31,8 @@ create table if not exists public.videos (
   content    jsonb,
   lock_until timestamptz,
   fails      int    not null default 0,      -- failures in a row on the current step
+  attempt    jsonb,                          -- the try in flight: when, which step, how old the worker was
+  trail      jsonb,                          -- the last few failed tries and why, for explaining a failure afterwards
   list       text,                           -- name of the list this video is filed under, if any
   seq        int,                            -- order inside that list
   created_at timestamptz not null default now(),

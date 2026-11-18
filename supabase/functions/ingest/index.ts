@@ -23,6 +23,18 @@ const ACTIVE = ["queued", "processing"];
 const WAITING = "status.in.(queued,processing),work->>phase.in.(translate,analyse)";
 const waiting = (r: any) => ACTIVE.includes(r.status) || ["translate", "analyse"].includes(r.work?.phase);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// The platform stops a worker 150 seconds after it BOOTS, and one worker can serve several requests in a row.
+// So what matters is how old the worker is, not how long this request has been running.
+const BOOT = Date.now();
+const WALL = 150_000, MARGIN = 8_000;
+// Longest each kind of step is expected to take, in seconds. A step only starts on a worker with that much life left.
+const NEED: Record<string, number> = { meta: 30, transcribe: 75, outline: 125, seams: 125, synth: 125, translate: 60, analyse: 60 };
+const need = (phase: unknown) => (NEED[String(phase || "meta")] ?? 125) * 1000;
+const fits = (phase: unknown) => Date.now() - BOOT + need(phase) + MARGIN <= WALL;
+const KILLED = "這一步沒有回報就中斷了，多半是超過 150 秒的執行時間上限。";
+// The last few tries of a video, newest last, so a failure can be explained after the fact.
+const trail = (row: any, entry: Record<string, unknown>) => [...(Array.isArray(row.trail) ? row.trail : []), entry].slice(-12);
 const mine = (q: any, row: any) => q.eq("user_id", row.user_id).eq("video_id", row.video_id);
 
 // One worker at a time per video. Atomic: only one caller gets the row back.
@@ -36,47 +48,56 @@ async function claim(db: any, row: any) {
 // Does the next unit and saves it. Every try is counted BEFORE the work starts, so a try that is killed half-way
 // (time limit, crash) still counts: a step can cost at most MAX_FAILS model calls, then the video is marked failed.
 async function runStep(db: any, row: any, deps: any) {
-  const tries = (row.fails || 0) + 1;
+  const tries = (row.fails || 0) + 1, phase = row.work?.phase || "meta", began = Date.now();
+  // A try that was opened and never closed died without a word: record that, it is the only trace it leaves.
+  if (row.attempt) row.trail = trail(row, { at: row.attempt.at, phase: row.attempt.phase, worker_age_s: row.attempt.worker_age_s, error: KILLED });
   // A video that is already readable stays readable: giving up only stops the background work.
   const stop = (msg: string) => row.status === "ready"
-    ? { work: { ...row.work, phase: "ready" }, progress: { phase: "ready", done: 1, total: 1 }, fails: 0, lock_until: null }
-    : { status: "error", error: msg, lock_until: null };
+    ? { work: { ...row.work, phase: "ready" }, progress: { phase: "ready", done: 1, total: 1 }, fails: 0, lock_until: null, attempt: null, trail: row.trail || [] }
+    : { status: "error", error: msg, lock_until: null, attempt: null, trail: row.trail || [] };
   if (tries > MAX_FAILS) {
-    const msg = row.error || `同一段連續 ${MAX_FAILS} 次沒有完成，已停止。`;
+    const last = Array.isArray(row.trail) && row.trail.length ? row.trail[row.trail.length - 1].error : "";
+    const msg = row.error || `同一段連續 ${MAX_FAILS} 次沒有完成，已停止。${last ? "最後一次：" + last : ""}`;
+    console.error(JSON.stringify({ video: row.video_id, phase, gave_up: msg }));
     await mine(db.from("videos").update(stop(msg)), row);
     return { error: msg, dead: true, http: 502 };
   }
-  await mine(db.from("videos").update({ fails: tries }), row);
+  const attempt = { at: new Date().toISOString(), phase, worker_age_s: Math.round((began - BOOT) / 1000) };
+  await mine(db.from("videos").update({ fails: tries, attempt, trail: row.trail || [] }), row);
   try {
     const patch = await ingestStep(row, deps);
     const updated_at = new Date().toISOString();
-    const { error } = await mine(db.from("videos").update({ ...patch, fails: 0, lock_until: null, updated_at }), row);
+    const { error } = await mine(db.from("videos").update({ ...patch, fails: 0, lock_until: null, attempt: null, updated_at }), row);
     if (error) throw error;
-    return { row: { ...row, ...patch, fails: 0, lock_until: null, updated_at } };
+    return { row: { ...row, ...patch, fails: 0, lock_until: null, attempt: null, updated_at } };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String((e as any)?.message || e);
     const limited = (e as any)?.status === 429;
     const dead = tries >= MAX_FAILS;
+    row.trail = trail(row, { ...attempt, took_s: Math.round((Date.now() - began) / 1000), error: msg });
+    console.error(JSON.stringify({ video: row.video_id, ...attempt, took_s: Math.round((Date.now() - began) / 1000), tries, error: msg }));
     const upd = dead ? stop(`連續 ${MAX_FAILS} 次失敗，已停止：${msg}`)
-      : { lock_until: new Date(Date.now() + (limited ? 60_000 : 20_000 * tries)).toISOString() };
+      : { lock_until: new Date(Date.now() + (limited ? 60_000 : 20_000 * tries)).toISOString(), attempt: null, trail: row.trail };
     await mine(db.from("videos").update(upd), row);
     return { error: msg, dead, http: limited ? 429 : 502 };
   }
 }
 
-// Called every minute by the database (see schema.sql). Works on whatever is waiting for about 45 seconds,
-// so videos finish with the page closed. Takes no input and only advances work a signed-in owner queued.
+// Called every minute by the database (see schema.sql). Works on whatever is waiting for as long as this worker
+// has life left, so videos finish with the page closed. Takes no input and only advances work a signed-in owner queued.
 function tick(deps: any) {
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const started = Date.now();
   return (async () => {
-    while (Date.now() - started < 45_000) {
-      const { data: rows } = await db.from("videos").select("user_id,video_id,lock_until").or(WAITING).order("updated_at").limit(50);
+    while (fits("meta")) {
+      const { data: rows } = await db.from("videos").select("user_id,video_id,lock_until,phase:work->>phase").or(WAITING).order("updated_at").limit(50);
       if (!rows || !rows.length) return;
-      const free = rows.find((r: any) => !r.lock_until || new Date(r.lock_until).getTime() < Date.now());
-      if (!free || !(await claim(db, free))) { await sleep(4000); continue; }
-      const { data: row } = await mine(db.from("videos").select("*"), free).maybeSingle();
-      if (!row || !waiting(row)) { await mine(db.from("videos").update({ lock_until: null }), free); continue; }
+      const free = rows.filter((r: any) => !r.lock_until || new Date(r.lock_until).getTime() < Date.now());
+      // The longest step this worker can still finish goes first, so a long step is never starved by short ones.
+      const pick = free.filter((r: any) => fits(r.phase)).sort((a: any, b: any) => need(b.phase) - need(a.phase))[0];
+      if (!pick) { if (free.length) return; await sleep(4000); continue; }   // work is waiting but needs a younger worker: leave it to the next one
+      if (!(await claim(db, pick))) { await sleep(1000); continue; }
+      const { data: row } = await mine(db.from("videos").select("*"), pick).maybeSingle();
+      if (!row || !waiting(row) || !fits(row.work?.phase)) { await mine(db.from("videos").update({ lock_until: null }), pick); if (row && waiting(row)) return; continue; }
       await runStep(db, row, deps);
     }
   })();
@@ -158,6 +179,7 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === "step" && row.status === "ready") return json(summary(row));
+    if (body.action === "step" && !fits(row.work?.phase)) return json({ ...summary(row), busy: true });
     if (!(await claim(sb, row))) return json({ ...summary(row), busy: true });
     {   // the background job may have saved a step since the row was read
       const { data: fresh } = await sb.from("videos").select("*").eq("video_id", vid).maybeSingle();
