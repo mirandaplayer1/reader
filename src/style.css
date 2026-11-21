@@ -521,3 +521,86 @@ textarea:focus,input:focus{border-color:var(--ink);box-shadow:none;outline:0}
 .cover i{border-radius:2px;background:var(--ink);color:var(--bg)}
 .more,.tolist{border-radius:var(--r)}
 .a-seg .turn.now{border-left-color:var(--accent)}
+
+
+/* ============ Stationery ============
+   The owner's reference: a notes app that feels like a drawer of good paper goods. What that look is made of:
+   objects you could pick up (notebooks on a shelf), a quiet greige page, typewriter lettering for anything that is a label,
+   heavy sans for headings, big soft pills for the one thing to press, round outlined buttons for the rest, and a lot of air.
+   This block replaces the magazine dress above; the paper palette underneath stays. */
+:root{
+  --bg:#E4E1D4; --surf:#F1EEE3; --surf2:#D8D5C7; --hover:rgba(60,52,40,.07); --ink:#2B2A26; --mute:#77736A; --line:rgba(60,52,40,.18);
+  --indigo:#5A4D41; --navy:#3A322A; --lav:#A8977C; --lav-2:#C4B69C; --lav-l:#D9D4C3;
+  --pink:#A8553F; --accent:var(--pink); --link:#6B4A32; --acc:var(--indigo); --on-acc:#F4F0E4;
+  --f-t:"American Typewriter","Courier Prime","Courier New",ui-monospace,Menlo,monospace; --f-h:var(--f-b);
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#22211D; --surf:#2B2A25; --surf2:#34322C; --hover:rgba(240,232,214,.07); --ink:#ECE7D8; --mute:#A39E90; --line:rgba(240,232,214,.16);
+  --indigo:#CDBFA6; --navy:#141310; --lav:#8E806A; --lav-2:#A89A82; --lav-l:#3A382F; --pink:#D98A72; --link:#D8C6A6; --acc:var(--indigo); --on-acc:#22211D } }
+:root[data-theme="dark"]{
+  --bg:#22211D; --surf:#2B2A25; --surf2:#34322C; --hover:rgba(240,232,214,.07); --ink:#ECE7D8; --mute:#A39E90; --line:rgba(240,232,214,.16);
+  --indigo:#CDBFA6; --navy:#141310; --lav:#8E806A; --lav-2:#A89A82; --lav-l:#3A382F; --pink:#D98A72; --link:#D8C6A6; --acc:var(--indigo); --on-acc:#22211D }
+
+/* header: just the name, typed */
+.top{border-top:0;border-bottom:0;background-color:var(--bg);padding-top:14px;padding-bottom:10px}
+.top h1{font-family:var(--f-t);font-style:normal;font-weight:400;font-size:25px;letter-spacing:.02em}
+/* labels are typed */
+.eyebrow,.no,.tlink,.pt time,.prow em,.idx,.ailab{font-family:var(--f-t);letter-spacing:.04em}
+.eyebrow{font-size:13px;font-weight:400}
+.a-seg>header i::before{font-family:var(--f-t);font-style:normal;font-weight:400;font-size:20px}
+.idx{font-style:normal}
+/* headings: heavy sans, the way a label maker would not */
+.home h2,.pts h2,.lhead h2{font-weight:800;letter-spacing:0;font-size:32px;line-height:1.25}
+.a-seg>header h3{font-weight:800;font-size:28px}
+.thesis{font-weight:700} .thesis::before{display:none}
+.zb b,.prow b,.item b,.q-zh,#k-title{font-family:var(--f-b)}
+/* the one thing to press is a big soft pill; everything else is a round outline */
+.btn{border-radius:999px;background:var(--indigo);color:var(--on-acc);min-height:46px;padding:0 22px;letter-spacing:.02em;box-shadow:0 6px 14px -8px rgba(40,30,15,.5)}
+.btn.sm{border-radius:999px;min-height:36px;padding:0 15px}
+.btn.ghost,.btn.line{background:none;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.banner{border-radius:18px;background:var(--navy);color:#F4F0E4} #toast{border-radius:999px;background:var(--navy);color:#F4F0E4}
+.banner .btn{background:#F4F0E4;color:var(--navy);box-shadow:none} .banner .btn.line{background:none;color:#F4F0E4;box-shadow:inset 0 0 0 1px rgba(244,240,228,.5)}
+.more{width:40px;height:40px;align-self:center;border-radius:50%;box-shadow:inset 0 0 0 1px var(--line)}
+.chips button[aria-pressed="true"]{background:var(--indigo);color:var(--on-acc)}
+.add input,.boxpage input,#sheet input:not([type]),#sheet input[type=text],#sheet input[type=email],#sheet input[type=password],textarea{border-radius:14px!important;background:var(--surf)}
+/* things on the page: soft cards, no hard rules */
+.item,.zcard{border-radius:16px;box-shadow:0 0 0 1px var(--line)}
+.item:hover,.zcard:hover{box-shadow:0 0 0 1px color-mix(in srgb,var(--ink) 34%,transparent)}
+.zcard.raw{box-shadow:inset 4px 0 0 var(--gold),0 0 0 1px var(--line)}
+.item img{border-radius:9px}
+#sheet{border-radius:26px 26px 0 0;background:var(--surf)} @media (min-width:700px){#sheet{border-radius:22px}}
+#selbar{border-radius:999px;padding:6px 8px;background:var(--surf)} #selbar button{border-radius:999px}
+.a-seg .absorb{border-radius:16px}
+.hl-row button{border-radius:14px}
+.tabs button[aria-pressed="true"]{box-shadow:none;position:relative} .tabs button[aria-pressed="true"]::after{content:"";position:absolute;left:50%;bottom:6px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--accent)}
+.tabs button{font-family:var(--f-b);letter-spacing:.04em}
+.pbar{height:4px;border-radius:2px} .pbar i{border-radius:2px}
+
+/* the shelf */
+.shelf{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));row-gap:30px;margin:6px -10px 4px}
+@media (min-width:640px){.shelf{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.book{display:grid;justify-items:center;text-align:center;align-content:start}
+.book .bk{transition:transform .18s ease} .book:hover .bk{transform:translateY(-5px) rotate(-1deg)}
+.bk{position:relative;display:block;width:min(74%,150px);aspect-ratio:5/7;border-radius:3px 9px 9px 3px;overflow:hidden;color:var(--ci,#2B2A26);
+  background-color:var(--c,#C9A77C);background-image:var(--grain);
+  box-shadow:inset 7px 0 0 rgba(0,0,0,.07),inset 8px 0 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(0,0,0,.08),3px 0 0 -1px rgba(255,255,255,.5),6px 10px 16px -8px rgba(50,35,15,.55)}
+.bk.t0{--c:#C9A77C} .bk.t1{--c:#BFD0C0} .bk.t2{--c:#55627B;--ci:#F1E7C8} .bk.t3{--c:#D98F82} .bk.t4{--c:#3C3B36;--ci:#EDE6D2} .bk.t5{--c:#D9B15A}
+.bk.t4{background-image:radial-gradient(rgba(237,230,210,.5) 1px,transparent 1.4px),radial-gradient(rgba(237,230,210,.35) 1px,transparent 1.6px);background-size:7px 7px,11px 11px;background-position:0 0,3px 5px}
+.bk .no{position:absolute;right:9%;top:7%;font-style:normal;font-size:9px;letter-spacing:.14em;opacity:.75}
+.bk .plate{position:absolute;left:14%;right:10%;top:19%;padding:6px 7px;background:#F4EEDD;color:#2B2A26;font-family:var(--f-t);font-weight:400;font-size:11.5px;line-height:1.35;text-align:left;
+  box-shadow:inset 0 0 0 1px rgba(43,42,38,.55),inset 0 0 0 3px #F4EEDD,inset 0 0 0 4px rgba(43,42,38,.35);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.bk .photo{position:absolute;left:16%;bottom:10%;width:62%;aspect-ratio:16/10;object-fit:cover;border:3px solid #F7F2E4;transform:rotate(-4deg);box-shadow:0 2px 5px rgba(0,0,0,.3)}
+/* the card box: a kraft box with index tabs showing over the rim */
+.bk.tbox{--c:#B79468;overflow:visible;border-radius:4px;margin-top:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.1),inset 0 9px 0 rgba(0,0,0,.08),6px 10px 16px -8px rgba(50,35,15,.55)}
+.bk.tbox u{position:absolute;top:-9px;height:16px;width:26%;background:#F4EEDD;border-radius:4px 4px 0 0;box-shadow:inset 0 0 0 1px rgba(43,42,38,.2)}
+.bk.tbox u:nth-child(1){left:10%} .bk.tbox u:nth-child(2){left:38%;top:-6px;background:#E9DFC6} .bk.tbox u:nth-child(3){left:64%;background:#F1CFC2}
+.bk.tbox .plate{top:34%;text-align:center;font-size:13px} .bk.tbox .no{top:13%}
+.plank{display:block;width:100%;height:11px;margin-top:-2px;background:linear-gradient(180deg,#C8A377,#A9835A 60%,#8E6C47);box-shadow:0 7px 9px -5px rgba(50,35,15,.45);position:relative;z-index:1}
+.book:first-child .plank{border-radius:3px 0 0 3px} .book:last-child .plank,.book:nth-child(2n) .plank{border-radius:0 3px 3px 0}
+@media (min-width:640px){.book:nth-child(2n) .plank{border-radius:0} .book:nth-child(4n) .plank,.book:last-child .plank{border-radius:0 3px 3px 0}}
+.cap{display:grid;gap:2px;padding:13px 8px 0} .cap b{font-size:16px;font-weight:600;line-height:1.4} .cap small{font-size:13.5px;color:var(--mute)}
+.book.still{pointer-events:none} .lhead .bk{width:min(100%,170px)} .lhead{grid-template-columns:auto 1fr;align-items:center}
+@media (max-width:560px){.lhead{grid-template-columns:120px 1fr}}
+.lcard.book,.book{gap:0}
+.bk.tbox{margin-top:0}

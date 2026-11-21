@@ -6,7 +6,7 @@
 
 <div id="root" data-m="side" data-view="home">
   <header class="top">
-    <h1><button id="gohome" aria-label="回到我的影片">Reader</button></h1>
+    <h1><button id="gohome" aria-label="回到我的影片">reader</button></h1>
     <span class="vt" id="vt"></span>
     <span class="pips" id="pips" title="內化進度"></span>
     <button class="sync" id="sync">僅存在這台裝置</button>
@@ -683,21 +683,26 @@ function itemHtml(it,n){const seen=!it.demo&&seenMap()[it.video_id],d=it.status=
       <span><b>${esc(it.title||"（讀取中）"+it.video_id)}</b><small class="${it.status==="error"?"err":""}">${esc(d&&statusLine(it)==="可以閱讀"?d:statusLine(it)+(d?" · "+d:""))}${seen?` · <u>讀過</u>`:""}</small>${it.status==="error"?`<em>點這裡從中斷的地方重試</em>`:""}</span></button>${it.demo||!canIngest()?"":`<button class="more" data-more="${it.video_id}" aria-label="更多">⋯</button>`}</div>`}
 function listStats(name){const items=inList(name),seen=seenMap(),total=items.reduce((a,it)=>a+(+it.duration||0),0),read=items.filter(it=>seen[it.video_id]).length;
   return {items,read,total,line:[`${items.length} 支`,dur(total),read?`讀過 ${read}`:""].filter(Boolean).join(" · ")}}
-function listCard(name){const st=listStats(name);return `<button class="lcard" data-list="${esc(name)}">
-    <span class="cover">${st.items[0]?`<img alt="" src="${thumb(st.items[0])}" onerror="this.style.visibility='hidden'">`:""}<i>${st.items.length}</i></span>
-    <span><b>${esc(name)}</b><small>${esc(st.line)}</small></span></button>`}
+/* The home screen is a shelf. Each list is a notebook with its own cover; the card box sits at the front.
+   A cover is drawn, not uploaded: a colour picked from the list's name, a typed label, and the first video taped on like a photo. */
+const coverTone=name=>{let h=0;for(const ch of String(name))h=(h*31+ch.codePointAt(0))>>>0;return h%6};
+function bookCover(name,items){return `<span class="bk t${coverTone(name)}"><i class="no">NO. ${String(items.length).padStart(2,"0")}</i>
+  ${items[0]?`<img class="photo" alt="" src="${thumb(items[0])}" onerror="this.style.display='none'">`:""}<b class="plate">${esc(name)}</b></span>`}
+function listCard(name){const st=listStats(name);return `<button class="lcard book" data-list="${esc(name)}">${bookCover(name,st.items)}<span class="plank"></span>
+    <span class="cap"><b>${esc(name)}</b><small>${esc(st.line)}</small></span></button>`}
+function boxBook(){const n=liveCards().length;return `<button class="book" id="open-box"><span class="bk tbox"><u></u><u></u><u></u><i class="no">INDEX</i><b class="plate">卡片盒</b></span><span class="plank"></span>
+    <span class="cap"><b>卡片盒</b><small>${n?`${n} 張卡片`:"還是空的"}</small></span></button>`}
 function libHtml(){
   const all=LIB.filter(it=>!(it.demo&&LIB.some(x=>!x.demo&&x.video_id===it.video_id))),names=lists(),loose=all.filter(it=>!it.list);
-  if(!names.length)return `<div class="eyebrow">我的影片</div><div class="lib">${all.map(it=>itemHtml(it)).join("")}</div>`;
-  return `<div class="eyebrow">清單</div><div class="lists">${names.map(listCard).join("")}</div>
-    ${loose.length?`<div class="eyebrow">其他影片</div><div class="lib">${loose.map(it=>itemHtml(it)).join("")}</div>`:""}`;
+  return `<div class="shelf">${boxBook()}${names.map(listCard).join("")}</div>
+    ${loose.length?`<div class="eyebrow">${names.length?"還沒放進清單的影片":"我的影片"}</div><div class="lib">${loose.map(it=>itemHtml(it)).join("")}</div>`:""}`;
 }
 function nextInList(name){const st=listStats(name),seen=seenMap(),ready=st.items.filter(it=>it.status==="ready");
   return ready.find(it=>!seen[it.video_id])||ready.slice().sort((a,b)=>(seen[b.video_id]||0)-(seen[a.video_id]||0))[0]||null}
 function listHtml(name,why){const st=listStats(name),pct=st.items.length?Math.round(st.read/st.items.length*100):0;
   return `<div class="pad home lpage">
     <div><button class="btn sm line" id="l-back">‹ 全部</button></div>
-    <div class="lhead"><span class="cover big">${st.items[0]?`<img alt="" src="${thumb(st.items[0])}" onerror="this.style.visibility='hidden'">`:""}</span>
+    <div class="lhead"><span class="book still">${bookCover(name,st.items)}</span>
       <div><div class="eyebrow">清單</div><h2>${esc(name)}</h2><p class="meta">${esc([`${st.items.length} 支`,dur(st.total)].filter(Boolean).join(" · "))}</p>
         <div class="pbar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div><p class="meta">讀過 ${st.read} 支，共 ${st.items.length} 支</p></div></div>
     <div class="row"><button class="btn" id="l-go" ${nextInList(name)?"":"disabled"}>${st.read?"繼續閱讀":"開始閱讀"}</button><button class="btn line" id="l-add">加入影片</button><span class="sp"></span><button class="btn line" id="l-more" aria-label="清單選項">⋯</button></div>
@@ -771,7 +776,6 @@ function renderHome(){
     <form id="add" class="add"><input id="add-url" type="url" inputmode="url" placeholder="貼上 YouTube 網址" ${canIngest()?"":"disabled"}><button class="btn" ${canIngest()?"":"disabled"}>加入</button></form>
     <p class="meta" id="add-msg">${why}</p>
     ${!window.claude&&sb&&!sbUser?`<div><button class="btn" id="home-login">登入</button></div>`:""}
-    <button class="boxcard" id="open-box"><span><b>卡片盒</b><small>${liveCards().length?`${liveCards().length} 張卡片，你自己的話`:"讀完留下來的想法，會放在這裡"}</small></span><i>›</i></button>
     ${libHtml()}
   </div>`;
   if(keep)$("#add-url").value=keep;
