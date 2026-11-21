@@ -44,6 +44,7 @@ PROMPTS.md                      流程圖和每個提示詞的說明，給 Miran
 node tests/pipeline.test.mjs        # 流程邏輯，AI 是假的。改 pipeline.js 必跑
 node tests/ui-flow.test.mjs         # 整個前端流程，後端是假的。需要 Playwright
 node tests/ui-highlight.test.mjs    # 選取文字畫重點
+node tests/ui-points.test.mjs       # 畫線、筆記、重點頁、觀點、舊資料轉換、兩台裝置不互相覆蓋
 node tests/ui-transcript.test.mjs   # 中文影片和未翻譯影片的逐字稿顯示
 ```
 
@@ -76,6 +77,9 @@ UI 測試讀的是建好的 `index.html`，所以先 `python3 build.py`。
   所以 `index.ts` 用 `BOOT` 算 worker 的年齡，剩餘時間不夠就不開始新的一步。新增更慢的步驟要調 `NEED`。
 - **每一步最多試 3 次**（`MAX_FAILS`），在開始前就計數，被強制關掉的也算。失敗原因記在 `videos.trail`。
 - **重試不能造成重複花費**：每一步做完才存檔，重試是重做同一步，不會從頭來。
+- **使用者的資料（`reader_state.state`）是整份覆蓋、時間新的贏。** 所以：資料格式的轉換（`upgrade()`、`migrateIds()`）只能在記憶體裡做，
+  不可以呼叫 `commit()` 或改 `S.at`，否則一台很久沒開的裝置一打開就會把別台的新內容蓋掉。`push()` 寫入前會先看伺服器上有沒有沒看過的版本。
+- 存進使用者資料的鍵不要用章節序號（`c3`）。章節重切後序號會變。用秒數。
 - 句子的 id 是 `t{秒數}-{句序}`，使用者的畫線和筆記靠它對應。改切句邏輯（`splitSentences`）會讓既有的畫線對不上。
 - 中文影片不翻譯；英文影片先可讀、再背景翻譯、再背景寫每章分析。影片在 `status=ready` 之後 `work.phase` 還會經過 `translate`、`analyse`。
 

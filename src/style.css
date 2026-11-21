@@ -351,3 +351,28 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
 .brief-p{display:grid;gap:4px} .brief-p p{margin:0;font-size:17.5px;line-height:1.75}
 .brief-g{display:grid;gap:6px} .brief-g h3{margin:0;font-size:17px;font-weight:700} .brief-g li b{font-weight:600}
 .brief-r{margin:0;padding:12px 14px;border-radius:8px;background:var(--lav-l);font-size:17px;line-height:1.6} .brief-r b{display:block;font-size:14px;font-weight:500;color:var(--mute);margin-bottom:2px}
+
+/* Points and views */
+:root{--hl-i:#E6E4F7} .s[data-hl="i"],.s mark[data-hl="i"]{background:var(--hl-i);color:var(--ink)} .s[data-soft="i"]{box-shadow:inset 0 -2px 0 var(--lav)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--hl-i:#34365F}} :root[data-theme="dark"]{--hl-i:#34365F}
+.hl-row{flex-wrap:wrap}
+.segnote{margin:-2px 0 6px}
+.pts{display:grid;gap:14px;align-content:start} .pts h2{margin:2px 0 0}
+.pch{display:grid;gap:8px;padding-top:14px;border-top:1px solid var(--line)}
+.pch>header{display:flex;gap:10px;align-items:flex-start} .ptitle{flex:1;min-width:0;text-align:left;display:grid;gap:1px}
+.ptitle b{font-size:17px;line-height:1.45} .ptitle small{font-size:13.5px;color:var(--mute)} .ptitle:hover b{text-decoration:underline;text-underline-offset:3px}
+.pt{display:flex;gap:10px;padding:10px 12px;border-radius:8px;background:var(--surf);box-shadow:inset 0 0 0 1px var(--line),inset 4px 0 0 var(--gold);cursor:pointer}
+.pt>div{min-width:0;flex:1;display:grid;gap:4px} .pt small{font-size:13.5px;color:var(--mute)} .pt p{margin:0;font-size:16.5px;line-height:1.7}
+.pt[data-hl="i"]{box-shadow:inset 0 0 0 1px var(--line),inset 4px 0 0 var(--lav)} .pt[data-hl="p"]{box-shadow:inset 0 0 0 1px var(--line),inset 4px 0 0 var(--pink)} .pt[data-hl="g"]{box-shadow:inset 0 0 0 1px var(--line),inset 4px 0 0 var(--blue)}
+.pt.ai{background:var(--lav-l);box-shadow:none;cursor:default} .pt.ai p{font-size:16px}
+.pick .pt.ai{cursor:pointer}
+.chk{flex:none;width:20px;height:20px;margin-top:3px;border-radius:5px;box-shadow:inset 0 0 0 2px var(--mute)} .chk.on{background:var(--acc);box-shadow:none}
+.chk.on::after{content:"✓";display:block;text-align:center;color:var(--on-acc);font-size:14px;line-height:20px;font-style:normal}
+.memo{display:grid;gap:2px;text-align:left;width:100%;padding:8px 12px;border-radius:8px;background:var(--surf2);font-size:16px;line-height:1.65}
+.memo small{font-size:13.5px;color:var(--mute)} .memo span{white-space:pre-wrap} .memo::before{content:"我的筆記";font-size:12.5px;color:var(--link);font-weight:500}
+.pt .memo{background:var(--bg)}
+.vcard{display:grid;gap:6px;text-align:left;width:100%;padding:14px 16px;border-radius:10px;background:var(--surf);box-shadow:inset 0 0 0 1px var(--line)}
+.vcard .vt{font-size:18px;line-height:1.7;white-space:pre-wrap} .vcard small{font-size:13.5px;color:var(--mute)} .vcard:hover{background:var(--surf2)}
+.vq{display:grid;gap:6px;max-height:30vh;overflow:auto} .vq .ev{font-size:15px;line-height:1.6;padding:6px 10px;border-radius:6px;background:var(--surf2)} .vq .ev.ai{background:var(--lav-l)}
+textarea.big{min-height:9em}
+.banner{position:sticky;top:0;z-index:3;display:flex;gap:8px;align-items:center;padding:10px 16px} .banner span{flex:1}

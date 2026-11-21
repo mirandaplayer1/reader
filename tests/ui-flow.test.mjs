@@ -105,16 +105,15 @@ console.log('deepened: zh starts', zh.slice(0, 16), '| en starts', en.slice(0, 3
 await p.evaluate(() => document.querySelector('#seg-c1').scrollIntoView()); await p.screenshot({ path: D + '/i-deep.png' });
 // 6. highlight, distill, card on generated content; state goes to the (stub) cloud
 await p.click('#seg-c1 .zh .s >> nth=4'); await p.click('#sheet [data-hl=y]'); await p.click('#a-done');
-await p.click('[data-tab=distill]'); await p.waitForTimeout(300);
-console.log('sparks', await p.locator('.spark').count());
-await p.click('.spark >> nth=0'); await p.fill('#d-new', '沒有人付錢之前都只是想像'); await p.click('#d-plant'); await p.waitForTimeout(300);
-await p.click('.claim'); await p.click('#d-add'); await p.click('.spark >> nth=1'); await p.click('#d-done'); await p.click('.claim'); await p.click('#d-mint'); await p.click('#m-go'); await p.waitForTimeout(1500);
+await p.click('[data-tab=points]'); await p.waitForSelector('.pts');
+console.log('points: my lines', await p.locator('.pt:not(.ai)').count(), '| AI first principles', await p.locator('.pt.ai').count());
+await p.click('#p-pick'); await p.click('.pt.ai'); await p.click('.pt:not(.ai)'); await p.click('#p-write'); await p.fill('#v-text', '沒有人付錢之前都只是想像'); await p.click('#v-done'); await p.waitForSelector('.vcard'); await p.waitForTimeout(1500);
 console.log('cards', await p.locator('.vcard').count(), '| synced state saved:', states.has('AAAAAAAAAAA'), '| badge', await p.textContent('#sync'));
 await p.screenshot({ path: D + '/i-cards.png' });
 // 7. back home, reload: library and the finished video come back from the store
 await p.click('#gohome'); await p.reload(); await p.waitForTimeout(900);
 console.log('after reload items', await p.locator('.item').count(), '| second status', await p.getAttribute('.item-row:nth-child(2) .item', 'data-status'));
-await p.click('.item-row:nth-child(2) .item'); await p.waitForTimeout(400); await p.click('[data-tab=cards]');
+await p.click('.item-row:nth-child(2) .item'); await p.waitForTimeout(400); await p.click('[data-tab=views]');
 console.log('cards after reload', await p.locator('.vcard').count());
 // 7b. reprocess (text only): highlights and translations survive, the back-to-playing button exists
 await p.click('[data-tab=read]'); await p.waitForTimeout(300);
