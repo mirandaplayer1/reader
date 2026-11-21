@@ -73,15 +73,31 @@ assert(md.includes('AI 整理的第一性原理') && md.includes('我的筆記�
 await p.click('[data-mine="1"]'); assert(await p.locator('.pt.ai').count() === 0, '只看我的 hides the AI lines');
 await p.click('[data-mine="0"]');
 
-// pick a few, write a view
+// pick a few, write a card
+const box = () => p.evaluate(() => JSON.parse(JSON.stringify(BOX.cards)));
+let cards = await box(); assert(cards.k1 && cards.k1.text === '收錢才能驗證市場' && cards.k1.vid, 'the old claim is in the box as a card');
 await p.click('#p-pick'); await p.click('.pt.ai'); await p.click('.pt:not(.ai)'); await p.screenshot({ path: D + '/pt-pick.png' });
-await p.click('#p-write'); await p.waitForSelector('#v-text'); await p.fill('#v-text', '先收到錢，再決定要不要繼續做。'); await p.screenshot({ path: D + '/pt-view.png' }); await p.click('#v-done');
-await p.waitForSelector('.vcard'); await p.screenshot({ path: D + '/pt-views.png' });
-s = await st(); const mine = Object.values(s.views).find(v => v.text.startsWith('先收到錢'));
-assert(mine && mine.quotes.length === 2 && mine.quotes.some(q => q.ai), 'view saved with the two picked quotes, one of them the AI line');
-console.log('views:', await p.$$eval('.vcard .vt', x => x.map(e => e.textContent)));
-// a view with no quotes at all is fine
-await p.click('#v-new'); await p.waitForSelector('#v-text'); await p.fill('#v-text', '沒有引文的觀點'); await p.click('#v-done');
+await p.click('#p-write'); await p.waitForSelector('#k-text');
+await p.fill('#k-title', '先收到錢再決定要不要做'); await p.fill('#k-text', '有人付錢是唯一不會騙人的訊號。註冊和稱讚都不用成本。');
+await p.fill('#k-topic', '找需求'); await p.dispatchEvent('#k-topic', 'change');
+await p.click('#k-link'); await p.waitForSelector('[data-pickcard]'); await p.click('[data-pickcard]'); await p.click('#lk-done'); await p.waitForSelector('#k-text');
+await p.screenshot({ path: D + '/pt-card.png' }); await p.click('#k-done');
+await p.waitForSelector('.zcard'); await p.screenshot({ path: D + '/pt-cards.png' });
+cards = await box(); const mine = Object.values(cards).find(c => c.title === '先收到錢再決定要不要做');
+assert(mine && mine.quotes.length === 2 && mine.quotes.some(q => q.ai) && mine.topic === '找需求' && mine.links.includes('k1') && mine.vt, 'card saved with its two sources, topic, link and where it came from');
+console.log('cards in this video:', await p.$$eval('.zcard b', x => x.map(e => e.textContent)));
+// the card it links to shows the link coming back
+await p.click('[data-card="k1"]'); await p.waitForSelector('#k-text'); assert((await p.textContent('.linked')).includes('連過來的'), 'backlink shown on the linked card'); await p.click('#k-done');
+// the box on the home screen, across videos
+await p.click('#v-box'); await p.waitForSelector('.boxpage');
+console.log('box:', (await p.textContent('.boxpage .eyebrow')).trim(), '| topics', await p.$$eval('[data-topic]', x => x.map(e => e.textContent)));
+await p.click('#bx-new'); await p.waitForSelector('#k-title'); await p.fill('#k-title', '跟影片無關的卡片'); await p.click('#k-done');
+await p.fill('#bx-q', '無關'); assert(await p.locator('.boxpage .zcard:not([hidden])').count() === 1, 'search narrows the box'); await p.fill('#bx-q', '');
+await p.click('#bx-pick'); await p.click('[data-card="k1"]'); await p.click(`.zcard:has-text("先收到錢再決定要不要做")`); await p.screenshot({ path: D + '/pt-box.png' });
+const outline = await p.evaluate(() => boxOutline(ui.bpick));
+assert(outline.indexOf('收錢才能驗證市場') < outline.indexOf('先收到錢再決定要不要做') && outline.includes('> '), 'outline follows the order the cards were picked in and carries the sources');
+await p.click('#bx-cancel'); await p.click('#bx-back'); assert((await p.textContent('#open-box')).includes('3 張卡片'), 'home shows the box: ' + await p.textContent('#open-box'));
+await open();
 // removing a line keeps its note visible
 await p.evaluate(() => setTab('read')); await p.click(`.s[data-lang="zh"][data-id="s1-0-0"]`); await p.waitForSelector('#a-note');
 assert(await p.inputValue('#a-note') === '舊筆記', 'the sentence sheet shows the note that was carried over');
@@ -89,8 +105,8 @@ await p.click('.hl-row [data-hl=""]'); await p.click('#a-done');
 await p.evaluate(() => setTab('points')); assert((await p.$$eval('.memo span', x => x.map(e => e.textContent))).includes('舊筆記'), 'a note outlives its highlight');
 
 await p.waitForTimeout(400); await p.reload(); await open(); s = await st();
-assert(Object.keys(s.views).length === 3 && Object.keys(s.memos).length === 5, 'everything survives a reload: views ' + Object.keys(s.views).length + ' memos ' + Object.keys(s.memos).length);
-console.log('after reload: highlights', Object.keys(s.hl).length, '| notes', Object.keys(s.memos).length, '| views', Object.keys(s.views).length, '| page errors', errs);
+cards = await box(); assert(Object.keys(cards).length === 3 && Object.keys(s.memos).length === 5, 'everything survives a reload: cards ' + Object.keys(cards).length + ' memos ' + Object.keys(s.memos).length);
+console.log('after reload: highlights', Object.keys(s.hl).length, '| notes', Object.keys(s.memos).length, '| cards', Object.keys(cards).length, '| page errors', errs);
 
 // two devices: this page must not overwrite something newer it has never seen
 const r = await p.evaluate(async () => {
@@ -107,4 +123,12 @@ const r = await p.evaluate(async () => {
 });
 console.log('two devices: first sync wrote', r.first, '| stale write blocked:', r.writes === r.first, '| newer note kept on server:', r.kept, '| loaded here:', r.adopted);
 assert(r.first === 1 && r.writes === r.first && r.kept && r.adopted, 'a stale page must not overwrite newer state');
+const m = await p.evaluate(async () => {
+  const remote = { cards: { far: { at: Date.now() + 9000, made: 1, title: '另一台裝置做的卡片', text: 'x', links: [], quotes: [] }, k1: { at: 0, title: '舊的', text: '舊的', links: [], quotes: [] } } }; let wrote = null;
+  const q = () => ({ select: () => q(), eq: () => q(), maybeSingle: async () => ({ data: { state: remote, at: 1 }, error: null }), upsert: async row => { wrote = JSON.parse(JSON.stringify(row.state.cards)); return { error: null }; } });
+  sb = { from: q }; sbUser = { id: 'u' }; await boxSync();
+  return { gotTheirs: !!BOX.cards.far, keptMine: BOX.cards.k1.text === '收錢才能驗證市場', pushed: !!(wrote && wrote.far && wrote.k1.text === '收錢才能驗證市場' && Object.keys(wrote).length === 4) };
+});
+console.log('box across devices: their card arrived', m.gotTheirs, '| my newer copy kept', m.keptMine, '| both written back', m.pushed);
+assert(m.gotTheirs && m.keptMine && m.pushed, 'cards from two devices merge instead of overwriting');
 await b.close(); assert(!errs.length, 'page errors');

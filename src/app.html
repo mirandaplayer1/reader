@@ -23,7 +23,7 @@
     </section>
     <section class="pane side"><div class="split" id="split" role="separator" aria-orientation="vertical" aria-label="拖曳調整左右欄寬度" tabindex="0"></div><div class="steps" id="steps" hidden></div><div class="scroll" id="side"></div></section>
   </div>
-  <nav class="tabs" id="tabs"><button data-tab="overview">總覽</button><button data-tab="read">閱讀</button><button data-tab="points">重點 <b id="n-d"></b></button><button data-tab="views">觀點 <b id="n-c"></b></button></nav>
+  <nav class="tabs" id="tabs"><button data-tab="overview">總覽</button><button data-tab="read">閱讀</button><button data-tab="points">重點 <b id="n-d"></b></button><button data-tab="views">卡片 <b id="n-c"></b></button></nav>
 </div>
 <div id="scrim" hidden></div><div id="sheet" hidden></div><div id="toast" hidden></div>
 <div id="selbar" hidden role="toolbar" aria-label="畫線"></div>
@@ -91,7 +91,7 @@ function upgrade(){
     (S.cards||[]).forEach(k=>{S.views[k.id]={at:k.at||0,text:k.text,quotes:q(k.ev)}});
     (S.claims||[]).forEach(c=>{if(!(S.cards||[]).some(k=>k.claim===c.id))S.views[c.id]={at:0,text:c.text,quotes:q(c.ev)}})}
 }
-const ui={side:"overview",m:"side",coreOnly:false,linkTo:null,fresh:null,open:new Set(),busy:{},list:null};
+const ui={side:"overview",m:"side",coreOnly:false,linkTo:null,fresh:null,open:new Set(),busy:{},list:null,box:false,topic:null,bpick:null};
 let cloud=null,cloudBase=null,cloudOff=null,sb=null,sbUser=null,pushT=null,remoteWaiting=false,seenAt=0;
 const canSync=()=>!!(cloud||(sb&&sbUser));
 const syncEl=$("#sync");
@@ -111,14 +111,14 @@ async function pull(){if(!sb||!sbUser||!VID)return;badge("同步中…");
   if(error){badge("同步失敗，內容仍在這台裝置","warn");return}
   if(data)seenAt=Math.max(seenAt,data.at);
   if(data&&data.at>S.at){adopt(JSON.stringify(data.state));badge("已同步","ok")}else if(S.at&&(!data||data.at<S.at))push();else badge("已同步","ok")}
-function setUser(u){const was=sbUser&&sbUser.id;sbUser=u||null;if(!u){badge("登入","link");LIB=LIB.filter(x=>x.demo);renderHome();return}if(u.id!==was){badge("已登入","ok");pull();loadLibrary()}}
+function setUser(u){const was=sbUser&&sbUser.id;sbUser=u||null;if(!u){badge("登入","link");LIB=LIB.filter(x=>x.demo);renderHome();return}if(u.id!==was){badge("已登入","ok");pull();loadLibrary();boxSync()}}
 (async()=>{if(window.claude||!CFG.supabaseUrl||!CFG.supabaseAnonKey)return;try{
   await new Promise((ok,no)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";s.onload=ok;s.onerror=no;document.head.appendChild(s)});
   sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey);
   const {data}=await sb.auth.getSession();setUser(data.session&&data.session.user);
   sb.auth.onAuthStateChange((_e,ses)=>setUser(ses&&ses.user));
   document.addEventListener("visibilitychange",()=>{if(!document.hidden){pull();loadLibrary()}});
-  window.addEventListener("focus",()=>pull());
+  window.addEventListener("focus",()=>{pull();boxSync()});
   setInterval(()=>{if(!document.hidden&&root.dataset.view==="video"&&!pushT)pull()},60000);
 }catch(e){badge("同步服務載入失敗，內容仍在這台裝置","warn")}})();
 const rateMsg=e=>(e&&(e.status===429||/rate limit/i.test(e.message||"")))?"寄信額度用完了：整個專案每小時只能寄幾封登入信。等一小時再試，或改用密碼登入。":null;
@@ -386,10 +386,10 @@ function renderPoints(){
       ${p.ai&&!ui.mine?`<div class="pt ai" data-key="${p.ai.key}">${box(p.ai.key)}<div><small>AI 整理的第一性原理</small><p>${esc(p.ai.text)}</p></div></div>`:""}
       ${p.blocks.map(b=>`<div class="pt" data-key="${b.key}" data-hl="${b.tag}">${box(b.key)}<div><small>${fmt(b.t)}${TAGS[b.tag]?" · "+TAGS[b.tag]:""}</small><p>${esc(b.text)}</p>${b.memos.map(memoHtml).join("")}</div></div>`).join("")}
       ${p.loose.map(memoHtml).join("")}</section>`}).join("");
-  side.innerHTML=(pick?`<div class="banner"><span>已選 ${pick.size} 則</span><button class="btn sm line" id="p-cancel">取消</button><button class="btn sm" id="p-write" ${pick.size?"":"disabled"}>寫成觀點</button></div>`:"")+
+  side.innerHTML=(pick?`<div class="banner"><span>已選 ${pick.size} 則</span><button class="btn sm line" id="p-cancel">取消</button><button class="btn sm" id="p-write" ${pick.size?"":"disabled"}>做成卡片</button></div>`:"")+
     `<div class="pad pts"><div><div class="eyebrow">畫線 ${nH} · 筆記 ${nM}</div><h2>我的重點</h2></div>
     <div class="row"><div class="chips"><button data-mine="0" aria-pressed="${!ui.mine}">全部</button><button data-mine="1" aria-pressed="${!!ui.mine}">只看我的</button></div><span class="sp"></span>
-      ${pick?"":`<button class="btn sm line" id="p-pick">選幾則寫觀點</button>`}<button class="btn sm" id="p-copy">複製全部</button></div>
+      ${pick?"":`<button class="btn sm line" id="p-pick">選幾則做成卡片</button>`}<button class="btn sm" id="p-copy">複製全部</button></div>
     <div class="row"><button class="btn sm line" data-note-all>＋ 對整支影片的筆記</button></div>
     ${wholeMemos().map(memoHtml).join("")}
     ${secs||`<p class="meta">還沒有畫線。在「閱讀」裡選一段文字，按「畫線」。</p>`}</div>`;
@@ -432,35 +432,105 @@ function blockSheet(key){
   $("#b-del").onclick=()=>{b.ids.forEach(id=>{delete S.hl[id];delete RNG()[id]});commit();b.ids.forEach(markSent);closeSheet()};
 }
 
-/* ---------- my views: my own words, with the lines that led to them ---------- */
+/* ---------- the card box ----------
+   A card holds one idea in my own words. Cards do not belong to a video: they live in one box across everything I read,
+   keep the lines they came from, and link to each other. Reading fills the box; writing draws from it. */
+const BOXID="__box__",BLS="rd4:"+BOXID;
+let BOX={cards:{}},boxT=null;
+function boxLoad(){try{BOX=Object.assign({cards:{}},JSON.parse(localStorage.getItem(BLS))||{})}catch(e){BOX={cards:{}}}}
+function boxSave(){try{localStorage.setItem(BLS,JSON.stringify(BOX))}catch(e){}}
+const CARDS=()=>BOX.cards;
+const liveCards=()=>Object.keys(CARDS()).filter(k=>!CARDS()[k].gone).sort((a,b)=>(CARDS()[b].made||0)-(CARDS()[a].made||0));
+// Two devices can both add cards. Merging card by card (the newer copy of each wins) means neither loses the other's.
+function boxMerge(theirs){let mine=false,changed=false;const c=CARDS();
+  for(const k in theirs||{}){if(!c[k]||(theirs[k].at||0)>(c[k].at||0)){c[k]=theirs[k];changed=true}}
+  for(const k in c){if(!theirs||!theirs[k]||(c[k].at||0)>(theirs[k].at||0))mine=true}
+  if(changed)boxSave();return {mine,changed}}
+async function boxSync(){if(!sb||!sbUser)return;try{
+  const {data,error}=await sb.from("reader_state").select("state,at").eq("video_id",BOXID).maybeSingle();if(error)throw error;
+  const r=boxMerge(data&&data.state&&data.state.cards);
+  if(r.mine){const {error:e2}=await sb.from("reader_state").upsert({user_id:sbUser.id,video_id:BOXID,state:BOX,at:Date.now()});if(e2)throw e2}
+  if(r.changed){if(root.dataset.view==="home")renderHome();else if(sheetEl.hidden&&ui.side==="views")renderSide();meta()}}catch(e){}}
+function boxCommit(){boxSave();if(VID)meta();clearTimeout(boxT);boxT=setTimeout(()=>{boxT=null;boxSync()},900)}
+function putCard(k,patch){CARDS()[k]={links:[],quotes:[],made:Date.now(),...(CARDS()[k]||{}),...patch,at:Date.now()};boxCommit()}
+function dropCard(k){CARDS()[k]={gone:true,at:Date.now()};liveCards().forEach(o=>{const c=CARDS()[o];if((c.links||[]).includes(k))putCard(o,{links:c.links.filter(x=>x!==k)})});boxCommit()}
+const cardTitle=c=>c.title||(c.text||"").split("\n")[0].slice(0,40)||"（還沒寫）";
+const backlinks=k=>liveCards().filter(o=>o!==k&&(CARDS()[o].links||[]).includes(k));
+const topics=()=>[...new Set(liveCards().map(k=>CARDS()[k].topic).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"zh-Hant"));
+function cardHtml(k,pickList){const c=CARDS()[k],n=(c.links||[]).length+backlinks(k).length,at=pickList?pickList.indexOf(k):-1;
+  return `<button class="zcard${c.text&&c.text.trim()?"":" raw"}" data-card="${esc(k)}" data-find="${esc((c.title+" "+c.text+" "+(c.topic||"")+" "+(c.vt||"")).toLowerCase())}">
+    ${pickList?`<i class="chk${at>=0?" on":""}">${at>=0?at+1:""}</i>`:""}<span class="zb"><b>${esc(cardTitle(c))}</b>${c.text&&c.title?`<span>${esc(c.text)}</span>`:""}
+    <small>${[c.topic?"＃"+c.topic:"",c.vt||"",(c.quotes||[]).length?`${c.quotes.length} 則出處`:"",n?`連到 ${n} 張`:"",c.text&&c.text.trim()?"":"還沒用自己的話寫"].filter(Boolean).map(esc).join(" · ")}</small></span></button>`}
 function pickedQuotes(){const out=[];if(!ui.pick)return out;
   SEGS.forEach(g=>{const p=pointsOf(g);if(p.ai&&ui.pick.has(p.ai.key))out.push({text:p.ai.text,t:p.ai.t,ai:true});
     p.blocks.forEach(b=>{if(ui.pick.has(b.key))out.push({text:b.text,t:b.t})})});return out}
-function viewSheet(vid,quotes){
-  let key=vid;const v=key&&VIEWS()[key];quotes=v?v.quotes||[]:quotes||[];
-  openSheet(`<div class="eyebrow">${v?"我的觀點":"寫下我的觀點"}</div>
-    <textarea id="v-text" class="big" placeholder="用你會對朋友講的方式寫。幾句就好。">${esc(v?v.text:"")}</textarea>
-    ${quotes.length?`<div class="eyebrow">根據這幾則</div><div class="vq">${quotes.map(q=>`<div class="ev${q.ai?" ai":""}">${esc(q.text)} ${tlink(q.t)}</div>`).join("")}</div>`:""}
-    <div class="row">${v?`<button class="btn sm line" id="v-del">刪除</button>`:""}<span class="sp"></span><button class="btn" id="v-done">完成</button></div>`,
-    ()=>{ui.pick=null;renderSide()});
-  const ta=$("#v-text");setTimeout(()=>ta.focus(),60);
-  ta.oninput=()=>{const t=ta.value;if(!t.trim()){if(key)delete VIEWS()[key];commit();return}
-    if(!key)key=uid("v");VIEWS()[key]={at:(VIEWS()[key]||{}).at||Date.now(),text:t,quotes};commit()};
-  $("#v-done").onclick=()=>{const made=key&&VIEWS()[key];closeSheet();if(made&&ui.side!=="views")setTab("views")};
-  const d=$("#v-del");if(d)d.onclick=()=>{delete VIEWS()[key];commit();closeSheet()};
+/* Writing a card. Nothing is saved until something is typed; after that every keystroke is. */
+function cardSheet(k,seed){
+  let key=k;const get=()=>key&&CARDS()[key]&&!CARDS()[key].gone?CARDS()[key]:null;
+  const draft={title:"",text:"",topic:"",quotes:[],links:[],...(seed||{})};
+  const cur=()=>get()||draft,save=patch=>{if(!key)key=uid("k");putCard(key,{...cur(),...patch})};
+  const draw=()=>{const c=cur(),back=key?backlinks(key):[];
+    openSheet(`<div class="eyebrow">卡片${c.vt?" · 來自《"+esc(c.vt)+"》":""}</div>
+      <input id="k-title" maxlength="80" placeholder="一句話講完這張卡片的想法" value="${esc(c.title||"")}">
+      <textarea id="k-text" class="big" placeholder="用自己的話寫。這是什麼意思？為什麼成立？我會用在哪裡？">${esc(c.text||"")}</textarea>
+      ${(c.quotes||[]).length?`<div class="eyebrow">出處</div><div class="vq">${c.quotes.map((q,n)=>`<div class="ev${q.ai?" ai":""}"><span>${q.ai?"AI 整理：":""}${esc(q.text)}</span><button class="x" data-qx="${n}" aria-label="拿掉這則出處">×</button></div>`).join("")}</div>`:""}
+      <div class="eyebrow">主題</div><input id="k-topic" list="k-topics" maxlength="30" placeholder="例如：找需求、定價。同主題的卡片會排在一起" value="${esc(c.topic||"")}"><datalist id="k-topics">${topics().map(t=>`<option value="${esc(t)}">`).join("")}</datalist>
+      <div class="eyebrow">連到的卡片</div>
+      <div class="linked">${(c.links||[]).filter(x=>CARDS()[x]&&!CARDS()[x].gone).map(x=>`<div><button class="go" data-go="${esc(x)}">${esc(cardTitle(CARDS()[x]))}</button><button class="x" data-unlink="${esc(x)}" aria-label="拿掉連結">×</button></div>`).join("")}
+        ${back.map(x=>`<div><button class="go" data-go="${esc(x)}">${esc(cardTitle(CARDS()[x]))}</button><small>連過來的</small></div>`).join("")}</div>
+      <div class="row"><button class="btn sm line" id="k-link">＋ 連到另一張卡片</button></div>
+      <div class="row">${get()?`<button class="btn sm line" id="k-del">刪除</button>`:""}<span class="sp"></span><button class="btn" id="k-done">完成</button></div>`,
+      ()=>{ui.pick=null;if(root.dataset.view==="home")renderHome();else renderSide()});
+    $("#k-title").oninput=e=>save({title:e.target.value});
+    $("#k-text").oninput=e=>save({text:e.target.value});
+    $("#k-topic").onchange=e=>save({topic:e.target.value.trim()});
+    $$("[data-qx]",sheetEl).forEach(b=>b.onclick=()=>{save({quotes:cur().quotes.filter((_,n)=>n!==+b.dataset.qx)});draw()});
+    $$("[data-unlink]",sheetEl).forEach(b=>b.onclick=()=>{save({links:cur().links.filter(x=>x!==b.dataset.unlink)});draw()});
+    $$("[data-go]",sheetEl).forEach(b=>b.onclick=()=>cardSheet(b.dataset.go));
+    $("#k-link").onclick=()=>{if(!get()){const c=cur();if(!(c.title||c.text||"").trim()&&!(c.quotes||[]).length){toast("先寫一點內容，再連到別的卡片");return}save({})}linkPicker()};
+    $("#k-done").onclick=()=>{const made=get();closeSheet();if(made&&root.dataset.view==="video"&&ui.side!=="views")setTab("views")};
+    const d=$("#k-del");if(d)d.onclick=()=>{dropCard(key);closeSheet()};
+    if(!get()&&!seed)setTimeout(()=>$("#k-title")&&$("#k-title").focus(),60);
+    else if(!get())setTimeout(()=>$("#k-text")&&$("#k-text").focus(),60)};
+  const linkPicker=()=>{const others=liveCards().filter(x=>x!==key);
+    openSheet(`<div class="eyebrow">連到哪一張？</div><p class="meta" style="margin:0">「${esc(cardTitle(cur()))}」跟哪些卡片在講相關的事？點一下連起來。</p>
+      <input id="lk-q" placeholder="搜尋卡片">
+      <div class="cards">${others.map(x=>`<button class="zcard${cur().links.includes(x)?" linked-on":""}" data-pickcard="${esc(x)}" data-find="${esc((CARDS()[x].title+" "+CARDS()[x].text).toLowerCase())}"><span class="zb"><b>${esc(cardTitle(CARDS()[x]))}</b><small>${esc([CARDS()[x].topic?"＃"+CARDS()[x].topic:"",CARDS()[x].vt||""].filter(Boolean).join(" · "))}</small></span></button>`).join("")||`<p class="meta">盒子裡還沒有別的卡片。</p>`}</div>
+      <div class="row"><span class="sp"></span><button class="btn" id="lk-done">好了</button></div>`,()=>{if(root.dataset.view==="home")renderHome();else renderSide()});
+    $("#lk-q").oninput=e=>{const q=e.target.value.trim().toLowerCase();$$("[data-pickcard]",sheetEl).forEach(b=>b.hidden=!!q&&!b.dataset.find.includes(q))};
+    $$("[data-pickcard]",sheetEl).forEach(b=>b.onclick=()=>{const x=b.dataset.pickcard,on=cur().links.includes(x);save({links:on?cur().links.filter(y=>y!==x):[...cur().links,x]});b.classList.toggle("linked-on",!on)});
+    $("#lk-done").onclick=draw};
+  draw();
 }
+/* Inside a video: the cards that came out of it. */
 function renderViews(){
-  const vs=VIEWS(),keys=Object.keys(vs).sort((a,b)=>(vs[a].at||0)-(vs[b].at||0));
-  side.innerHTML=`<div class="pad pts"><div><div class="eyebrow">${keys.length} 則</div><h2>我的觀點</h2></div>
-    <div class="row"><button class="btn sm" id="v-new">＋ 寫一則觀點</button><button class="btn sm line" id="v-from">從重點挑幾則來寫</button><span class="sp"></span>${keys.length?`<button class="btn sm line" id="v-copy">複製全部</button>`:""}</div>
-    ${keys.map(k=>`<button class="vcard" data-view="${esc(k)}"><span class="vt">${esc(vs[k].text)}</span>${(vs[k].quotes||[]).length?`<small>根據 ${vs[k].quotes.length} 則重點</small>`:""}</button>`).join("")||
-      `<p class="meta">這裡放你自己的話。可以直接寫，也可以先到「重點」挑幾則畫線，再寫下你從中得到的看法。</p>`}</div>`;
+  const keys=liveCards().filter(k=>CARDS()[k].vid===V.vid);
+  side.innerHTML=`<div class="pad pts"><div><div class="eyebrow">這支影片 ${keys.length} 張 · 盒子裡共 ${liveCards().length} 張</div><h2>卡片</h2>
+      <p class="meta" style="margin:6px 0 0">一張卡片只放一個想法，用你自己的話寫。畫線是別人的話，卡片才是你的。</p></div>
+    <div class="row"><button class="btn sm" id="v-from">從重點挑幾則來寫</button><button class="btn sm line" id="v-new">＋ 空白卡片</button><span class="sp"></span><button class="btn sm line" id="v-box">打開卡片盒</button></div>
+    <div class="cards">${keys.map(k=>cardHtml(k)).join("")}</div>
+    ${keys.length?"":`<p class="meta">還沒有卡片。到「重點」勾幾則畫線或 AI 整理的第一性原理，寫下你自己的看法。</p>`}</div>`;
 }
-function viewsText(){const vs=VIEWS();return `看完《${V.title}》，我的看法：\n\n`+Object.keys(vs).sort((a,b)=>(vs[a].at||0)-(vs[b].at||0)).map((k,i)=>`${i+1}. ${vs[k].text}`).join("\n\n")}
+/* The whole box, across every video. Opened from the home screen. */
+function boxOutline(keys){return keys.map(k=>{const c=CARDS()[k];return `## ${cardTitle(c)}\n\n${c.text&&c.title?c.text+"\n\n":""}${(c.quotes||[]).map(q=>"> "+q.text.replace(/\n+/g," ")).join("\n")}${(c.quotes||[]).length?"\n\n":""}`}).join("").trim()}
+function renderBox(){
+  const all=liveCards(),tp=topics(),f=ui.topic,keys=all.filter(k=>f==null?true:f===""?!CARDS()[k].topic:CARDS()[k].topic===f),pick=ui.bpick;
+  homeEl.innerHTML=`<div class="pad home boxpage">
+    <div><button class="btn sm line" id="bx-back">‹ 全部影片</button></div>
+    <div><div class="eyebrow">${all.length} 張卡片 · 來自 ${new Set(all.map(k=>CARDS()[k].vid).filter(Boolean)).size} 支影片</div><h2>卡片盒</h2>
+      <p class="meta">讀的時候往裡面放，寫的時候從裡面拿。一張卡片一個想法。</p></div>
+    <div class="row"><input id="bx-q" placeholder="搜尋卡片" style="flex:1;min-width:8em"><button class="btn sm" id="bx-new">＋ 新卡片</button></div>
+    ${tp.length?`<div class="chips wrap"><button data-topic="*" aria-pressed="${f==null}">全部</button>${tp.map(t=>`<button data-topic="${esc(t)}" aria-pressed="${f===t}">＃${esc(t)}</button>`).join("")}<button data-topic="" aria-pressed="${f===""}">還沒分主題</button></div>`:""}
+    ${pick?`<div class="banner"><span>照點的順序排：已選 ${pick.length} 張</span><button class="btn sm line" id="bx-cancel">取消</button><button class="btn sm" id="bx-copy" ${pick.length?"":"disabled"}>複製成大綱</button></div>`
+      :all.length>1?`<div class="row"><button class="btn sm line" id="bx-pick">挑幾張排成大綱</button></div>`:""}
+    <div class="cards">${keys.map(k=>cardHtml(k,pick)).join("")}</div>
+    ${all.length?"":`<p class="meta">盒子還是空的。打開一支影片，在「重點」勾幾則畫線，寫成第一張卡片。</p>`}</div>`;
+  $("#bx-q").oninput=e=>{const q=e.target.value.trim().toLowerCase();$$(".boxpage [data-card]").forEach(b=>b.hidden=!!q&&!b.dataset.find.includes(q))};
+}
 
 /* ---------- shell ---------- */
 function meta(){
-  const h=Object.keys(S.hl).filter(id=>SENT[id]).length,v=Object.keys(VIEWS()).length;
+  const h=Object.keys(S.hl).filter(id=>SENT[id]).length,v=V?liveCards().filter(k=>CARDS()[k].vid===V.vid).length:0;
   $("#pips").innerHTML="";$("#n-d").textContent=h||"";$("#n-c").textContent=v||"";$("#steps").hidden=true;
 }
 function renderSide(){({overview:renderOverview,points:renderPoints,views:renderViews})[ui.side]();meta();
@@ -479,14 +549,14 @@ side.addEventListener("click",e=>{
   else if(t.id==="p-copy")copyString(pointsMarkdown());
   else if(t.id==="p-pick"){ui.pick=new Set();renderPoints()}
   else if(t.id==="p-cancel"){ui.pick=null;renderPoints()}
-  else if(t.id==="p-write")viewSheet(null,pickedQuotes());
+  else if(t.id==="p-write")cardSheet(null,{quotes:pickedQuotes(),vid:V.vid,vt:V.title});
   else if(t.dataset.noteAll!=null)noteSheet({});
   else if(t.dataset.noteT!=null)noteSheet({t:+t.dataset.noteT});
   else if(t.dataset.memo)noteSheet({mid:t.dataset.memo});
-  else if(t.id==="v-new")viewSheet(null,[]);
+  else if(t.id==="v-new")cardSheet(null,{vid:V.vid,vt:V.title});
   else if(t.id==="v-from"){setTab("points");ui.pick=new Set();renderPoints()}
-  else if(t.id==="v-copy")copyString(viewsText());
-  else if(t.dataset.view)viewSheet(t.dataset.view);
+  else if(t.id==="v-box"){ui.box=true;ui.topic=null;ui.bpick=null;goHome()}
+  else if(t.dataset.card)cardSheet(t.dataset.card);
 });
 // Lines and the AI's first principle are not buttons: in pick mode a tap ticks them, otherwise a line opens its sheet.
 side.addEventListener("click",e=>{if(e.target.closest("a")||(!ui.pick&&e.target.closest("button")))return;const pt=e.target.closest(".pt");if(!pt)return;const key=pt.dataset.key;
@@ -494,6 +564,7 @@ side.addEventListener("click",e=>{if(e.target.closest("a")||(!ui.pick&&e.target.
   else if(key.startsWith("h-"))blockSheet(key)});
 
 /* ---------- library, adding a video, processing ---------- */
+boxLoad();
 let LIB=[{video_id:DEMO.vid,title:DEMO.title,status:"ready",demo:true}];
 const cache={};const driving=new Set();
 const canIngest=()=>!!(sb&&sbUser);
@@ -676,6 +747,7 @@ function renderHome(){
     :!(CFG.supabaseUrl&&CFG.supabaseAnonKey)?"後端還沒接上，目前只能看範例。"
     :!sbUser?"先登入，才能加入影片並跨裝置同步。":"";
   const keep=$("#add-url")?$("#add-url").value:"",onList=!!$(".lpage"),adding=onList&&!$("#add").hidden;
+  if(ui.box){renderBox();return}
   if(ui.list&&!lists().includes(ui.list))ui.list=null;
   if(ui.list){
     homeEl.innerHTML=listHtml(ui.list,why);
@@ -692,6 +764,7 @@ function renderHome(){
     <form id="add" class="add"><input id="add-url" type="url" inputmode="url" placeholder="貼上 YouTube 網址" ${canIngest()?"":"disabled"}><button class="btn" ${canIngest()?"":"disabled"}>加入</button></form>
     <p class="meta" id="add-msg">${why}</p>
     ${!window.claude&&sb&&!sbUser?`<div><button class="btn" id="home-login">登入</button></div>`:""}
+    <button class="boxcard" id="open-box"><span><b>卡片盒</b><small>${liveCards().length?`${liveCards().length} 張卡片，你自己的話`:"讀完留下來的想法，會放在這裡"}</small></span><i>›</i></button>
     ${libHtml()}
   </div>`;
   if(keep)$("#add-url").value=keep;
@@ -706,6 +779,18 @@ async function openItem(vid,st,demo){
   markSeen(vid);openVideo(c);
 }
 homeEl.addEventListener("click",e=>{
+  const bx=e.target.closest("#open-box,#bx-back,#bx-new,#bx-pick,#bx-cancel,#bx-copy,[data-topic],[data-card]");
+  if(bx){
+    if(bx.id==="open-box"){ui.box=true;ui.topic=null;ui.bpick=null;renderHome();window.scrollTo(0,0);boxSync()}
+    else if(bx.id==="bx-back"){ui.box=false;renderHome()}
+    else if(bx.id==="bx-new")cardSheet(null);
+    else if(bx.id==="bx-pick"){ui.bpick=[];renderBox()}
+    else if(bx.id==="bx-cancel"){ui.bpick=null;renderBox()}
+    else if(bx.id==="bx-copy"){copyString(boxOutline(ui.bpick));ui.bpick=null;renderBox()}
+    else if(bx.dataset.topic!=null){ui.topic=bx.dataset.topic==="*"?null:bx.dataset.topic;renderBox()}
+    else if(ui.bpick){const k=bx.dataset.card,at=ui.bpick.indexOf(k);at>=0?ui.bpick.splice(at,1):ui.bpick.push(k);const y=window.scrollY;renderBox();window.scrollTo(0,y)}
+    else cardSheet(bx.dataset.card);
+    return}
   const m=e.target.closest("[data-more]");if(m){videoMenu(m.dataset.more);return}
   const l=e.target.closest("[data-list]");if(l){ui.list=l.dataset.list;renderHome();homeEl.scrollTop=0;window.scrollTo(0,0);return}
   const b=e.target.closest("[data-vid]");if(b)openItem(b.dataset.vid,b.dataset.status,b.dataset.demo!=null);
@@ -713,12 +798,13 @@ homeEl.addEventListener("click",e=>{
 function openVideo(c){
   V=c;VID=c.vid;SEGS=c.segs||[];CH=c.chapters||[];THESIS=c.thesis||"";TLDR=c.tldr||[];
   indexContent();loadState();migrateIds();upgrade();bindCloud();pull();
+  {let moved=false;for(const k in S.views||{}){const v=S.views[k];if(!CARDS()[k]&&v&&(v.text||"").trim()){CARDS()[k]={at:v.at||1,made:v.at||1,title:"",text:v.text,topic:"",links:[],quotes:(v.quotes||[]).map(q=>({...q})),vid:V.vid,vt:V.title};moved=true}}if(moved)boxCommit()}
   $("#vt").textContent=c.title+(c.channel?" · "+c.channel:"");
   ui.side="overview";ui.m="side";ui.pick=null;ui.open=new Set();
   root.dataset.view="video";renderAll();initYT();rscroll.scrollTop=0;side.scrollTop=0;
 }
 function goHome(){closeSheet();try{if(player&&ytOK)player.pauseVideo()}catch(e){} root.dataset.view="home";$("#vt").textContent="";renderHome()}
-$("#gohome").onclick=()=>{if(root.dataset.view==="home")ui.list=null;goHome()};
+$("#gohome").onclick=()=>{if(root.dataset.view==="home"){ui.list=null;ui.box=false}goHome()};
 /* wide screens: drag the divider to resize the two columns; double-click to reset */
 (function(){
   const split=$("#split"),KEY="rd4:side-w",clamp=w=>Math.max(340,Math.min(innerWidth-420,w));

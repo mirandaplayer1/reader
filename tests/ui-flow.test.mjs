@@ -107,14 +107,14 @@ await p.evaluate(() => document.querySelector('#seg-c1').scrollIntoView()); awai
 await p.click('#seg-c1 .zh .s >> nth=4'); await p.click('#sheet [data-hl=y]'); await p.click('#a-done');
 await p.click('[data-tab=points]'); await p.waitForSelector('.pts');
 console.log('points: my lines', await p.locator('.pt:not(.ai)').count(), '| AI first principles', await p.locator('.pt.ai').count());
-await p.click('#p-pick'); await p.click('.pt.ai'); await p.click('.pt:not(.ai)'); await p.click('#p-write'); await p.fill('#v-text', '沒有人付錢之前都只是想像'); await p.click('#v-done'); await p.waitForSelector('.vcard'); await p.waitForTimeout(1500);
-console.log('cards', await p.locator('.vcard').count(), '| synced state saved:', states.has('AAAAAAAAAAA'), '| badge', await p.textContent('#sync'));
+await p.click('#p-pick'); await p.click('.pt.ai'); await p.click('.pt:not(.ai)'); await p.click('#p-write'); await p.fill('#k-text', '沒有人付錢之前都只是想像'); await p.click('#k-done'); await p.waitForSelector('.zcard'); await p.waitForTimeout(1500);
+console.log('cards', await p.locator('#side .zcard').count(), '| synced state saved:', states.has('AAAAAAAAAAA'), '| badge', await p.textContent('#sync'));
 await p.screenshot({ path: D + '/i-cards.png' });
 // 7. back home, reload: library and the finished video come back from the store
 await p.click('#gohome'); await p.reload(); await p.waitForTimeout(900);
 console.log('after reload items', await p.locator('.item').count(), '| second status', await p.getAttribute('.item-row:nth-child(2) .item', 'data-status'));
 await p.click('.item-row:nth-child(2) .item'); await p.waitForTimeout(400); await p.click('[data-tab=views]');
-console.log('cards after reload', await p.locator('.vcard').count());
+console.log('cards after reload', await p.locator('#side .zcard').count());
 // 7b. reprocess (text only): highlights and translations survive, the back-to-playing button exists
 await p.click('[data-tab=read]'); await p.waitForTimeout(300);
 const before = await p.evaluate(() => ({ hl: document.querySelectorAll('.zh .s[data-hl="y"]').length, ids: Object.keys(S.hl), zh: document.querySelector('#seg-c1 .turn .zh').textContent.slice(0, 14) }));
