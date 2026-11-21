@@ -376,3 +376,21 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
 .vq{display:grid;gap:6px;max-height:30vh;overflow:auto} .vq .ev{font-size:15px;line-height:1.6;padding:6px 10px;border-radius:6px;background:var(--surf2)} .vq .ev.ai{background:var(--lav-l)}
 textarea.big{min-height:9em}
 .banner{position:sticky;top:0;z-index:3;display:flex;gap:8px;align-items:center;padding:10px 16px} .banner span{flex:1}
+
+/* The card box */
+.boxcard{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:16px 18px;border-radius:10px;background:var(--lav-l);box-shadow:inset 0 0 0 1px var(--line)}
+.boxcard span{flex:1;display:grid;gap:2px} .boxcard b{font-size:18px} .boxcard small{font-size:14.5px;color:var(--mute)} .boxcard i{font-style:normal;font-size:22px;color:var(--mute)} .boxcard:hover{filter:brightness(.98)}
+.cards{display:grid;gap:10px}
+.boxpage .cards{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.zcard{display:flex;gap:10px;text-align:left;width:100%;padding:14px 16px;border-radius:10px;background:var(--surf);box-shadow:inset 0 0 0 1px var(--line),0 1px 0 var(--line);align-items:flex-start}
+.zcard:hover{background:var(--surf2)} .zcard[hidden]{display:none}
+.zb{flex:1;min-width:0;display:grid;gap:5px} .zb b{font-size:17.5px;line-height:1.5} .zb>span{font-size:15.5px;line-height:1.65;color:var(--ink);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
+.zb small{font-size:13.5px;color:var(--mute);line-height:1.5}
+.zcard.raw{box-shadow:inset 0 0 0 1px var(--line),inset 4px 0 0 var(--gold)} .zcard.linked-on{box-shadow:inset 0 0 0 2px var(--acc)}
+.zcard .chk{margin-top:2px;font-size:12px;line-height:20px;text-align:center;color:var(--on-acc);font-style:normal} .zcard .chk.on::after{content:none}
+#sheet input:not([type]),#sheet input[type=text]{width:100%;border:1px solid var(--line);background:var(--surf);border-radius:6px;padding:10px 12px;font-size:17px}
+#k-title{font-weight:600}
+.vq .ev{display:flex;gap:8px;align-items:flex-start} .vq .ev span{flex:1}
+.linked .go{flex:1;text-align:left;text-decoration:underline;text-underline-offset:3px} .linked small{font-size:13px;color:var(--mute)}
+.chips.wrap{flex-wrap:wrap}
+.boxpage input{border:1px solid var(--line);background:var(--surf);border-radius:6px;padding:10px 12px;font-size:17px}
