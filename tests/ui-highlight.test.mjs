@@ -31,7 +31,7 @@ const pick = (sel) => p.evaluate(({ a, b, i, j, lang }) => {
 let [id1, , text1] = await pick({ lang: 'zh', i: 0, j: 0, a: 3, b: 10 });
 await p.waitForSelector('#selbar:not([hidden])');
 await p.screenshot({ path: S + '/shots/sel-bar.png' });
-await p.click('#selbar [data-k="y"]');
+await p.click('#selbar [data-k="y"]:not([data-note])');
 const m1 = await p.$eval(`.s[data-lang="zh"][data-id="${id1}"] mark`, e => e.textContent);
 const soft = await p.$eval(`.s[data-lang="en"][data-id="${id1}"]`, e => e.dataset.soft).catch(() => 'n/a');
 console.log('part:', JSON.stringify(text1), '->', JSON.stringify(m1), m1 === text1 ? 'OK' : 'MISMATCH', '| other language underline:', soft, '| bar hidden:', await p.$eval('#selbar', e => e.hidden));
@@ -39,7 +39,7 @@ console.log('part:', JSON.stringify(text1), '->', JSON.stringify(m1), m1 === tex
 // 2. across three sentences: from char 5 of sentence 2 to char 4 of sentence 4
 const [ia, ib, text2] = await pick({ lang: 'zh', i: 2, j: 4, a: 5, b: 4 });
 await p.waitForSelector('#selbar:not([hidden])');
-await p.click('#selbar [data-k="g"]');
+await p.click('#selbar [data-tags]'); await p.click('#selbar [data-k="g"]');
 const st = await p.evaluate(() => ({ hl: S.hl, rng: S.rng }));
 console.log('across:', JSON.stringify(text2.slice(0, 40)), '| hl', JSON.stringify(st.hl), '| rng', JSON.stringify(st.rng));
 const mids = await p.$$eval('.s[data-lang="zh"]', els => els.slice(2, 5).map(e => [e.dataset.hl, e.querySelector('mark') ? e.querySelector('mark').textContent.length : 0, e.textContent.length]));

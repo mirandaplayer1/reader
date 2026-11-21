@@ -355,6 +355,31 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
 .brief-g{display:grid;gap:6px} .brief-g h3{margin:0;font-size:17px;font-weight:700} .brief-g li b{font-weight:600}
 .brief-r{margin:0;padding:12px 14px;border-radius:8px;background:var(--lav-l);font-size:17px;line-height:1.6} .brief-r b{display:block;font-size:14px;font-weight:500;color:var(--mute);margin-bottom:2px}
 
+/* Points and views */
+:root{--hl-i:#E6E4F7} .s[data-hl="i"],.s mark[data-hl="i"]{background:var(--hl-i);color:var(--ink)} .s[data-soft="i"]{box-shadow:inset 0 -2px 0 var(--lav)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--hl-i:#34365F}} :root[data-theme="dark"]{--hl-i:#34365F}
+.hl-row{flex-wrap:wrap}
+.segnote{margin:-2px 0 6px}
+.pts{display:grid;gap:14px;align-content:start} .pts h2{margin:2px 0 0}
+.pch{display:grid;gap:8px;padding-top:14px;border-top:1px solid var(--line)}
+.pch>header{display:flex;gap:10px;align-items:flex-start} .ptitle{flex:1;min-width:0;text-align:left;display:grid;gap:1px}
+.ptitle b{font-size:17px;line-height:1.45} .ptitle small{font-size:13.5px;color:var(--mute)} .ptitle:hover b{text-decoration:underline;text-underline-offset:3px}
+.pt{display:flex;gap:10px;padding:10px 12px;border-radius:8px;background:var(--surf);box-shadow:inset 0 0 0 1px var(--line),inset 4px 0 0 var(--gold);cursor:pointer}
+.pt>div{min-width:0;flex:1;display:grid;gap:4px} .pt small{font-size:13.5px;color:var(--mute)} .pt p{margin:0;font-size:16.5px;line-height:1.7}
+.pt[data-hl="i"]{box-shadow:inset 0 0 0 1px var(--line),inset 4px 0 0 var(--lav)} .pt[data-hl="p"]{box-shadow:inset 0 0 0 1px var(--line),inset 4px 0 0 var(--pink)} .pt[data-hl="g"]{box-shadow:inset 0 0 0 1px var(--line),inset 4px 0 0 var(--blue)}
+.pt.ai{background:var(--lav-l);box-shadow:none;cursor:default} .pt.ai p{font-size:16px}
+.pick .pt.ai{cursor:pointer}
+.chk{flex:none;width:20px;height:20px;margin-top:3px;border-radius:5px;box-shadow:inset 0 0 0 2px var(--mute)} .chk.on{background:var(--acc);box-shadow:none}
+.chk.on::after{content:"✓";display:block;text-align:center;color:var(--on-acc);font-size:14px;line-height:20px;font-style:normal}
+.memo{display:grid;gap:2px;text-align:left;width:100%;padding:8px 12px;border-radius:8px;background:var(--surf2);font-size:16px;line-height:1.65}
+.memo small{font-size:13.5px;color:var(--mute)} .memo span{white-space:pre-wrap} .memo::before{content:"我的筆記";font-size:12.5px;color:var(--link);font-weight:500}
+.pt .memo{background:var(--bg)}
+.vcard{display:grid;gap:6px;text-align:left;width:100%;padding:14px 16px;border-radius:10px;background:var(--surf);box-shadow:inset 0 0 0 1px var(--line)}
+.vcard .vt{font-size:18px;line-height:1.7;white-space:pre-wrap} .vcard small{font-size:13.5px;color:var(--mute)} .vcard:hover{background:var(--surf2)}
+.vq{display:grid;gap:6px;max-height:30vh;overflow:auto} .vq .ev{font-size:15px;line-height:1.6;padding:6px 10px;border-radius:6px;background:var(--surf2)} .vq .ev.ai{background:var(--lav-l)}
+textarea.big{min-height:9em}
+.banner{position:sticky;top:0;z-index:3;display:flex;gap:8px;align-items:center;padding:10px 16px} .banner span{flex:1}
+
 </style>
 
 <div id="root" data-m="side" data-view="home">
@@ -376,10 +401,10 @@ textarea:focus,input:focus{border-color:var(--lav);box-shadow:0 0 0 3px color-mi
     </section>
     <section class="pane side"><div class="split" id="split" role="separator" aria-orientation="vertical" aria-label="拖曳調整左右欄寬度" tabindex="0"></div><div class="steps" id="steps" hidden></div><div class="scroll" id="side"></div></section>
   </div>
-  <nav class="tabs" id="tabs"><button data-tab="overview">總覽</button><button data-tab="read">閱讀</button><button data-tab="distill">淬煉 <b id="n-d"></b></button><button data-tab="cards">觀點卡 <b id="n-c"></b></button></nav>
+  <nav class="tabs" id="tabs"><button data-tab="overview">總覽</button><button data-tab="read">閱讀</button><button data-tab="points">重點 <b id="n-d"></b></button><button data-tab="views">觀點 <b id="n-c"></b></button></nav>
 </div>
 <div id="scrim" hidden></div><div id="sheet" hidden></div><div id="toast" hidden></div>
-<div id="selbar" hidden role="toolbar" aria-label="畫重點"><span>畫成</span><button data-k="y"><i style="background:var(--hl-y)"></i>洞見</button><button data-k="p"><i style="background:var(--hl-p)"></i>疑問</button><button data-k="g"><i style="background:var(--hl-g)"></i>要去做</button><button data-k="">取消</button></div>
+<div id="selbar" hidden role="toolbar" aria-label="畫線"></div>
 
 <script>
 let VID="";
@@ -474,7 +499,7 @@ function migrateIds(){if(!V||V.demo)return;let ch=false;
   const m=id=>{const r=/^c(\d+)-(\d+)-(\d+)$/.exec(id);if(!r)return id;const tu=SEGS[+r[1]]&&SEGS[+r[1]].turns[+r[2]];if(!tu)return id;ch=true;return `${tu._id}-${r[3]}`};
   for(const k of ["hl","notes","rng"]){const o={};for(const id in S[k]||{})o[m(id)]=S[k][id];S[k]=o}
   S.claims.forEach(c=>c.ev=(c.ev||[]).map(m));S.cards.forEach(c=>c.ev=(c.ev||[]).map(m));
-  if(ch)commit()}
+  if(ch)try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}}   // saved here, but not stamped as an edit
 const isDeep=g=>g.deep!==false;
 const keyIds=g=>(g.key||[]).map(([a,b])=>g.turns[a]?`${g.turns[a]._id}-${b}`:"").filter(id=>SENT[id]);
 const who=tu=>(V.speakers&&V.speakers[tu.sp])||tu.sp;
@@ -488,23 +513,40 @@ async function copyText(ta){try{await navigator.clipboard.writeText(ta.value);to
 
 /* ---------- state: local first, cloud when available ---------- */
 let LS="";
-const blank=()=>({hl:{},notes:{},rng:{},refl:{},claims:[],cards:[],mode:"both",at:0});
+const blank=()=>({hl:{},notes:{},rng:{},refl:{},memos:{},claims:[],cards:[],mode:"both",at:0});
 let S=blank();
-function loadState(){LS="rd4:"+VID;S=blank();try{Object.assign(S,JSON.parse(localStorage.getItem(LS))||{})}catch(e){}}
+function loadState(){LS="rd4:"+VID;S=blank();seenAt=0;try{Object.assign(S,JSON.parse(localStorage.getItem(LS))||{})}catch(e){}}
+/* Brings older saved state up to the current shape, in memory only. It never touches S.at: a migration is not an edit,
+   and stamping it as one would let a device that has been asleep for a week overwrite newer work on the server. */
+function upgrade(){
+  S.memos=S.memos||{};
+  for(const id in S.notes||{}){const v=S.notes[id];if(v&&v.trim()&&!S.memos["n-"+id])S.memos["n-"+id]={at:S.at||0,text:v,ids:[id]}}
+  S.notes={};
+  for(const k in S.refl||{}){const v=S.refl[k],g=SEGS.find(x=>x.id===k);if(v&&v.trim()&&g&&!S.memos["r"+g.t])S.memos["r"+g.t]={at:S.at||0,text:v,t:g.t,q:g.ask||""}}
+  S.refl={};
+  if(!S.views){S.views={};const q=ids=>(ids||[]).map(quoteOf).filter(Boolean);
+    (S.cards||[]).forEach(k=>{S.views[k.id]={at:k.at||0,text:k.text,quotes:q(k.ev)}});
+    (S.claims||[]).forEach(c=>{if(!(S.cards||[]).some(k=>k.claim===c.id))S.views[c.id]={at:0,text:c.text,quotes:q(c.ev)}})}
+}
 const ui={side:"overview",m:"side",coreOnly:false,linkTo:null,fresh:null,open:new Set(),busy:{},list:null};
-let cloud=null,cloudBase=null,cloudOff=null,sb=null,sbUser=null,pushT=null,remoteWaiting=false;
+let cloud=null,cloudBase=null,cloudOff=null,sb=null,sbUser=null,pushT=null,remoteWaiting=false,seenAt=0;
 const canSync=()=>!!(cloud||(sb&&sbUser));
 const syncEl=$("#sync");
 function badge(t,c){syncEl.textContent=t;syncEl.className="sync "+(c||"")}
-function commit(){if(!VID)return;S.at=Date.now();try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){} meta();if(canSync()){badge("同步中…");clearTimeout(pushT);pushT=setTimeout(push,900)}}
-async function push(){if(!canSync())return;const at=S.at;try{
+function commit(){if(!VID)return;S.at=Date.now();try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){} meta();if(canSync()){badge("同步中…");clearTimeout(pushT);pushT=setTimeout(()=>{pushT=null;push()},900)}}
+async function push(){if(!canSync())return;const at=S.at,vid=VID;try{
   if(cloud)await cloud.set({json:JSON.stringify(S),at});
-  else{const {error}=await sb.from("reader_state").upsert({user_id:sbUser.id,video_id:VID,state:S,at});if(error)throw error}
+  else{
+    // Look before writing: if the server holds something this page has not seen, another device got there first.
+    const {data:cur,error:e0}=await sb.from("reader_state").select("state,at").eq("video_id",vid).maybeSingle();if(e0)throw e0;if(vid!==VID)return;
+    if(cur&&cur.at>seenAt&&cur.at!==at){seenAt=cur.at;adopt(JSON.stringify(cur.state));badge("已同步","ok");toast("另一台裝置有較新的內容，已載入");return}
+    const {error}=await sb.from("reader_state").upsert({user_id:sbUser.id,video_id:vid,state:S,at});if(error)throw error;seenAt=at}
   if(at===S.at)badge("已同步","ok")}catch(e){badge("同步失敗，內容仍在這台裝置","warn")}}
 /* Supabase: used on the hosted site when src/config.json is filled in */
 async function pull(){if(!sb||!sbUser||!VID)return;badge("同步中…");
   const {data,error}=await sb.from("reader_state").select("state,at").eq("video_id",VID).maybeSingle();
   if(error){badge("同步失敗，內容仍在這台裝置","warn");return}
+  if(data)seenAt=Math.max(seenAt,data.at);
   if(data&&data.at>S.at){adopt(JSON.stringify(data.state));badge("已同步","ok")}else if(S.at&&(!data||data.at<S.at))push();else badge("已同步","ok")}
 function setUser(u){const was=sbUser&&sbUser.id;sbUser=u||null;if(!u){badge("登入","link");LIB=LIB.filter(x=>x.demo);renderHome();return}if(u.id!==was){badge("已登入","ok");pull();loadLibrary()}}
 (async()=>{if(window.claude||!CFG.supabaseUrl||!CFG.supabaseAnonKey)return;try{
@@ -513,6 +555,8 @@ function setUser(u){const was=sbUser&&sbUser.id;sbUser=u||null;if(!u){badge("登
   const {data}=await sb.auth.getSession();setUser(data.session&&data.session.user);
   sb.auth.onAuthStateChange((_e,ses)=>setUser(ses&&ses.user));
   document.addEventListener("visibilitychange",()=>{if(!document.hidden){pull();loadLibrary()}});
+  window.addEventListener("focus",()=>pull());
+  setInterval(()=>{if(!document.hidden&&root.dataset.view==="video"&&!pushT)pull()},60000);
 }catch(e){badge("同步服務載入失敗，內容仍在這台裝置","warn")}})();
 const rateMsg=e=>(e&&(e.status===429||/rate limit/i.test(e.message||"")))?"寄信額度用完了：整個專案每小時只能寄幾封登入信。等一小時再試，或改用密碼登入。":null;
 syncEl.onclick=()=>{if(!sb){if(!window.claude)toast("後端還沒接上");return}
@@ -538,7 +582,7 @@ syncEl.onclick=()=>{if(!sb){if(!window.claude)toast("後端還沒接上");return
     const {error}=await sb.auth.signInWithOtp({email:mail,options:{emailRedirectTo:location.origin+location.pathname}});
     msg.textContent=error?(rateMsg(error)||"沒有寄出："+error.message):"寄出了。到信箱點連結，回到這一頁就會登入。連結一小時內有效，只能用一次。";if(error)b.disabled=false}};
 function adopt(json){if(!VID)return;try{S=Object.assign(blank(),JSON.parse(json))}catch(e){return}try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}
-  migrateIds();
+  migrateIds();upgrade();
   if(document.activeElement&&document.activeElement.tagName==="TEXTAREA"){remoteWaiting=true;return}if(root.dataset.view==="video")renderAll()}
 document.addEventListener("focusout",()=>{if(remoteWaiting){remoteWaiting=false;setTimeout(()=>{if(!(document.activeElement&&document.activeElement.tagName==="TEXTAREA")&&root.dataset.view==="video")renderAll()},50)}});
 function bindCloud(){
@@ -628,7 +672,7 @@ const cut=(id,lang)=>{const r=part(id,lang),t=SENT[id][lang];return r?t.slice(r[
 const picked=id=>{const r=S.hl[id]&&RNG()[id];return r?(r.zh?cut(id,"zh"):cut(id,"en")):SENT[id].zh};
 function sentLook(id,lang){const k=S.hl[id]||"",any=k&&RNG()[id],r=part(id,lang),t=SENT[id][lang];
   return {hl:any?"":k,soft:any&&!r?k:"",html:r?esc(t.slice(0,r[0]))+`<mark data-hl="${k}">${esc(t.slice(r[0],r[1]))}</mark>`+esc(t.slice(r[1])):esc(t)}}
-const span=(id,lang)=>{const l=sentLook(id,lang);return `<span class="s${S.notes[id]?" has-note":""}" data-id="${id}" data-lang="${lang}" data-hl="${l.hl}" data-soft="${l.soft}" role="button" tabindex="0">${l.html}</span>`};
+const span=(id,lang)=>{const l=sentLook(id,lang);return `<span class="s${noted(id)?" has-note":""}" data-id="${id}" data-lang="${lang}" data-hl="${l.hl}" data-soft="${l.soft}" role="button" tabindex="0">${l.html}</span>`};
 function renderRead(){
   const top=rscroll.scrollTop,mono=/^zh/i.test(V.lang||"");
   root.classList.toggle("mono",mono);
@@ -643,32 +687,36 @@ function renderRead(){
       <div class="eyebrow">第一性原理</div><p class="core">${esc(g.core)}</p>
       <details><summary>展開推理鏈（${(g.chain||[]).length} 步）</summary><ol class="chain">${(g.chain||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ol></details>
       <div class="eyebrow">換到你身上</div><p class="ask">${esc(g.ask)}</p>
-      <textarea id="refl-${g.id}" data-refl="${g.id}" placeholder="寫一兩句就好">${esc(S.refl[g.id]||"")}</textarea>
+      <textarea id="refl-${g.id}" data-refl="${g.t}" placeholder="寫一兩句就好">${esc((MEMOS()["r"+g.t]||{}).text||"")}</textarea>
     </div>`;
     return `<section class="a-seg${deep||hasZh||mono?"":" raw"}" id="seg-${g.id}">
-    <header><i>第 ${gi+1} 段，共 ${SEGS.length} 段</i><h3>${esc(g.title)}</h3>${tlink(g.t)}</header>${tools}${body}${absorb}</section>`}).join("")+`</div>`;
+    <header><i>第 ${gi+1} 段，共 ${SEGS.length} 段</i><h3>${esc(g.title)}</h3>${tlink(g.t)}</header><div class="row segnote"><button class="btn sm line" data-note-t="${g.t}">＋ 這一章的筆記</button></div>${tools}${body}${absorb}</section>`}).join("")+`</div>`;
   rscroll.scrollTop=top;nowId=null;
   $$("[data-mode]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===S.mode));
 }
-function markSent(id){$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>{const l=sentLook(id,e.dataset.lang||"zh");e.dataset.hl=l.hl;e.dataset.soft=l.soft;e.innerHTML=l.html;e.classList.toggle("has-note",!!S.notes[id])})}
+function markSent(id){$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>{const l=sentLook(id,e.dataset.lang||"zh");e.dataset.hl=l.hl;e.dataset.soft=l.soft;e.innerHTML=l.html;e.classList.toggle("has-note",noted(id))})}
 function sentSheet(id){
-  const s=SENT[id];$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>e.classList.add("on"));
+  const s=SENT[id];if(!s)return;$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>e.classList.add("on"));
+  const mid=memoFor([id])||"n-"+id;
   openSheet(`<p class="q-zh">${esc(s.zh)}</p>${s.zh===s.en?"":`<p class="q-en">${esc(s.en)}</p>`}
-    <div class="hl-row">${[["y","洞見","var(--hl-y)"],["p","疑問","var(--hl-p)"],["g","要去做","var(--hl-g)"],["","不畫","transparent"]].map(([k,l,c])=>`<button data-hl="${k}" aria-pressed="${(S.hl[id]||"")===k}"><i style="background:${c}"></i>${l}</button>`).join("")}</div>
+    <div class="hl-row">${[["y","畫線","var(--hl-y)"],["i","洞見","var(--hl-i)"],["p","疑問","var(--hl-p)"],["g","要去做","var(--hl-g)"],["","不畫","transparent"]].map(([k,l,c])=>`<button data-hl="${k}" aria-pressed="${(S.hl[id]||"")===k}"><i style="background:${c}"></i>${l}</button>`).join("")}</div>
     ${S.hl[id]&&RNG()[id]?`<p class="meta" id="a-part">只畫了：「${esc(picked(id))}」 <button class="btn sm line" id="a-whole">改成整句</button></p>`:""}
-    <textarea id="a-note" placeholder="這句讓你想到什麼？">${esc(S.notes[id]||"")}</textarea>
+    <textarea id="a-note" placeholder="這句讓你想到什麼？">${esc((MEMOS()[mid]||{}).text||"")}</textarea>
     <div class="ai-out" id="a-aiout" hidden></div>
     <div class="row">${tlink(s.t,"▶ 從這段播放 "+fmt(s.t))}<span class="sp"></span><button class="btn sm ghost ai-only" id="a-ask">請 AI 解釋這句</button><button class="btn sm" id="a-done">完成</button></div>`,
     ()=>{$$(".s.on",rscroll).forEach(e=>e.classList.remove("on"));if(ui.side!=="overview")renderSide()});
   $$("[data-hl]",sheetEl).forEach(b=>b.onclick=()=>{const k=b.dataset.hl;if(k)S.hl[id]=k;else{delete S.hl[id];delete RNG()[id];const pp=$("#a-part");if(pp)pp.hidden=true}commit();markSent(id);$$("[data-hl]",sheetEl).forEach(x=>x.setAttribute("aria-pressed",x===b))});
-  $("#a-note").oninput=e=>{const v=e.target.value;if(v.trim()){S.notes[id]=v;if(!S.hl[id])S.hl[id]="y"}else delete S.notes[id];commit();markSent(id)};
+  // S can be replaced under an open sheet when another device syncs in, so the memo is looked up afresh on every keystroke.
+  $("#a-note").oninput=e=>{const v=e.target.value,old=MEMOS()[mid];
+    if(v.trim()){MEMOS()[mid]={...(old||{ids:[id]}),at:Date.now(),text:v};if(!S.hl[id])S.hl[id]="y"}else delete MEMOS()[mid];commit();markSent(id)};
   $("#a-done").onclick=closeSheet;
   const whole=$("#a-whole");if(whole)whole.onclick=()=>{delete RNG()[id];commit();markSent(id);$("#a-part").hidden=true};
   $("#a-ask").onclick=e=>askAI(`你是陪讀夥伴。讀者的母語是繁體中文，是一位創業者，正在讀一段英文訪談逐字稿。請用繁體中文、最多 90 個字，解釋下面這句話在上下文中的意思，並點出它背後的一個假設。直接講，不要開場白，不要條列。\n\n這段的主題：${s.seg.title}\n上下文：${s.turn.s.filter(Boolean).map(p=>p[0]).join(" ")}\n要解釋的句子：${s.en}`,$("#a-aiout"),e.currentTarget);
 }
 rscroll.addEventListener("click",e=>{const s=e.target.closest(".s"),o=e.target.closest("[data-open]"),d=e.target.closest("[data-deepen]");
   if(s&&!getSelection().isCollapsed)return;
-  if(s)sentSheet(s.dataset.id);else if(o){ui.open.add(o.dataset.open);renderRead()}else if(d)deepen(+d.dataset.deepen)});
+  const nt=e.target.closest("[data-note-t]");
+  if(nt)noteSheet({t:+nt.dataset.noteT});else if(s)sentSheet(s.dataset.id);else if(o){ui.open.add(o.dataset.open);renderRead()}else if(d)deepen(+d.dataset.deepen)});
 rscroll.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.classList.contains("s"))sentSheet(e.target.dataset.id)});
 /* Select text to highlight from any point to any point, inside one sentence or across several. */
 const selbar=$("#selbar");let selParts=[];
@@ -687,15 +735,24 @@ function readSelection(){
 }
 let selT;document.addEventListener("selectionchange",()=>{clearTimeout(selT);selT=setTimeout(()=>{
   if(root.dataset.view==="home"||!sheetEl.hidden){selbar.hidden=true;return}
-  const ps=readSelection();if(ps.length){selParts=ps;selbar.hidden=false}else selbar.hidden=true},180)});
+  const ps=readSelection();if(ps.length){selParts=ps;selbar.hidden=false}else{selbar.hidden=true;selbar.innerHTML=BAR_MAIN}},180)});
 selbar.addEventListener("pointerdown",e=>e.preventDefault());   // keep the selection while the button is pressed
-selbar.addEventListener("click",e=>{const b=e.target.closest("[data-k]");if(!b)return;const k=b.dataset.k;
-  if(k){selParts.forEach(x=>{if(!SENT[x.id])return;S.hl[x.id]=k;
-      if(x.full){const r=RNG()[x.id];if(r){delete r[x.lang];if(!Object.keys(r).length)delete RNG()[x.id]}}
-      else RNG()[x.id]={...(RNG()[x.id]||{}),[x.lang]:[x.a,x.b]}});
-    commit();[...new Set(selParts.map(x=>x.id))].forEach(markSent);if(ui.side!=="overview")renderSide()}
-  getSelection().removeAllRanges();selbar.hidden=true;selParts=[]});
-rscroll.addEventListener("input",e=>{const k=e.target.dataset&&e.target.dataset.refl;if(k){S.refl[k]=e.target.value;commit()}});
+const BAR_MAIN=`<button data-k="y"><i style="background:var(--hl-y)"></i>畫線</button><button data-k="y" data-note>畫線＋筆記</button><button data-tags>標記 ▸</button>`;
+const BAR_TAGS=`<button data-back aria-label="返回">‹</button><button data-k="i"><i style="background:var(--hl-i)"></i>洞見</button><button data-k="p"><i style="background:var(--hl-p)"></i>疑問</button><button data-k="g"><i style="background:var(--hl-g)"></i>要去做</button>`;
+selbar.innerHTML=BAR_MAIN;
+selbar.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.tags!=null){selbar.innerHTML=BAR_TAGS;return}
+  if(b.dataset.back!=null){selbar.innerHTML=BAR_MAIN;return}
+  const k=b.dataset.k,parts=selParts.filter(x=>SENT[x.id]),ids=[...new Set(parts.map(x=>x.id))];if(!k||!ids.length)return;
+  parts.forEach(x=>{const whole=S.hl[x.id]&&!RNG()[x.id];S.hl[x.id]=k;
+    if(x.full){const r=RNG()[x.id];if(r){delete r[x.lang];if(!Object.keys(r).length)delete RNG()[x.id]}}
+    else if(!whole)RNG()[x.id]={...(RNG()[x.id]||{}),[x.lang]:[x.a,x.b]}});   // a sentence already drawn in full stays in full
+  commit();ids.forEach(markSent);
+  getSelection().removeAllRanges();selbar.hidden=true;selbar.innerHTML=BAR_MAIN;selParts=[];
+  if(b.dataset.note!=null)noteSheet({ids});else if(ui.side!=="overview")renderSide()});
+rscroll.addEventListener("input",e=>{const k=e.target.dataset&&e.target.dataset.refl;if(k==null)return;
+  const g=SEGS.find(x=>String(x.t)===k),v=e.target.value;if(!g)return;
+  if(v.trim())MEMOS()["r"+g.t]={at:Date.now(),text:v,t:g.t,q:g.ask||""};else delete MEMOS()["r"+g.t];commit()});
 $$("[data-mode]").forEach(b=>b.onclick=()=>{S.mode=b.dataset.mode;commit();rscroll.className="scroll m-"+S.mode;$$("[data-mode]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
 
 /* ---------- overview ---------- */
@@ -731,123 +788,147 @@ function renderOverview(){
     </details>`}</div>`;
 }
 
-/* ---------- distill ---------- */
-function sparks(){const out=[];SEGS.forEach(g=>{const k=isDeep(g)?keyIds(g):[];if(k.length)out.push({id:"ai-"+g.id,seg:g,ai:true,text:g.spark,t:SENT[k[0]].t});
-  Object.keys(S.hl).filter(id=>SENT[id]&&SENT[id].seg===g).sort().forEach(id=>out.push({id,seg:g,text:picked(id),hl:S.hl[id],t:SENT[id].t}))});return out}
-const lvName=n=>n>=3?"樹":n===2?"芽":"種子";
-const liveEv=c=>{const ids=new Set(sparks().map(s=>s.id));return c.ev.filter(e=>ids.has(e))};
-function renderDistill(){
-  const sp=sparks(),used=new Set(S.claims.flatMap(c=>c.ev)),lt=ui.linkTo&&S.claims.find(c=>c.id===ui.linkTo);
-  let h="",last=null;
-  sp.forEach(s=>{if(s.seg!==last){h+=`<div class="dlab">${s.seg.title}</div>`;last=s.seg}
-    h+=`<button class="spark${used.has(s.id)?" used":""}${lt&&lt.ev.includes(s.id)?" pick":""}" data-spark="${s.id}" data-hl="${s.hl||""}"><small>${fmt(s.t)} · ${s.ai?"AI 挑的":"你畫的"}</small><span>${esc(s.text)}</span></button>`});
-  side.innerHTML=(lt?`<div class="banner"><span>點左邊的火花，加入或移除證據</span><button class="btn sm" id="d-done">完成</button></div>`:"")+
-    `<div class="dmap" id="dmap"><svg id="dsvg"></svg><div class="dcol"><div class="eyebrow">火花 ${sp.length}</div>${h}</div>
-    <div class="dright" id="dright"><div class="eyebrow">我的主張 ${S.claims.length}</div>${S.claims.length?"":`<div class="dempty">點左邊任何一個火花，寫下你的第一個主張</div>`}
-    ${S.claims.map(c=>{const n=liveEv(c).length,card=S.cards.some(k=>k.claim===c.id);return `<button class="claim lv${Math.min(3,Math.max(1,n))}${card?" carded":""}${ui.linkTo===c.id?" pick":""}" data-claim="${c.id}"><small>${card?"已成卡 · ":""}${lvName(n)} · ${n} 個證據</small>${esc(c.text)}</button>`}).join("")}</div></div>`;
-  requestAnimationFrame(layoutDistill);
+/* ---------- my points: every line I drew and every note I wrote, by chapter ---------- */
+const TAGS={i:"洞見",p:"疑問",g:"要去做"};
+const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const MEMOS=()=>S.memos||(S.memos={});
+const VIEWS=()=>S.views||(S.views={});
+const noted=id=>{const m=MEMOS();for(const k in m)if(m[k].ids&&m[k].ids.includes(id))return true;return false};
+const memoFor=ids=>{const m=MEMOS();return Object.keys(m).find(k=>m[k].ids&&m[k].ids.some(x=>ids.includes(x)))||null};
+function order(){if(order.v===V)return order.m;const m={};let n=0;SEGS.forEach(g=>g.turns.forEach(tu=>tu.s.forEach((p,si)=>{if(p)m[`${tu._id}-${si}`]=n++})));order.v=V;order.m=m;return m}
+const segAt=t=>{let g=SEGS[0];for(const x of SEGS)if(x.t<=t)g=x;return g};
+// What the reader sees for a highlighted sentence: the part that was drawn, in the language being read.
+const shown=id=>{const r=S.hl[id]&&RNG()[id];if(r)return r.zh?cut(id,"zh"):cut(id,"en");return S.mode==="en"?SENT[id].en:SENT[id].zh};
+const joinText=ids=>{const cjk=S.mode!=="en"||/^zh/i.test(V.lang||"");return ids.map(shown).join(cjk?"":" ")};
+function quoteOf(id){if(String(id).startsWith("ai-")){const g=SEGS.find(x=>"ai-"+x.id===id||"ai-"+x.t===id);return g&&(g.core||g.spark)?{text:g.core||g.spark,t:g.t,ai:true}:null}
+  return SENT[id]?{text:shown(id),t:SENT[id].t}:null}
+/* One chapter's worth: the AI's first principle, then runs of highlighted sentences, then notes. */
+function pointsOf(g){
+  const o=order(),ids=Object.keys(S.hl).filter(id=>SENT[id]&&SENT[id].seg===g).sort((a,b)=>o[a]-o[b]),blocks=[];
+  ids.forEach(id=>{const last=blocks[blocks.length-1];
+    if(last&&last.tag===S.hl[id]&&o[id]===o[last.ids[last.ids.length-1]]+1)last.ids.push(id);else blocks.push({key:"h-"+id,ids:[id],tag:S.hl[id],t:SENT[id].t})});
+  const m=MEMOS(),mine=Object.keys(m).filter(k=>{const x=m[k];return x.ids&&x.ids.length?SENT[x.ids[0]]&&SENT[x.ids[0]].seg===g:x.t!=null&&segAt(x.t)===g});
+  blocks.forEach(b=>{b.text=joinText(b.ids);b.memos=mine.filter(k=>m[k].ids&&m[k].ids.some(x=>b.ids.includes(x)))});
+  const used=new Set(blocks.flatMap(b=>b.memos));
+  return {ai:isDeep(g)&&g.core?{key:"ai-"+g.t,text:g.core,t:g.t}:null,blocks,loose:mine.filter(k=>!used.has(k)).sort((a,b)=>(m[a].at||0)-(m[b].at||0))};
 }
-function layoutDistill(){
-  const map=$("#dmap");if(!map)return;const right=$("#dright"),mr=map.getBoundingClientRect(),rr=right.getBoundingClientRect();
-  const mid=el=>{const r=el.getBoundingClientRect();return {x:r.right-mr.left,y:r.top-mr.top+r.height/2}};
-  const items=S.claims.map(c=>{const el=$(`[data-claim="${c.id}"]`,map),ev=liveEv(c).map(id=>$(`[data-spark="${id}"]`,map)).filter(Boolean).map(mid);
-    const want=ev.length?ev.reduce((a,p)=>a+p.y,0)/ev.length:60;return {c,el,ev,want,h:el.offsetHeight}}).sort((a,b)=>a.want-b.want);
-  let y=34;const off=rr.top-mr.top;
-  items.forEach(it=>{const top=Math.max(y,it.want-off-it.h/2);it.el.style.top=top+"px";it.cy=top+off+it.h/2;y=top+it.h+22});
-  right.style.minHeight=y+"px";
-  const lx=rr.left-mr.left;
-  $("#dsvg").innerHTML=items.flatMap(it=>it.ev.map(p=>`<path d="M${p.x} ${p.y} C${(p.x+lx)/2} ${p.y} ${(p.x+lx)/2} ${it.cy} ${lx} ${it.cy}"/>`)).join("");
+const wholeMemos=()=>{const m=MEMOS();return Object.keys(m).filter(k=>!(m[k].ids&&m[k].ids.length)&&m[k].t==null).sort((a,b)=>(m[a].at||0)-(m[b].at||0))};
+function memoHtml(k){const x=MEMOS()[k],quote=x.ids&&x.ids.length&&!S.hl[x.ids[0]]&&SENT[x.ids[0]]?`<small>「${esc(shown(x.ids[0]).slice(0,40))}」</small>`:"";
+  return `<button class="memo" data-memo="${esc(k)}">${x.q?`<small>${esc(x.q)}</small>`:quote}<span>${esc(x.text)}</span></button>`}
+function renderPoints(){
+  const pick=ui.pick,nH=Object.keys(S.hl).filter(id=>SENT[id]).length,nM=Object.keys(MEMOS()).length;
+  const box=key=>pick?`<i class="chk${pick.has(key)?" on":""}"></i>`:"";
+  const secs=SEGS.map((g,gi)=>{const p=pointsOf(g),n=p.blocks.length+p.loose.length;if(!n&&(ui.mine||!p.ai))return "";
+    return `<section class="pch"><header><button class="ptitle" data-seg="${g.id}"><b>${esc(g.title)}</b><small>${fmt(g.t)}${n?" · "+n+" 則":""}</small></button><button class="btn sm line" data-note-t="${g.t}">＋筆記</button></header>
+      ${p.ai&&!ui.mine?`<div class="pt ai" data-key="${p.ai.key}">${box(p.ai.key)}<div><small>AI 整理的第一性原理</small><p>${esc(p.ai.text)}</p></div></div>`:""}
+      ${p.blocks.map(b=>`<div class="pt" data-key="${b.key}" data-hl="${b.tag}">${box(b.key)}<div><small>${fmt(b.t)}${TAGS[b.tag]?" · "+TAGS[b.tag]:""}</small><p>${esc(b.text)}</p>${b.memos.map(memoHtml).join("")}</div></div>`).join("")}
+      ${p.loose.map(memoHtml).join("")}</section>`}).join("");
+  side.innerHTML=(pick?`<div class="banner"><span>已選 ${pick.size} 則</span><button class="btn sm line" id="p-cancel">取消</button><button class="btn sm" id="p-write" ${pick.size?"":"disabled"}>寫成觀點</button></div>`:"")+
+    `<div class="pad pts"><div><div class="eyebrow">畫線 ${nH} · 筆記 ${nM}</div><h2>我的重點</h2></div>
+    <div class="row"><div class="chips"><button data-mine="0" aria-pressed="${!ui.mine}">全部</button><button data-mine="1" aria-pressed="${!!ui.mine}">只看我的</button></div><span class="sp"></span>
+      ${pick?"":`<button class="btn sm line" id="p-pick">選幾則寫觀點</button>`}<button class="btn sm" id="p-copy">複製全部</button></div>
+    <div class="row"><button class="btn sm line" data-note-all>＋ 對整支影片的筆記</button></div>
+    ${wholeMemos().map(memoHtml).join("")}
+    ${secs||`<p class="meta">還沒有畫線。在「閱讀」裡選一段文字，按「畫線」。</p>`}</div>`;
 }
-window.addEventListener("resize",()=>{if(ui.side==="distill")layoutDistill()});
-function sparkSheet(id){
-  const s=sparks().find(x=>x.id===id);if(!s)return;const g=s.seg,q=s.ai?keyIds(g).map(i=>SENT[i]):[SENT[id]];
-  openSheet(`<div class="eyebrow">火花 · ${g.title}</div><p class="q-en" style="color:var(--ink)">${q.map(x=>esc(x.en)).join(" ")}</p><p class="q-zh" style="font-size:17px;font-weight:400;color:var(--mute)">${q.map(x=>esc(x.zh)).join("")}</p>
-    ${!s.ai&&S.notes[id]?`<p style="margin:0;font-weight:700">✎ ${esc(S.notes[id])}</p>`:""}
-    <div class="row">${tlink(q[0].t,"▶ 從這段播放 "+fmt(q[0].t))}</div>
-    <details><summary>這一段的第一性原理</summary><p style="margin:8px 0 0">${g.core}</p></details>
-    ${S.claims.length?`<div class="eyebrow">當成哪個主張的證據？</div><div class="linked">${S.claims.map(c=>`<button data-toggle="${c.id}" aria-pressed="${c.ev.includes(id)}"><span>${esc(c.text)}</span><span class="x">${c.ev.includes(id)?"✓":"＋"}</span></button>`).join("")}</div>`:""}
-    <div class="eyebrow">${S.claims.length?"或者寫一個新主張":"這讓你想主張什麼？"}</div><textarea id="d-new" placeholder="用你會對朋友講的方式寫一句"></textarea>
-    <div class="row"><span class="sp"></span><button class="btn" id="d-plant" disabled>種下去</button></div>`,renderDistill);
-  const ta=$("#d-new");ta.oninput=()=>$("#d-plant").disabled=ta.value.trim().length<4;
-  $("#d-plant").onclick=()=>{S.claims.push({id:"k"+Date.now().toString(36),text:ta.value.trim(),ev:[id]});commit();closeSheet();toast("種下了一顆種子")};
-  $$("[data-toggle]",sheetEl).forEach(b=>b.onclick=()=>{const c=S.claims.find(x=>x.id===b.dataset.toggle),on=c.ev.includes(id);c.ev=on?c.ev.filter(e=>e!==id):[...c.ev,id];commit();b.setAttribute("aria-pressed",!on);b.lastElementChild.textContent=on?"＋":"✓"});
+function pointsMarkdown(){
+  const m=MEMOS(),L=[`# ${V.title}`,""];
+  const w=wholeMemos();if(w.length){L.push("## 整支影片的筆記","");w.forEach(k=>L.push("- "+m[k].text.replace(/\n+/g," ")));L.push("")}
+  SEGS.forEach(g=>{const p=pointsOf(g);if(!p.blocks.length&&!p.loose.length&&(ui.mine||!p.ai))return;
+    L.push(`## ${g.title}（${fmt(g.t)}）`,"");
+    if(p.ai&&!ui.mine)L.push("- AI 整理的第一性原理："+p.ai.text);
+    p.blocks.forEach(b=>{L.push(`- 「${b.text}」${TAGS[b.tag]?"（"+TAGS[b.tag]+"）":""}`);b.memos.forEach(k=>L.push("  - 我的筆記："+m[k].text.replace(/\n+/g," ")))});
+    p.loose.forEach(k=>L.push("- 我的筆記："+(m[k].q?"（"+m[k].q+"）":"")+m[k].text.replace(/\n+/g," ")));L.push("")});
+  return L.join("\n");
 }
-function claimSheet(cid){
-  const c=S.claims.find(x=>x.id===cid);if(!c)return;const sp=sparks(),ev=liveEv(c).map(id=>sp.find(s=>s.id===id)),n=ev.length;
-  openSheet(`<div class="eyebrow">我的主張 · ${lvName(n)} · ${n} 個證據</div><textarea id="d-edit">${esc(c.text)}</textarea>
-    <div class="linked">${ev.map(s=>`<div><span>${esc(s.text)}</span><button class="x" data-unlink="${s.id}" aria-label="移除證據">×</button></div>`).join("")||`<div><span style="color:var(--mute)">還沒有證據</span></div>`}</div>
-    <p style="margin:0;font-size:15px;color:var(--mute)">${n>=2?"證據夠了，可以鑄成觀點卡。每支影片最多留 "+MAXC+" 張。":"再連 "+(2-n)+" 個證據，就能鑄成觀點卡。"}</p>
-    <div class="row"><button class="btn line sm" id="d-del">刪除</button><button class="btn line sm" id="d-add">加證據</button><span class="sp"></span><button class="btn" id="d-mint" ${n>=2?"":"disabled"}>鑄成觀點卡</button></div>`,renderDistill);
-  $("#d-edit").oninput=e=>{c.text=e.target.value;commit()};
-  $("#d-add").onclick=()=>{ui.linkTo=cid;closeSheet()};
-  $("#d-del").onclick=()=>{S.claims=S.claims.filter(x=>x.id!==cid);commit();closeSheet()};
-  $("#d-mint").onclick=()=>mintSheet(cid);
-  $$("[data-unlink]",sheetEl).forEach(b=>b.onclick=()=>{c.ev=c.ev.filter(e=>e!==b.dataset.unlink);commit();claimSheet(cid)});
+async function copyString(t){try{await navigator.clipboard.writeText(t);toast("已複製")}catch(e){openSheet(`<div class="eyebrow">請手動複製</div><textarea class="big" id="cp">${esc(t)}</textarea><div class="row"><span class="sp"></span><button class="btn" id="cp-x">關閉</button></div>`);$("#cp").select();$("#cp-x").onclick=closeSheet}}
+/* A note: tied to some sentences, to a chapter, or to nothing (the whole video). mid edits an existing one. */
+function noteSheet({ids,t,mid}){
+  let key=mid||(ids&&memoFor(ids))||null;const x=key&&MEMOS()[key];if(x){ids=x.ids;t=x.t}
+  const g=ids&&ids.length&&SENT[ids[0]]?SENT[ids[0]].seg:t!=null?segAt(t):null;
+  const head=ids&&ids.length?`<p class="q-zh">${esc(joinText(ids.filter(i=>SENT[i])).slice(0,160))}</p>`:"";
+  openSheet(`<div class="eyebrow">筆記 · ${g?esc(g.title):"整支影片"}</div>${head}${x&&x.q?`<p class="meta" style="margin:0">${esc(x.q)}</p>`:""}
+    <textarea id="n-text" class="big" placeholder="${ids&&ids.length?"這段讓你想到什麼？":g?"對這一章的想法":"對整支影片的想法"}">${esc(x?x.text:"")}</textarea>
+    <div class="row">${key?`<button class="btn sm line" id="n-del">刪除</button>`:""}<span class="sp"></span><button class="btn" id="n-done">完成</button></div>`,
+    ()=>{if(ids)ids.forEach(markSent);if(ui.side!=="overview")renderSide()});
+  const ta=$("#n-text");setTimeout(()=>ta.focus(),60);
+  ta.oninput=()=>{const v=ta.value;if(!v.trim()){if(key)delete MEMOS()[key];commit();return}
+    if(!key)key=uid("m");const old=MEMOS()[key]||{};
+    MEMOS()[key]={...old,at:old.at||Date.now(),text:v,...(ids&&ids.length?{ids}:{}),...(t!=null&&!(ids&&ids.length)?{t}:{})};commit()};
+  $("#n-done").onclick=closeSheet;const d=$("#n-del");if(d)d.onclick=()=>{delete MEMOS()[key];commit();closeSheet()};
 }
-function mintSheet(cid){
-  const c=S.claims.find(x=>x.id===cid),sp=sparks(),ev=liveEv(c).map(id=>sp.find(s=>s.id===id));
-  const tally={};ev.forEach(s=>tally[s.seg.id]=(tally[s.seg.id]||0)+1);const g=SEGS.find(x=>x.id===Object.keys(tally).sort((a,b)=>tally[b]-tally[a])[0]);
-  const others=S.cards.filter(k=>k.claim!==cid),full=others.length>=MAXC;let revised=false;
-  openSheet(`<div class="eyebrow">鑄卡之前，先過反方這一關</div><textarea id="m-text">${esc(c.text)}</textarea>
-    <div class="counter"><b>反方會說</b>${g.counter}</div><div class="ai-out" id="m-ai" hidden></div>
-    <button class="btn sm ghost ai-only" id="m-live" style="align-self:flex-start">針對我這句話再反駁一次</button>
-    ${full?`<div class="eyebrow">已經有 ${MAXC} 張了。換掉哪一張？</div><div class="linked">${others.map((k,i)=>`<button data-swap="${k.id}" aria-pressed="${i===0}"><span>${esc(k.text)}</span></button>`).join("")}</div>`:""}
-    <div class="row"><span style="font-size:15px;color:var(--mute);flex:1">改了句子會標成「修正過」。</span><button class="btn" id="m-go">${full?"換掉並收成卡片":"收成卡片"}</button></div>`,renderDistill);
-  let swap=full?others[0].id:null;
-  $$("[data-swap]",sheetEl).forEach(b=>b.onclick=()=>{swap=b.dataset.swap;$$("[data-swap]",sheetEl).forEach(x=>x.setAttribute("aria-pressed",x===b))});
-  $("#m-text").oninput=e=>{c.text=e.target.value;revised=true;commit()};
-  $("#m-live").onclick=e=>askAI(`你是嚴格但友善的辯論對手。讀者看完一段訪談，用自己的話寫下一個主張。請用繁體中文、最多 100 個字，指出這個主張最弱的一個環節（一個具體反例，或一個沒說出口的假設），最後用一個問題結尾。不要稱讚，不要重述他的話，不要條列。\n\n訪談重點：${g.sum.join(" ")}\n他引用的證據：${ev.map(s=>s.text).join("；")}\n讀者的主張：${c.text}`,$("#m-ai"),e.currentTarget);
-  $("#m-go").onclick=()=>{if(c.text.trim().length<4)return;
-    S.cards=S.cards.filter(k=>k.claim!==cid&&k.id!==swap);const card={id:"c"+Date.now().toString(36),claim:cid,text:c.text.trim(),ev:liveEv(c),revised,at:Date.now()};S.cards.push(card);commit();
-    ui.fresh=card.id;closeSheet();toast("得到一張觀點卡");setTab("cards")};
+/* A line I drew, opened from the points page. */
+function blockSheet(key){
+  const first=key.slice(2),g=SENT[first]&&SENT[first].seg;if(!g)return;const b=pointsOf(g).blocks.find(x=>x.key===key);if(!b)return;
+  openSheet(`<div class="eyebrow">${esc(g.title)} · ${fmt(b.t)}</div><p class="q-zh">${esc(b.text)}</p>
+    <div class="hl-row">${[["y","畫線","var(--hl-y)"],["i","洞見","var(--hl-i)"],["p","疑問","var(--hl-p)"],["g","要去做","var(--hl-g)"]].map(([k,l,c])=>`<button data-hl="${k}" aria-pressed="${b.tag===k}"><i style="background:${c}"></i>${l}</button>`).join("")}</div>
+    <div class="row"><button class="btn sm line" id="b-go">到逐字稿</button><button class="btn sm line" id="b-note">${b.memos.length?"改筆記":"寫筆記"}</button><span class="sp"></span><button class="btn sm line" id="b-del">移除畫線</button></div>`,renderSide);
+  $$("[data-hl]",sheetEl).forEach(x=>x.onclick=()=>{b.ids.forEach(id=>{if(S.hl[id])S.hl[id]=x.dataset.hl});commit();b.ids.forEach(markSent);closeSheet()});
+  $("#b-go").onclick=()=>{closeSheet();setTab("read");const el=$(`.s[data-id="${first}"]`,rscroll);if(el){el.scrollIntoView({block:"center"});lastUserScroll=Date.now()}};
+  $("#b-note").onclick=()=>noteSheet({ids:b.ids});
+  $("#b-del").onclick=()=>{b.ids.forEach(id=>{delete S.hl[id];delete RNG()[id]});commit();b.ids.forEach(markSent);closeSheet()};
 }
 
-/* ---------- cards ---------- */
-function evQuote(id){if(id.startsWith("ai-")){const g=SEGS.find(x=>"ai-"+x.id===id);if(!g)return null;const q=keyIds(g).map(i=>SENT[i]);if(!q.length)return null;return {en:q.map(x=>x.en).join(" "),zh:q.map(x=>x.zh).join(""),t:q[0].t}}return SENT[id]}
-function renderCards(){
-  const cards=S.cards,names={y:"洞見",p:"疑問",g:"要去做"};
-  const post=cards.length?`看完《${V.title}》，我只留下這 ${cards.length} 句：\n\n`+cards.map((k,i)=>`${i+1}. ${k.text}`).join("\n\n"):"";
-  const hl=Object.keys(S.hl).filter(id=>SENT[id]).sort((a,b)=>SENT[a].t-SENT[b].t||a.localeCompare(b)),refl=SEGS.filter(g=>(S.refl[g.id]||"").trim());
-  side.innerHTML=`<div class="pad"><div><div class="eyebrow">這支影片最多留 ${MAXC} 張</div><h2>${cards.length?"這些句子是你寫的。":"還沒有觀點卡。"}</h2></div>
-    ${cards.map(k=>`<div class="vcard${ui.fresh===k.id?" mint":""}"><div class="row"><span class="tag">${k.revised?"修正過":"原句過關"}</span><span class="sp"></span><button data-drop="${k.id}">移除</button></div><p>${esc(k.text)}</p>
-      ${k.ev.map(evQuote).filter(Boolean).filter((q,i,a)=>!a.some((o,j)=>j!==i&&o.en.includes(q.en)&&(o.en.length>q.en.length||j<i))).slice(0,3).map(q=>`<div class="ev">${esc(q.en)} ${tlink(q.t)}</div>`).join("")}</div>`).join("")}
-    ${Array.from({length:MAXC-cards.length},(_,i)=>`<div class="slot">${i===0&&!cards.length?"到「淬煉」把火花連成主張，有 2 個證據就能鑄成卡片。":"空位"}</div>`).join("")}
-    ${cards.length?`<div class="eyebrow">組成貼文</div><textarea class="big" id="c-post">${esc(post)}</textarea><div class="ai-out" id="c-ai" hidden></div>
-      <div class="row"><button class="btn" id="c-copy">複製</button><button class="btn ghost ai-only" id="c-polish">請 AI 順成一篇貼文</button></div>`:""}
-    <details><summary>全部筆記（畫線 ${hl.length} · 回答 ${refl.length}）</summary><div style="display:grid;gap:8px;margin-top:10px">
-      ${refl.map(g=>`<div class="ncard"><small>我對「${g.title}」的回答</small><span class="mine">${esc(S.refl[g.id])}</span></div>`).join("")}
-      ${hl.map(id=>{const s=SENT[id];return `<div class="ncard" data-hl="${S.hl[id]}"><small>${names[S.hl[id]]} · ${tlink(s.t)}</small><span>${esc(RNG()[id]?picked(id):s.zh)}</span>${RNG()[id]?"":`<span class="q-en" style="font-size:17px">${esc(s.en)}</span>`}${S.notes[id]?`<span class="mine">✎ ${esc(S.notes[id])}</span>`:""}</div>`}).join("")||""}
-    </div></details></div>`;
-  ui.fresh=null;
+/* ---------- my views: my own words, with the lines that led to them ---------- */
+function pickedQuotes(){const out=[];if(!ui.pick)return out;
+  SEGS.forEach(g=>{const p=pointsOf(g);if(p.ai&&ui.pick.has(p.ai.key))out.push({text:p.ai.text,t:p.ai.t,ai:true});
+    p.blocks.forEach(b=>{if(ui.pick.has(b.key))out.push({text:b.text,t:b.t})})});return out}
+function viewSheet(vid,quotes){
+  let key=vid;const v=key&&VIEWS()[key];quotes=v?v.quotes||[]:quotes||[];
+  openSheet(`<div class="eyebrow">${v?"我的觀點":"寫下我的觀點"}</div>
+    <textarea id="v-text" class="big" placeholder="用你會對朋友講的方式寫。幾句就好。">${esc(v?v.text:"")}</textarea>
+    ${quotes.length?`<div class="eyebrow">根據這幾則</div><div class="vq">${quotes.map(q=>`<div class="ev${q.ai?" ai":""}">${esc(q.text)} ${tlink(q.t)}</div>`).join("")}</div>`:""}
+    <div class="row">${v?`<button class="btn sm line" id="v-del">刪除</button>`:""}<span class="sp"></span><button class="btn" id="v-done">完成</button></div>`,
+    ()=>{ui.pick=null;renderSide()});
+  const ta=$("#v-text");setTimeout(()=>ta.focus(),60);
+  ta.oninput=()=>{const t=ta.value;if(!t.trim()){if(key)delete VIEWS()[key];commit();return}
+    if(!key)key=uid("v");VIEWS()[key]={at:(VIEWS()[key]||{}).at||Date.now(),text:t,quotes};commit()};
+  $("#v-done").onclick=()=>{const made=key&&VIEWS()[key];closeSheet();if(made&&ui.side!=="views")setTab("views")};
+  const d=$("#v-del");if(d)d.onclick=()=>{delete VIEWS()[key];commit();closeSheet()};
 }
+function renderViews(){
+  const vs=VIEWS(),keys=Object.keys(vs).sort((a,b)=>(vs[a].at||0)-(vs[b].at||0));
+  side.innerHTML=`<div class="pad pts"><div><div class="eyebrow">${keys.length} 則</div><h2>我的觀點</h2></div>
+    <div class="row"><button class="btn sm" id="v-new">＋ 寫一則觀點</button><button class="btn sm line" id="v-from">從重點挑幾則來寫</button><span class="sp"></span>${keys.length?`<button class="btn sm line" id="v-copy">複製全部</button>`:""}</div>
+    ${keys.map(k=>`<button class="vcard" data-view="${esc(k)}"><span class="vt">${esc(vs[k].text)}</span>${(vs[k].quotes||[]).length?`<small>根據 ${vs[k].quotes.length} 則重點</small>`:""}</button>`).join("")||
+      `<p class="meta">這裡放你自己的話。可以直接寫，也可以先到「重點」挑幾則畫線，再寫下你從中得到的看法。</p>`}</div>`;
+}
+function viewsText(){const vs=VIEWS();return `看完《${V.title}》，我的看法：\n\n`+Object.keys(vs).sort((a,b)=>(vs[a].at||0)-(vs[b].at||0)).map((k,i)=>`${i+1}. ${vs[k].text}`).join("\n\n")}
 
 /* ---------- shell ---------- */
 function meta(){
-  const h=Object.keys(S.hl).length,r=Object.values(S.refl).filter(v=>v&&v.trim()).length,k=S.claims.length,c=S.cards.length;
-  const done=[h>=3,r>=1,k>=1,c>=1,c>=MAXC];
-  $("#pips").innerHTML=done.map(d=>`<i class="${d?"on":""}"></i>`).join("");
-  $("#n-d").textContent=k||"";$("#n-c").textContent=c?c+"/"+MAXC:"";
-  const st=$("#steps");st.hidden=ui.side!=="distill";
-  st.innerHTML=[["畫線 "+h,h>=1],["寫主張 "+k,k>=1],["連 2 個證據",S.claims.some(x=>liveEv(x).length>=2)],["鑄卡 "+c+"/"+MAXC,c>=1]].map(([t,on],i)=>`<span class="${on?"on":""}">${i+1} ${t}</span>`).join("");
+  const h=Object.keys(S.hl).filter(id=>SENT[id]).length,v=Object.keys(VIEWS()).length;
+  $("#pips").innerHTML="";$("#n-d").textContent=h||"";$("#n-c").textContent=v||"";$("#steps").hidden=true;
 }
-function renderSide(){({overview:renderOverview,distill:renderDistill,cards:renderCards})[ui.side]();meta();
+function renderSide(){({overview:renderOverview,points:renderPoints,views:renderViews})[ui.side]();meta();
   $$("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===(ui.m==="read"?"read":ui.side)));root.dataset.m=ui.m}
-function setTab(t){closeSheet();const prev=ui.side;if(t==="read")ui.m="read";else{ui.m="side";ui.side=t}if(t!=="distill")ui.linkTo=null;renderSide();if(t!=="read"&&t!==prev)side.scrollTop=0}
+function setTab(t){closeSheet();const prev=ui.side;if(t==="read")ui.m="read";else{ui.m="side";ui.side=t}if(t!=="points")ui.pick=null;renderSide();if(t!=="read"&&t!==prev)side.scrollTop=0}
 function renderAll(){renderRead();renderSide()}
 $("#tabs").onclick=e=>{const b=e.target.closest("[data-tab]");if(b)setTab(b.dataset.tab)};
 side.addEventListener("click",e=>{
   const t=e.target.closest("button");if(!t)return;
+  if(ui.pick&&t.closest(".pt"))return;   // while picking, a tap anywhere on a line ticks it
   if(t.dataset.core!=null){ui.coreOnly=t.dataset.core==="1";renderOverview()}
   else if(t.dataset.redo)reprocess(t.dataset.redo);
   else if(t.dataset.deepen!=null)deepen(+t.dataset.deepen);
   else if(t.dataset.seg){if(t.dataset.raw!=null){ui.open.add(t.dataset.seg);renderRead()}setTab("read");const el=$("#seg-"+t.dataset.seg);el&&el.scrollIntoView({block:"start"});lastUserScroll=Date.now()}
-  else if(t.id==="d-done"){ui.linkTo=null;renderDistill()}
-  else if(t.dataset.spark){if(ui.linkTo){const c=S.claims.find(x=>x.id===ui.linkTo),id=t.dataset.spark;c.ev=c.ev.includes(id)?c.ev.filter(x=>x!==id):[...c.ev,id];commit();renderDistill()}else sparkSheet(t.dataset.spark)}
-  else if(t.dataset.claim){if(ui.linkTo){ui.linkTo=null;renderDistill()}else claimSheet(t.dataset.claim)}
-  else if(t.dataset.drop){S.cards=S.cards.filter(k=>k.id!==t.dataset.drop);commit();renderCards()}
-  else if(t.id==="c-copy")copyText($("#c-post"));
-  else if(t.id==="c-polish")askAI(`把下面這位讀者自己寫的結論整理成一篇繁體中文社群貼文，250 字以內。規則：只能使用他寫的觀點，不能加入新論點；保留他的口吻；不要勵志結尾，不要 hashtag，不要 emoji。\n\n${$("#c-post").value}`,$("#c-ai"),t);
+  else if(t.dataset.mine!=null){ui.mine=t.dataset.mine==="1";renderPoints()}
+  else if(t.id==="p-copy")copyString(pointsMarkdown());
+  else if(t.id==="p-pick"){ui.pick=new Set();renderPoints()}
+  else if(t.id==="p-cancel"){ui.pick=null;renderPoints()}
+  else if(t.id==="p-write")viewSheet(null,pickedQuotes());
+  else if(t.dataset.noteAll!=null)noteSheet({});
+  else if(t.dataset.noteT!=null)noteSheet({t:+t.dataset.noteT});
+  else if(t.dataset.memo)noteSheet({mid:t.dataset.memo});
+  else if(t.id==="v-new")viewSheet(null,[]);
+  else if(t.id==="v-from"){setTab("points");ui.pick=new Set();renderPoints()}
+  else if(t.id==="v-copy")copyString(viewsText());
+  else if(t.dataset.view)viewSheet(t.dataset.view);
 });
+// Lines and the AI's first principle are not buttons: in pick mode a tap ticks them, otherwise a line opens its sheet.
+side.addEventListener("click",e=>{if(e.target.closest("a")||(!ui.pick&&e.target.closest("button")))return;const pt=e.target.closest(".pt");if(!pt)return;const key=pt.dataset.key;
+  if(ui.pick){ui.pick.has(key)?ui.pick.delete(key):ui.pick.add(key);const top=side.scrollTop;renderPoints();side.scrollTop=top}
+  else if(key.startsWith("h-"))blockSheet(key)});
 
 /* ---------- library, adding a video, processing ---------- */
 let LIB=[{video_id:DEMO.vid,title:DEMO.title,status:"ready",demo:true}];
@@ -1068,9 +1149,9 @@ homeEl.addEventListener("click",e=>{
 });
 function openVideo(c){
   V=c;VID=c.vid;SEGS=c.segs||[];CH=c.chapters||[];THESIS=c.thesis||"";TLDR=c.tldr||[];
-  indexContent();loadState();migrateIds();bindCloud();pull();
+  indexContent();loadState();migrateIds();upgrade();bindCloud();pull();
   $("#vt").textContent=c.title+(c.channel?" · "+c.channel:"");
-  ui.side="overview";ui.m="side";ui.linkTo=null;ui.open=new Set();
+  ui.side="overview";ui.m="side";ui.pick=null;ui.open=new Set();
   root.dataset.view="video";renderAll();initYT();rscroll.scrollTop=0;side.scrollTop=0;
 }
 function goHome(){closeSheet();try{if(player&&ytOK)player.pauseVideo()}catch(e){} root.dataset.view="home";$("#vt").textContent="";renderHome()}
