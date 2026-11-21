@@ -2,7 +2,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
 /* Layout: one full-height app. Phone: one pane at a time behind a bottom tab bar. Wide: player + transcript left, overview / distill / cards right.
-   Look: a Notion-like document. White page, warm-grey ink, one sans family, hairline dividers, small radii, grey callouts, soft background-colour highlights. */
+   Look: a printed book on a wooden desk. The colours are set in the "Paper and wood" block at the end of this file; the values up here are older layers it overrides. */
 :root{
   --bg:#FFFFFF; --surf:#FFFFFF; --surf2:#F7F6F3; --hover:rgba(55,53,47,.08); --ink:#37352F; --mute:#787774; --line:rgba(55,53,47,.12);
   --acc:#2383E2; --grow:#2383E2; --warn:#D9730D; --on-acc:#FFFFFF;
@@ -410,6 +410,61 @@ textarea.big{min-height:9em}
 .linked .go{flex:1;text-align:left;text-decoration:underline;text-underline-offset:3px} .linked small{font-size:13px;color:var(--mute)}
 .chips.wrap{flex-wrap:wrap}
 .boxpage input{border:1px solid var(--line);background:var(--surf);border-radius:6px;padding:10px 12px;font-size:17px}
+
+/* ============ Paper and wood ============
+   The look of a printed book on a wooden desk. Everything above keeps its variable names; this block re-inks them.
+     page      warm cream paper, a lighter sheet for things that sit on it, kraft for callouts
+     ink       warm black, the grey of pencil for secondary text
+     wood      walnut for what you act on (header, buttons), oak for rules and markers
+     marks     highlighter yellow, ochre, clay and sage, the colours that actually get used on paper
+     thread    one red-pencil accent, used sparingly */
+:root{
+  --bg:#F3ECDD; --surf:#FAF5E9; --surf2:#EBE2CF; --hover:rgba(70,48,22,.07); --ink:#2A251E; --mute:#786C5B; --line:rgba(70,48,22,.17);
+  --indigo:#5A3E28; --navy:#3A2717; --lav:#B08C58; --lav-2:#CBAC7B; --lav-l:#E9DDC4;
+  --pink:#B4533B; --pink-d:#8C3A27; --gold:#C8A046; --blue:#5F7F68;
+  --acc:var(--indigo); --grow:var(--indigo); --link:#7B4B26; --warn:var(--pink-d); --on-acc:#FBF6EA;
+  --hl-y:#F4E4A1; --hl-i:#F0D3A6; --hl-p:#F1CFC2; --hl-g:#D6E0C3; --edge-y:var(--gold); --edge-p:var(--pink); --edge-g:var(--blue);
+  --tag-y:var(--hl-y); --tag-g:#E3D9C3; --scrim:rgba(42,28,14,.46);
+  --f-h:"Songti TC","Noto Serif TC","Source Han Serif TC","Iowan Old Style","Palatino Linotype",Georgia,serif;
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .22 0 0 0 0 .1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#1D1914; --surf:#25201A; --surf2:#2D2720; --hover:rgba(240,222,190,.07); --ink:#ECE3D2; --mute:#A79A85; --line:rgba(240,222,190,.15);
+  --indigo:#3B2A1B; --navy:#120E0A; --lav:#9C7B4C; --lav-2:#B5925F; --lav-l:#372E22;
+  --pink:#D9836B; --pink-d:#E39C86; --gold:#C8A046; --blue:#86A790;
+  --acc:#D6B580; --grow:#D6B580; --link:#D6B580; --on-acc:#1D1914;
+  --hl-y:#5B4B1D; --hl-i:#553F20; --hl-p:#5B3128; --hl-g:#34422D; --tag-g:#3A3126; --scrim:rgba(0,0,0,.62) } }
+:root[data-theme="dark"]{
+  --bg:#1D1914; --surf:#25201A; --surf2:#2D2720; --hover:rgba(240,222,190,.07); --ink:#ECE3D2; --mute:#A79A85; --line:rgba(240,222,190,.15);
+  --indigo:#3B2A1B; --navy:#120E0A; --lav:#9C7B4C; --lav-2:#B5925F; --lav-l:#372E22;
+  --pink:#D9836B; --pink-d:#E39C86; --gold:#C8A046; --blue:#86A790;
+  --acc:#D6B580; --grow:#D6B580; --link:#D6B580; --on-acc:#1D1914;
+  --hl-y:#5B4B1D; --hl-i:#553F20; --hl-p:#5B3128; --hl-g:#34422D; --tag-g:#3A3126; --scrim:rgba(0,0,0,.62) }
+
+/* paper has tooth: a faint grain over the page, none over the things laid on it */
+body{background-color:var(--bg);background-image:var(--grain)}
+/* the header is a strip of wood: long soft grain lines over walnut */
+.top{background-color:var(--indigo);color:#FBF6EA;
+  background-image:repeating-linear-gradient(92deg,rgba(255,235,200,.05) 0 2px,rgba(0,0,0,0) 2px 7px,rgba(0,0,0,.06) 7px 9px,rgba(0,0,0,0) 9px 23px),linear-gradient(180deg,rgba(255,240,215,.08),rgba(0,0,0,.12));
+  box-shadow:0 1px 0 rgba(0,0,0,.25),0 2px 6px rgba(42,28,14,.18)}
+.top .vt{color:rgba(251,246,234,.82)} .top .sync,.top .sync.link,.top .sync.warn{color:#FBF6EA}
+/* titles are set like a book */
+h1,h2,h3,.thesis,.zb b,.prow b,.ptitle b,.lcard b,.boxcard b,.item b,.q-zh,#k-title{font-family:var(--f-h);letter-spacing:.01em}
+.thesis{font-weight:700}
+/* things laid on the page are sheets of paper: a hair of shadow instead of a drawn border */
+.item,.zcard,.lcard .cover,#sheet,#selbar{box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(60,40,15,.10),0 6px 16px -10px rgba(60,40,15,.28)}
+.zcard.raw{box-shadow:inset 4px 0 0 var(--gold),0 0 0 1px var(--line),0 1px 2px rgba(60,40,15,.10)}
+.zcard.linked-on{box-shadow:0 0 0 2px var(--acc)}
+.boxcard{background:var(--lav-l);box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(60,40,15,.10)}
+.btn{background:var(--indigo);color:var(--on-acc);box-shadow:inset 0 1px 0 rgba(255,240,215,.14),0 1px 1px rgba(42,28,14,.25)}
+.btn.ghost,.btn.line{background:none;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.banner .btn{background:#FBF6EA;color:var(--navy);box-shadow:none} .banner .btn.line{background:none;color:#FBF6EA;box-shadow:inset 0 0 0 1px rgba(251,246,234,.5)}
+.a-seg>header i::before{background:var(--lav-2);color:var(--navy)}
+.tabs{background:var(--surf)}
+/* highlighter sits on the paper, slightly uneven, like the real thing */
+.s[data-hl="y"],.s[data-hl="i"],.s[data-hl="p"],.s[data-hl="g"],.s mark{border-radius:2px 5px 3px 4px}
+.cover{box-shadow:0 -4px 0 -1px var(--surf),0 -5px 0 0 var(--lav),0 -9px 0 -3px var(--surf),0 -10px 0 -2px var(--lav-2)}
+.cover i{background:rgba(42,28,14,.78)}
 
 </style>
 
@@ -1235,7 +1290,7 @@ function renderHome(){
     return;
   }
   homeEl.innerHTML=`<div class="pad home">
-    <div><h2>把看過的影片變成自己的觀點</h2><p class="meta">貼上網址，先看摘要決定值不值得細看，再精讀、畫線、淬煉成最多三張觀點卡。</p></div>
+    <div><h2>把看過的影片變成自己的觀點</h2><p class="meta">貼上網址，先看摘要決定值不值得細看，再精讀、畫線，把想法寫成自己的卡片。</p></div>
     <form id="add" class="add"><input id="add-url" type="url" inputmode="url" placeholder="貼上 YouTube 網址" ${canIngest()?"":"disabled"}><button class="btn" ${canIngest()?"":"disabled"}>加入</button></form>
     <p class="meta" id="add-msg">${why}</p>
     ${!window.claude&&sb&&!sbUser?`<div><button class="btn" id="home-login">登入</button></div>`:""}

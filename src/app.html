@@ -767,7 +767,7 @@ function renderHome(){
     return;
   }
   homeEl.innerHTML=`<div class="pad home">
-    <div><h2>把看過的影片變成自己的觀點</h2><p class="meta">貼上網址，先看摘要決定值不值得細看，再精讀、畫線、淬煉成最多三張觀點卡。</p></div>
+    <div><h2>把看過的影片變成自己的觀點</h2><p class="meta">貼上網址，先看摘要決定值不值得細看，再精讀、畫線，把想法寫成自己的卡片。</p></div>
     <form id="add" class="add"><input id="add-url" type="url" inputmode="url" placeholder="貼上 YouTube 網址" ${canIngest()?"":"disabled"}><button class="btn" ${canIngest()?"":"disabled"}>加入</button></form>
     <p class="meta" id="add-msg">${why}</p>
     ${!window.claude&&sb&&!sbUser?`<div><button class="btn" id="home-login">登入</button></div>`:""}
