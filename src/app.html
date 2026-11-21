@@ -378,21 +378,26 @@ function pointsOf(g){
 const wholeMemos=()=>{const m=MEMOS();return Object.keys(m).filter(k=>!(m[k].ids&&m[k].ids.length)&&m[k].t==null).sort((a,b)=>(m[a].at||0)-(m[b].at||0))};
 function memoHtml(k){const x=MEMOS()[k],quote=x.ids&&x.ids.length&&!S.hl[x.ids[0]]&&SENT[x.ids[0]]?`<small>「${esc(shown(x.ids[0]).slice(0,40))}」</small>`:"";
   return `<button class="memo" data-memo="${esc(k)}">${x.q?`<small>${esc(x.q)}</small>`:quote}<span>${esc(x.text)}</span></button>`}
+/* An outline, not a wall: one row per chapter, opened where I have something. Lines are quotes, notes are plain text,
+   and the only filled shape on the page is the one I am ticking. */
 function renderPoints(){
-  const pick=ui.pick,nH=Object.keys(S.hl).filter(id=>SENT[id]).length,nM=Object.keys(MEMOS()).length;
+  const pick=ui.pick,nH=Object.keys(S.hl).filter(id=>SENT[id]).length,nM=Object.keys(MEMOS()).length,fold=ui.fold||(ui.fold={});
   const box=key=>pick?`<i class="chk${pick.has(key)?" on":""}"></i>`:"";
-  const secs=SEGS.map((g,gi)=>{const p=pointsOf(g),n=p.blocks.length+p.loose.length;if(!n&&(ui.mine||!p.ai))return "";
-    return `<section class="pch"><header><button class="ptitle" data-seg="${g.id}"><b>${esc(g.title)}</b><small>${fmt(g.t)}${n?" · "+n+" 則":""}</small></button><button class="btn sm line" data-note-t="${g.t}">＋筆記</button></header>
-      ${p.ai&&!ui.mine?`<div class="pt ai" data-key="${p.ai.key}">${box(p.ai.key)}<div><small>AI 整理的第一性原理</small><p>${esc(p.ai.text)}</p></div></div>`:""}
-      ${p.blocks.map(b=>`<div class="pt" data-key="${b.key}" data-hl="${b.tag}">${box(b.key)}<div><small>${fmt(b.t)}${TAGS[b.tag]?" · "+TAGS[b.tag]:""}</small><p>${esc(b.text)}</p>${b.memos.map(memoHtml).join("")}</div></div>`).join("")}
-      ${p.loose.map(memoHtml).join("")}</section>`}).join("");
-  side.innerHTML=(pick?`<div class="banner"><span>已選 ${pick.size} 則</span><button class="btn sm line" id="p-cancel">取消</button><button class="btn sm" id="p-write" ${pick.size?"":"disabled"}>做成卡片</button></div>`:"")+
-    `<div class="pad pts"><div><div class="eyebrow">畫線 ${nH} · 筆記 ${nM}</div><h2>我的重點</h2></div>
-    <div class="row"><div class="chips"><button data-mine="0" aria-pressed="${!ui.mine}">全部</button><button data-mine="1" aria-pressed="${!!ui.mine}">只看我的</button></div><span class="sp"></span>
-      ${pick?"":`<button class="btn sm line" id="p-pick">選幾則做成卡片</button>`}<button class="btn sm" id="p-copy">複製全部</button></div>
-    <div class="row"><button class="btn sm line" data-note-all>＋ 對整支影片的筆記</button></div>
-    ${wholeMemos().map(memoHtml).join("")}
-    ${secs||`<p class="meta">還沒有畫線。在「閱讀」裡選一段文字，按「畫線」。</p>`}</div>`;
+  let anyOpen=false;
+  const secs=SEGS.map(g=>{const p=pointsOf(g),n=p.blocks.length+p.loose.length;if(!n&&(ui.mine||!p.ai))return "";
+    const open=fold[g.t]!=null?fold[g.t]:n>0;if(open)anyOpen=true;
+    return `<section class="pch${open?" open":""}"><button class="prow" data-fold="${g.t}" aria-expanded="${open}"><i class="tw"></i><span><b>${esc(g.title)}</b>${!open&&p.ai&&!ui.mine?`<small>${esc(p.ai.text)}</small>`:""}</span>${n?`<em>${n}</em>`:""}</button>
+      ${open?`<div class="pbody">
+        ${p.ai&&!ui.mine?`<div class="pt ai" data-key="${p.ai.key}">${box(p.ai.key)}<div><p><span class="ailab">AI 整理</span>${esc(p.ai.text)}</p></div></div>`:""}
+        ${p.blocks.map(b=>`<div class="pt" data-key="${b.key}" data-hl="${b.tag}">${box(b.key)}<div><p>${esc(b.text)}</p>${b.memos.map(memoHtml).join("")}</div><time>${fmt(b.t)}${TAGS[b.tag]?"<br>"+TAGS[b.tag]:""}</time></div>`).join("")}
+        ${p.loose.map(memoHtml).join("")}
+        <div class="row pfoot"><button class="quiet" data-note-t="${g.t}">＋ 這一章的筆記</button><button class="quiet" data-seg="${g.id}">到逐字稿 ›</button></div></div>`:""}</section>`}).join("");
+  side.innerHTML=(pick?`<div class="banner"><span>點你要用的那幾則：已選 ${pick.size}</span><button class="btn sm line" id="p-cancel">取消</button><button class="btn sm" id="p-write" ${pick.size?"":"disabled"}>做成卡片</button></div>`:"")+
+    `<div class="pad pts${pick?" picking":""}"><div><div class="eyebrow">畫線 ${nH} · 筆記 ${nM}</div><h2>我的重點</h2></div>
+    <div class="row ptbar"><div class="chips"><button data-mine="0" aria-pressed="${!ui.mine}">全部</button><button data-mine="1" aria-pressed="${!!ui.mine}">只看我的</button></div><span class="sp"></span>
+      <button class="quiet" id="p-fold" data-open="${anyOpen?1:0}">${anyOpen?"全部收合":"全部展開"}</button><button class="quiet" id="p-copy">複製</button>${pick?"":`<button class="btn sm" id="p-pick">做成卡片</button>`}</div>
+    <div class="pwhole">${wholeMemos().map(memoHtml).join("")}<button class="quiet" data-note-all>＋ 對整支影片寫一則筆記</button></div>
+    <div class="outline">${secs||`<p class="meta">還沒有畫線。在「閱讀」裡選一段文字，按「畫線」。</p>`}</div></div>`;
 }
 function pointsMarkdown(){
   const m=MEMOS(),L=[`# ${V.title}`,""];
@@ -546,6 +551,8 @@ side.addEventListener("click",e=>{
   else if(t.dataset.deepen!=null)deepen(+t.dataset.deepen);
   else if(t.dataset.seg){if(t.dataset.raw!=null){ui.open.add(t.dataset.seg);renderRead()}setTab("read");const el=$("#seg-"+t.dataset.seg);el&&el.scrollIntoView({block:"start"});lastUserScroll=Date.now()}
   else if(t.dataset.mine!=null){ui.mine=t.dataset.mine==="1";renderPoints()}
+  else if(t.dataset.fold!=null){const k=t.dataset.fold;(ui.fold||(ui.fold={}))[k]=t.getAttribute("aria-expanded")!=="true";const y=side.scrollTop,wy=window.scrollY;renderPoints();side.scrollTop=y;window.scrollTo(0,wy)}
+  else if(t.id==="p-fold"){const to=t.dataset.open!=="1";ui.fold={};SEGS.forEach(g=>ui.fold[g.t]=to);renderPoints()}
   else if(t.id==="p-copy")copyString(pointsMarkdown());
   else if(t.id==="p-pick"){ui.pick=new Set();renderPoints()}
   else if(t.id==="p-cancel"){ui.pick=null;renderPoints()}
@@ -800,7 +807,7 @@ function openVideo(c){
   indexContent();loadState();migrateIds();upgrade();bindCloud();pull();
   {let moved=false;for(const k in S.views||{}){const v=S.views[k];if(!CARDS()[k]&&v&&(v.text||"").trim()){CARDS()[k]={at:v.at||1,made:v.at||1,title:"",text:v.text,topic:"",links:[],quotes:(v.quotes||[]).map(q=>({...q})),vid:V.vid,vt:V.title};moved=true}}if(moved)boxCommit()}
   $("#vt").textContent=c.title+(c.channel?" · "+c.channel:"");
-  ui.side="overview";ui.m="side";ui.pick=null;ui.open=new Set();
+  ui.side="overview";ui.m="side";ui.pick=null;ui.fold={};ui.open=new Set();
   root.dataset.view="video";renderAll();initYT();rscroll.scrollTop=0;side.scrollTop=0;
 }
 function goHome(){closeSheet();try{if(player&&ytOK)player.pauseVideo()}catch(e){} root.dataset.view="home";$("#vt").textContent="";renderHome()}
