@@ -1,0 +1,12 @@
+# Secrets never go in the repo. The Gemini key lives only in Supabase's function secrets.
+.env
+.env.*
+*.pem
+*.key
+supabase/.env
+supabase/.temp/
+supabase/functions/.env
+
+# local clutter
+.DS_Store
+node_modules/
