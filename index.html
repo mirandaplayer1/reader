@@ -662,6 +662,11 @@ mark.aim{background:var(--hl-y);color:var(--ink);border-radius:2px 5px 3px 4px;p
 .absorb td,.brief-c li{-webkit-user-select:text;user-select:text}
 .segwait{margin:0 0 8px;font-size:14px} .ch header b,.ch.w1 header b{color:var(--ink);font-weight:700}
 
+/* a section's write-up in free form (paragraphs, lists, steps, tables) */
+.md{display:grid;gap:10px} .md p{margin:0;line-height:1.75} .md ul,.md ol{margin:0;padding-left:1.4em;display:grid;gap:6px} .md b{font-weight:700}
+.absorb.md p,.absorb.md li{font-size:16.5px} .ch .md{margin-top:6px} .ch .md p,.ch .md li{font-size:16px;color:var(--ink);line-height:1.7}
+.md p,.md li,.md td{-webkit-user-select:text;user-select:text}
+
 </style>
 
 <div id="root" data-m="side" data-view="home">
@@ -980,7 +985,7 @@ function renderRead(){
     const notes=Object.keys(MEMOS()).filter(k=>{const x=MEMOS()[k];return !(x.ids&&x.ids.length)&&x.t===g.t&&!(deep&&g.ask&&k==="r"+g.t)});
     const segmemos=notes.length?`<div class="segmemos">${notes.map(k=>`<button class="segmemo" data-memo="${esc(k)}">${esc(MEMOS()[k].text)}</button>`).join("")}</div>`:"";
     const tools=deep?"":pending()&&!busy?`<p class="meta segwait">這一段的整理還在寫…</p>`:`<div class="row segtools"><button class="btn sm line" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):hasZh||mono?"整理這一段":"翻譯並整理這一段"}</button></div>`;
-    const absorb=!deep?"":g.role!=null||g.points?`<div class="absorb" data-ai-t="${g.t}">
+    const absorb=!deep?"":g.body?`<div class="absorb md" data-ai-t="${g.t}">${md(g.body)}</div>`:g.role!=null||g.points?`<div class="absorb" data-ai-t="${g.t}">
       ${g.role?`<div class="eyebrow">這一段的作用</div><p class="core">${esc(g.role)}</p>`:""}
       ${(g.points||[]).length?`<div class="eyebrow">重點</div><ul>${g.points.map(pointLi).join("")}</ul>`:""}
       ${(g.tables||[]).map(t=>`<div class="tblwrap"><table>${t.title?`<caption>${esc(t.title)}</caption>`:""}<thead><tr>${t.headers.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${t.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`).join("")}
@@ -1105,6 +1110,16 @@ $$("[data-mode]").forEach(b=>b.onclick=()=>{S.mode=b.dataset.mode;commit();rscro
 /* ---------- overview ---------- */
 const segsIn=i=>SEGS.filter(g=>g.t>=CH[i].t&&(i===CH.length-1||g.t<CH[i+1].t));
 /* The top of the overview: the argument of the whole video. Older videos only have three bullet points. */
+/* A section's write-up is free text in light Markdown: paragraphs, **bold**, "- " lists, "1. " steps, "| a | b |" tables. */
+const inl=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+function md(src){const out=[];let list=null,tbl=null;
+  const flush=()=>{if(list){out.push(`<${list.tag}>${list.items.map(x=>`<li>${inl(x)}</li>`).join("")}</${list.tag}>`);list=null}
+    if(tbl){const [h,...r]=tbl;out.push(`<div class="tblwrap"><table><thead><tr>${h.map(c=>`<th>${inl(c)}</th>`).join("")}</tr></thead><tbody>${r.map(x=>`<tr>${x.map(c=>`<td>${inl(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`);tbl=null}};
+  String(src||"").split("\n").forEach(l=>{l=l.trim();let m;if(!l)return;
+    if(/^\|.*\|$/.test(l)){if(list)flush();if(!/^\|[\s:|-]+\|$/.test(l))(tbl=tbl||[]).push(l.slice(1,-1).split("|").map(x=>x.trim()));return}
+    if(m=/^[-*•]\s+(.+)$/.exec(l)){if(tbl||list&&list.tag!=="ul")flush();(list=list||{tag:"ul",items:[]}).items.push(m[1]);return}
+    if(m=/^\d+[.、)]\s*(.+)$/.exec(l)){if(tbl||list&&list.tag!=="ol")flush();(list=list||{tag:"ol",items:[]}).items.push(m[1]);return}
+    flush();out.push(`<p>${inl(l)}</p>`)});flush();return out.join("")}
 const pointLi=x=>{const m=/^([^：:，。]{1,14})[：:]\s*(.+)$/.exec(x);return m?`<li><b>${esc(m[1])}</b>：${esc(m[2])}</li>`:`<li>${esc(x)}</li>`};
 function checkHtml(ck){const rows=[["邏輯最穩的幾環",ck.solid],["沒有說明的假設",ck.assumptions],["證據的限制",ck.evidence],["前後矛盾的地方",ck.contradictions]].filter(x=>x[1]&&x[1].length);
   return rows.length?`<section class="brief-c"><div class="eyebrow">推論強弱檢查</div>${rows.map(([h,l])=>`<h4>${h}</h4><ul>${l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`).join("")}</section>`:""}
@@ -1130,11 +1145,11 @@ function renderOverview(){
     <div class="ovname"><b>${esc(V.title)}</b><small>${[V.channel?esc(V.channel):"",V.duration?fmtDur(V.duration):"",CH.length+" 章"].filter(Boolean).join(" · ")}</small></div>
     <p class="thesis">${esc(THESIS)}</p>
     ${briefHtml()}
-    <div class="eyebrow">章節</div>
-    <div class="chs">${list.map(({c,i,segs})=>{const one=segs.length===1?segs[0]:null,text=one&&one.role?one.role:c.sum||"",wait=pending()&&segs.some(g=>!isDeep(g));
+    <div class="eyebrow">分段整理</div>
+    <div class="chs">${list.map(({c,i,segs})=>{const one=segs.length===1?segs[0]:null,full=one&&one.body?one.body:"",text=one&&one.role?one.role:c.sum||"",wait=pending()&&segs.some(g=>!isDeep(g));
       return `<article class="ch" data-ai-t="${c.t}">
-      <header><b>${one?`<button class="t" data-seg="${one.id}">${esc(c.zh)}</button>`:`<span class="t">${esc(c.zh)}</span>`}${c.en?`<small>${esc(c.en)}</small>`:""}</b>${tlink(c.t)}</header>
-      ${text?`<p>${esc(text)}</p>`:wait?`<p class="meta">整理中…</p>`:""}
+      <header><b>${one?`<button class="t" data-seg="${one.id}">${i+1}. ${esc(c.zh)}</button>`:`<span class="t">${esc(c.zh)}</span>`}${c.en?`<small>${esc(c.en)}</small>`:""}</b>${tlink(c.t)}</header>
+      ${full?`<div class="md">${md(full)}</div>`:text?`<p>${esc(text)}</p>`:wait?`<p class="meta">整理中…</p>`:""}
       ${(btns=>btns?`<div class="row">${btns}</div>`:"")(segs.map(g=>isDeep(g)?(segs.length>1?`<button class="btn sm line" data-seg="${g.id}">${esc(g.title)}</button>`:"")
         :wait?"":`<button class="btn sm line" data-deepen="${SEGS.indexOf(g)}" ${ui.busy[g.id]?"disabled":""}>${ui.busy[g.id]?esc(ui.busy[g.id]):"整理這一段"}</button>`).join(""))}
     </article>`}).join("")}</div>
@@ -1165,7 +1180,7 @@ function quoteOf(id){if(String(id).startsWith("ai-")){const g=SEGS.find(x=>"ai-"
    Nothing gets on the points page by itself. */
 const AIP=()=>S.aip||(S.aip={});
 const EDITS=()=>S.edit||(S.edit={});
-const AI_SEL=".absorb li,.absorb .core,.absorb .ask,.absorb td,.ov .thesis,.brief-p p,.brief-g li,.brief-c li,.brief-r,.ch>p";
+const AI_SEL=".absorb li,.absorb .core,.absorb .ask,.absorb td,.ov .thesis,.brief-p p,.brief-g li,.brief-c li,.brief-r,.ch>p,.md p,.md li,.md td";
 function pointsOf(g){
   const o=order(),ids=Object.keys(S.hl).filter(id=>SENT[id]&&SENT[id].seg===g).sort((a,b)=>o[a]-o[b]),blocks=[];
   ids.forEach(id=>{const last=blocks[blocks.length-1];

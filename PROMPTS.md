@@ -87,8 +87,8 @@ flowchart TD
 
 ```text
 # 輸出
-把三份成果放進下面這個 JSON。(A) 的標題放 headline，第一性原理放 principle，主題區塊放 groups（每個區塊的名稱放 title，條列放 points），核心提醒放 reminder。(B) 的每一段是 sections 裡的一項，照時間順序，第一段從逐字稿第一行開始，整份逐字稿都要分到：t 是這一段開始的秒數，title 是這一段的標題，這段的作用放 role，重點放 points（條列），表格放 tables（每個表格有 title、headers、rows，rows 的每一列是 cells）；這一段沒有表格就給空陣列。(C) 的四項依序放 check 的 solid、assumptions、evidence、contradictions，每一項都是條列；哪一項沒有內容就給空陣列。
-JSON：{"lang":"<逐字稿語言的 BCP-47 代碼，例如 en、zh-TW、ja>","title":"<影片標題，看不出來就寫最貼切的一句>","host":"<訪問者或主持人的 speaker 標籤，沒有就寫空字串>","headline":"<(A) 的標題>","principle":"<(A) 的第一性原理>","groups":[{"title":"<主題區塊的名稱>","points":["<條列>"]}],"reminder":"<(A) 的核心提醒>","check":{"solid":["<邏輯最穩的一環和原因>"],"assumptions":["<未說明的假設>"],"evidence":["<證據的問題>"],"contradictions":["<矛盾>"]},"sections":[{"t":<這一段開始的秒數，必須是逐字稿裡某一行開頭方括號裡的數字>,"title":"<你為這一段標註的標題>","role":"<這段在整體論證中的作用>","points":["<重點>"],"tables":[{"title":"<表格標題>","headers":["<欄名>"],"rows":[{"cells":["<儲存格>"]}]}]}]}
+把三份成果放進下面這個 JSON。(A) 的標題放 headline，第一性原理放 principle，主題區塊放 groups（每個區塊的名稱放 title，條列放 points），核心提醒放 reminder。(B) 的每一段是 sections 裡的一項，照時間順序，第一段從逐字稿第一行開始，整份逐字稿都要分到：t 是這一段開始的秒數，title 是這一段的標題，這一段的整理全文放 body，是一段文字，照步驟三的寫法自由安排：段落之間空一行，條列每行用「- 」開頭，有先後的步驟用「1. 」編號，要強調的引導詞用 **粗體**，表格用 | 欄 | 欄 | 的寫法（第一列是欄名）。(C) 的四項依序放 check 的 solid、assumptions、evidence、contradictions，每一項都是條列；哪一項沒有內容就給空陣列。
+JSON：{"lang":"<逐字稿語言的 BCP-47 代碼，例如 en、zh-TW、ja>","title":"<影片標題，看不出來就寫最貼切的一句>","host":"<訪問者或主持人的 speaker 標籤，沒有就寫空字串>","headline":"<(A) 的標題>","principle":"<(A) 的第一性原理>","groups":[{"title":"<主題區塊的名稱>","points":["<條列>"]}],"reminder":"<(A) 的核心提醒>","check":{"solid":["<邏輯最穩的一環和原因>"],"assumptions":["<未說明的假設>"],"evidence":["<證據的問題>"],"contradictions":["<矛盾>"]},"sections":[{"t":<這一段開始的秒數，必須是逐字稿裡某一行開頭方括號裡的數字>,"title":"<你為這一段標註的標題>","body":"<這一段的整理全文>"}]}
 
 # 逐字稿
 每一行開頭的方括號是那一行開始的秒數，這就是時間戳。
@@ -109,9 +109,7 @@ JSON：{"lang":"<逐字稿語言的 BCP-47 代碼，例如 en、zh-TW、ja>","ti
 | reminder | 總覽「核心提醒」 |
 | check | 總覽「推論強弱檢查」的四類 |
 | sections[].title | 章節標題 |
-| sections[].role | 閱讀頁每段的「這一段的作用」，也顯示在總覽的章節清單 |
-| sections[].points | 閱讀頁每段的「重點」 |
-| sections[].tables | 重點下面的表格 |
+| sections[].body | 每段的整理全文。顯示在總覽的「分段整理」和閱讀頁每段逐字稿下面 |
 
 ## 三、① 聽寫逐字稿
 
@@ -146,5 +144,5 @@ Return JSON only: {"turns":[{"ts":"MM:SS","speaker":"name","text":"..."}],"visua
 
 ## 五、不在自動流程裡的
 
-- **重寫單一段**：某一段的整理失敗或你想重寫時，閱讀頁會出現「整理這一段」。它送出你的寫作規範、步驟三和最後自我檢查，加上那一段的逐字稿。
+- **重寫單一段**：某一段的整理失敗或你想重寫時，閱讀頁會出現「整理這一段」。它送出你的寫作規範、步驟三和最後自我檢查，加上那一段的逐字稿，回來的一樣是那一段的整理全文。
 - **請 AI 解釋這句**（點句子後的面板）：只在 Claude 預覽頁有作用，部署版沒有接上。

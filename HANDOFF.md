@@ -2,6 +2,17 @@
 
 每次收工更新這一頁。最新的放最上面，舊的可以刪。規則見 `CLAUDE.md`。
 
+## 2026-11-23 晚：分析改由 Claude 寫，分段整理改成自由格式
+
+- Miranda 決定：影片的分析預設由 Claude 寫再寫回資料庫，Gemini 只當備援。做法在 `docs/claude-analysis.md`。
+  寫回用資料庫函式 `public.reader_apply_analysis`（定義在 `supabase/schema.sql` 最後，已套用到資料庫）。
+- 分段整理 (B) 的格式換了：每段是一塊自由格式的文字 `segs[].body`（段落、粗體、條列、編號、表格），
+  不再拆成 `role`／`points`／`tables`。舊格式畫面仍會顯示。總覽的「分段整理」直接列出每段全文。
+- **後端沒有重新部署**：repo 的 `pipeline.js` 已經改成要 AI 回 `body`，也多了 `work.given`，但部署的還是第 15 版（回 `role`／`points`）。
+  Gemini 的預付額度 2026-11-23 用完了，儲值前部署了也跑不動。儲值後要部署並用測試帳號跑一支真影片。
+- 她的影片有哪些已經由 Claude 寫過：`select video_id, work->>'by', content->'segs'->0 ? 'body' from public.videos`。
+  `by = claude` 且第一段有 `body` 的是新格式；有 `by` 沒 `body` 的是舊格式，要重寫分段整理（只送 `sections`）。
+
 ## 目前狀態（2026-11-23，雲端 agent 交給本機 Claude Code CLI）
 
 Miranda 決定之後由本機的 Claude Code CLI 接手。雲端這邊的每小時排程已停用，不會再自己動 repo 或 Notion。
@@ -11,6 +22,7 @@ Miranda 決定之後由本機的 Claude Code CLI 接手。雲端這邊的每小�
 | 前端 | `main` 是最新，已上線。最後合併的是 PR #26 |
 | 後端 | Edge function `ingest` **第 15 版**（2026-11-23，commit `1f36622` 的內容）。repo 裡的 `supabase/functions/ingest/` 就是部署的版本。**第 15 版還沒用真的 AI 跑過**，見下面 |
 | 資料庫 | 跟 `supabase/schema.sql` 一致，沒有待套用的變更 |
+| 後端（更新） | 見上面一節：repo 比部署的第 15 版新 |
 | 測試 | 五組全過（見 `CLAUDE.md` 的測試一節） |
 | 沒推上去的東西 | 沒有 |
 

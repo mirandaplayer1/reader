@@ -25,11 +25,11 @@ const fetchStub = async (url, opt) => {
     out = { turns: real.filter(t => t.t >= a && t.t < b), visuals: a === 0 ? [{ t: 30, text: 'nomadlist.com' }] : [], reached_end: b > 2200 };
   } else {
     const p = parts[0].text;
-    const sec = (t, title) => ({ t, title, role: '這一段提出整場的核心機制：用付款當作驗證。', points: ['付款驗證：有人刷卡才算數，註冊和稱讚不算。', '兩週上線一個小產品。', '多數嘗試會失敗。'], tables: [{ title: '兩種做法', headers: ['做法', '代價'], rows: [{ cells: ['先募資', '時間長'] }, { cells: ['先上線', '兩週'] }] }] });
+    const sec = (t, title) => ({ t, title, body: '這一段提出整場的核心機制：用付款當作驗證。\\n\\n**心智模型：** 有人刷卡才算數，註冊和稱讚不算。\\n\\n- 兩週上線一個小產品。\\n- 多數嘗試會失敗。\\n\\n1. 先放付款按鈕\\n2. 再寫功能\\n\\n| 做法 | 代價 |\\n|---|---|\\n| 先募資 | 時間長 |\\n| 先上線 | 兩週 |' });
     if (p.includes('"sections"')) out = { lang: 'en', title: 'x', host: 'Lex Fridman', headline: '一個人靠快速上線的小實驗找到會賺錢的產品。', principle: '沒有人能事先知道哪個點子會成，所以要讓每次嘗試都便宜。', groups: [{ title: '起點', points: ['付款驗證：有人刷卡才算數。', '兩週上線。'] }], reminder: '先放一個付款按鈕。', check: { solid: ['付款是有成本的訊號。'], assumptions: ['假設每個產品都能兩週做完。'], evidence: [], contradictions: [] },
       sections: [sec(0, '開場'), sec(125, '不募資快速驗證'), sec(574, '低潮'), sec(1195, '旅居')] };
     else if (p.includes('"zh":[')) out = { zh: p.split('\n').filter(l => /^\d+\. /.test(l)).map(l => '（譯）' + l.replace(/^\d+\. /, '').slice(0, 24)) };
-    else out = { role: '這一段提出整場的核心機制：用付款當作驗證。', points: ['付款驗證：有人刷卡才算數，註冊和稱讚不算。', '兩週上線一個小產品。', '多數嘗試會失敗。'], tables: [{ title: '兩種做法', headers: ['做法', '代價'], rows: [{ cells: ['先募資', '時間長'] }, { cells: ['先上線', '兩週'] }] }], key: [4, 5] };
+    else out = { body: '這一段提出整場的核心機制：用付款當作驗證。\\n\\n**心智模型：** 有人刷卡才算數，註冊和稱讚不算。\\n\\n- 兩週上線一個小產品。\\n- 多數嘗試會失敗。\\n\\n1. 先放付款按鈕\\n2. 再寫功能\\n\\n| 做法 | 代價 |\\n|---|---|\\n| 先募資 | 時間長 |\\n| 先上線 | 兩週 |', key: [4, 5] };
   }
   return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(out) }] } }] }) };
 };
@@ -105,13 +105,13 @@ for (const r of rows.values()) { let n = 0; while (['translate', 'analyse'].incl
 await p.click('#gohome'); await p.waitForTimeout(300); await p.click('.item-row:nth-child(2) .item'); await p.waitForTimeout(500); await p.evaluate(() => setTab('read'));
 await p.waitForFunction(() => !!document.querySelector('#seg-c1 .absorb'), null, { timeout: 60000 });
 const zh = await p.textContent('#seg-c1 .turn:nth-of-type(2) .zh'); const en = await p.textContent('#seg-c1 .turn:nth-of-type(2) .en');
-console.log('deepened: zh starts', zh.slice(0, 16), '| en starts', en.slice(0, 30), '| core', await p.textContent('#seg-c1 .core'));
+console.log('deepened: zh starts', zh.slice(0, 16), '| en starts', en.slice(0, 30), '| core', await p.textContent('#seg-c1 .absorb p'));
 await p.evaluate(() => document.querySelector('#seg-c1').scrollIntoView()); await p.screenshot({ path: D + '/i-deep.png' });
 // 6. highlight, distill, card on generated content; state goes to the (stub) cloud
 await p.click('#seg-c1 .zh .s >> nth=4'); await p.click('#sheet [data-hl=y]'); await p.click('#a-done');
 await p.click('[data-tab=points]'); await p.waitForSelector('.pts');
 const selAI = q => p.evaluate(q => { const el = document.querySelector(q), r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return el.textContent; }, q);
-await p.evaluate(() => setTab('read')); await selAI('#seg-c1 .core'); await p.waitForSelector('#selbar [data-ai-save]'); await p.click('#selbar [data-ai-save]:not([data-note])');
+await p.evaluate(() => setTab('read')); await selAI('#seg-c1 .absorb p'); await p.waitForSelector('#selbar [data-ai-save]'); await p.click('#selbar [data-ai-save]:not([data-note])');
 await p.click('[data-tab=points]'); await p.waitForSelector('.pts');
 console.log('points: my lines', await p.locator('.pcard.hl').count(), '| AI passages I marked', await p.locator('.pcard.ai').count());
 await p.click('#p-pick'); await p.click('.pcard.ai'); await p.click('.pcard.hl'); await p.click('#p-write'); await p.fill('#k-text', '沒有人付錢之前都只是想像'); await p.click('#k-done'); await p.waitForSelector('.zcard'); await p.waitForTimeout(1500);
