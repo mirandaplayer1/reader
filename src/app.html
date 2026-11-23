@@ -204,21 +204,21 @@ function follow(){
   nowTurn=hit;const id=hit?hit.id:null;
   if(id!==nowId){nowId=id;
     $$(".turn.now",rscroll).forEach(e=>e.classList.remove("now"));
-    const el=id&&$(`[data-turn="${id}"]`,rscroll);
+    const el=id&&$(`[data-turns~="${id}"]`,rscroll);
     if(el){el.classList.add("now");if(Date.now()-lastUserScroll>4000)el.scrollIntoView({block:"center",behavior:"smooth"})}}
   showToNow();
 }
 /* The button appears whenever the line being played is off screen or inside a collapsed chapter. */
 function showToNow(){
   const b=$("#tonow");if(!nowTurn){b.hidden=true;return}
-  const el=$(`[data-turn="${nowTurn.id}"]`,rscroll);let off=true;
+  const el=$(`[data-turns~="${nowTurn.id}"]`,rscroll);let off=true;
   if(el){const r=el.getBoundingClientRect(),v=rscroll.getBoundingClientRect();off=r.bottom<v.top+8||r.top>v.bottom-8}
   b.hidden=!off;
 }
 function goToNow(){
   if(!nowTurn)return;
-  if(!$(`[data-turn="${nowTurn.id}"]`,rscroll)){ui.open.add(nowTurn.seg);renderRead()}
-  const el=$(`[data-turn="${nowTurn.id}"]`,rscroll);if(!el)return;
+  if(!$(`[data-turns~="${nowTurn.id}"]`,rscroll)){ui.open.add(nowTurn.seg);renderRead()}
+  const el=$(`[data-turns~="${nowTurn.id}"]`,rscroll);if(!el)return;
   el.classList.add("now");nowId=nowTurn.id;lastUserScroll=0;el.scrollIntoView({block:"center",behavior:"smooth"});$("#tonow").hidden=true;
 }
 $("#tonow").onclick=goToNow;
@@ -242,12 +242,14 @@ function renderRead(){
   root.classList.toggle("mono",mono);
   rscroll.className="scroll m-"+S.mode;
   const multi=new Set(SEGS.flatMap(g=>g.turns.filter(tu=>!isScreen(tu)).map(tu=>tu.sp))).size>1;
-  rscroll.innerHTML=`<div class="rin">`+SEGS.map((g,gi)=>{let prev=null;
+  const lead=leads();
+  rscroll.innerHTML=`<div class="rin">`+SEGS.map((g,gi)=>{let prev=null,lastT=g.t;
     const deep=isDeep(g),hasZh=!deep&&g.turns.some(tu=>tu.s.some(p=>p&&p[1]&&p[1]!==p[0])),open=true,busy=ui.busy[g.id];
-    const body=!open?"":g.turns.map((tu,ti)=>{const ids=tu.s.map((p,si)=>p?`${tu._id}-${si}`:null);const line=l=>ids.map(id=>id?span(id,l):`<span class="gap">[…]</span>`).join(l==="en"?" ":"");
-      if(isScreen(tu))return `<details class="turn screen" data-turn="${tu._id}"><summary>畫面</summary><p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></details>`;
-      const name=multi&&tu.sp!==prev?esc(who(tu)).toUpperCase():"";prev=tu.sp;const time=ti===0&&tu.t===g.t?"":tlink(tu.t);
-      return `<div class="turn sp-${tu.sp===V.host?"L":"P"}" data-turn="${tu._id}">${name||time?`<div class="who${name?"":" bare"}">${name?`<b>${name}</b>`:""}${time}</div>`:""}<p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></div>`}).join("");
+    const body=!open?"":paragraphs(gi,lead).map((u,ui_)=>{const ids=[];u.parts.forEach(({tu,from,to})=>{for(let si=from;si<to;si++)ids.push(tu.s[si]?`${tu._id}-${si}`:null)});
+      const line=l=>ids.map(id=>id?span(id,l):`<span class="gap">[…]</span>`).join(l==="en"?" ":""),tu=u.parts[0].tu,all=[...new Set(u.parts.map(x=>x.tu._id))].join(" ");
+      if(u.screen)return `<details class="turn screen" data-turn="${tu._id}" data-turns="${all}"><summary>畫面</summary><p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></details>`;
+      const name=multi&&tu.sp!==prev?esc(who(tu)).toUpperCase():"";prev=tu.sp;const time=tu.t===lastT?"":tlink(tu.t);lastT=tu.t;
+      return `<div class="turn sp-${tu.sp===V.host?"L":"P"}" data-turn="${tu._id}" data-turns="${all}">${name||time?`<div class="who${name?"":" bare"}">${name?`<b>${name}</b>`:""}${time}</div>`:""}<p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></div>`}).join("");
     const notes=Object.keys(MEMOS()).filter(k=>{const x=MEMOS()[k];return !(x.ids&&x.ids.length)&&x.t===g.t&&!(deep&&k==="r"+g.t)});
     const segmemos=notes.length?`<div class="segmemos">${notes.map(k=>`<button class="segmemo" data-memo="${esc(k)}">${esc(MEMOS()[k].text)}</button>`).join("")}</div>`:"";
     const tools=deep?"":`<div class="row segtools">${open?"":`<button class="btn sm line" data-open="${g.id}">顯示原文</button>`}<button class="btn sm" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):hasZh||mono?"補上摘要和第一性原理":"精讀這一章（翻譯＋第一性原理）"}</button></div>`;
@@ -263,6 +265,26 @@ function renderRead(){
   paintAI(rscroll);rscroll.scrollTop=top;nowId=null;showChap();
   $$("[data-mode]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===S.mode));
 }
+/* The transcript arrives in turns of twenty-odd seconds, cut wherever the clock said, often in the middle of a sentence.
+   For reading, turns are joined into paragraphs that end where a sentence ends. Only the display changes: every sentence
+   keeps its own id, so highlights and notes are untouched.
+   A chapter can also stop mid-sentence; then the rest of that sentence, which opens the next chapter, is shown at the end of this one. */
+const SENT_END=/[。！？?!.…][」』”’"'）)\]]*\s*$/;
+const turnText=(tu,from,to)=>tu.s.slice(from||0,to==null?tu.s.length:to).filter(Boolean).map(p=>p[0]).join(" ");
+const speech=g=>g.turns.filter(tu=>!isScreen(tu)&&tu.s.some(Boolean));
+function leads(){return SEGS.map((g,gi)=>{if(!gi)return 0;const a=speech(SEGS[gi-1]),b=speech(g);if(!a.length||!b.length)return 0;
+  const last=a[a.length-1],first=b[0];if(last.sp!==first.sp||SENT_END.test(turnText(last))||!first.s[0])return 0;
+  return b.length===1&&first.s.length===1?0:1})}
+function paragraphs(gi,lead){const g=SEGS[gi],out=[];let cur=null;
+  g.turns.forEach(tu=>{if(!tu.s.some(Boolean)&&!isScreen(tu))return;
+    if(isScreen(tu)){out.push({screen:true,parts:[{tu,from:0,to:tu.s.length}]});cur=null;return}
+    const from=tu===speech(g)[0]?lead[gi]:0,n=tu.s.length;if(from>=n)return;
+    const add=(a,b)=>{if(cur&&cur.sp===tu.sp&&!cur.done)cur.parts.push({tu,from:a,to:b});else{cur={sp:tu.sp,parts:[{tu,from:a,to:b}]};out.push(cur)}};
+    // whole sentences close the paragraph; a sentence left hanging at the end of the turn opens the next one
+    if(SENT_END.test(turnText(tu,from))){add(from,n);cur.done=true}
+    else{if(n-from>1){add(from,n-1);cur.done=true}add(n-1,n);cur.done=false}});
+  const next=SEGS[gi+1];if(next&&lead[gi+1]){const tu=speech(next)[0],part={tu,from:0,to:lead[gi+1]};if(cur&&!cur.done)cur.parts.push(part);else out.push({sp:tu.sp,parts:[part]})}
+  return out}
 const isScreen=tu=>/^(on[ -]?screen|screen|畫面)$/i.test(String(who(tu)||"").trim());
 /* Where I am in the video: the chapter whose heading has passed the top of the reading pane. It is shown on the chapter
    button, and saved (by the chapter's second, never its number) so the video opens where I left it on any device. */
