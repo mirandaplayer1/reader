@@ -98,14 +98,14 @@ const TRANSCRIPT_SCHEMA = {
 const STR = { type: "STRING" }, INT = { type: "INTEGER" };
 const LIST = (items) => ({ type: "ARRAY", items });
 const OBJ = (properties) => ({ type: "OBJECT", properties, required: Object.keys(properties) });
-const CHAPTER_ITEM = OBJ({ t: INT, en: STR, zh: STR, sum: STR, take: STR, worth: INT });
+const CHAPTER_ITEM = OBJ({ t: INT, en: STR, zh: STR, sum: STR, worth: INT });
 const CHECK = OBJ({ solid: LIST(STR), assumptions: LIST(STR), evidence: LIST(STR), contradictions: LIST(STR) });
 const META = { lang: STR, title: STR, host: STR, headline: STR, principle: STR, groups: LIST(OBJ({ title: STR, points: LIST(STR) })), reminder: STR, check: CHECK };
 const SCHEMA = {
   window: OBJ({ chapters: LIST(CHAPTER_ITEM) }),
   synth: OBJ(META),
   translate: OBJ({ zh: LIST(STR) }),
-  analysis: OBJ({ role: STR, points: LIST(STR), tables: LIST(OBJ({ title: STR, headers: LIST(STR), rows: LIST(OBJ({ cells: LIST(STR) })) })), key: LIST(INT) }),
+  analysis: OBJ({ role: STR, points: LIST(STR), tables: LIST(OBJ({ title: STR, headers: LIST(STR), rows: LIST(OBJ({ cells: LIST(STR) })) })) }),
 };
 
 async function gemini(deps, model, parts, maxTokens = 32768, schema = null) {
@@ -193,9 +193,10 @@ const TITLES = `標題怎麼下（zh 欄位）：
 - 不用驚嘆號、引號，也不用「揭秘」「真相」「你不知道的」這類標題黨字眼。
 - 同一份逐字稿的例子半句之間，不要重複句型。`;
 
-// The overview and the chapter notes follow one prompt the owner wrote herself (2026-11-23). It is kept in her words and
-// only cut into the parts each request needs: RULES go to both, DECOMPOSE + BRIEF + CHECK_SPEC write the overview,
-// SECTION writes one chapter. What was added is the mapping from her headings to the JSON fields the app stores.
+// The overview and the chapter notes follow one prompt the owner wrote herself (2026-11-23). These constants are her text
+// WORD FOR WORD, only cut into the parts each request needs: RULES go to both, DECOMPOSE + BRIEF + CHECK_SPEC write the
+// overview, SECTION writes one chapter. Do not edit them. Which heading goes into which JSON field is said outside them,
+// in the "# 輸出" part of each request.
 const RULES = `# 寫作規範
 - 使用繁體中文，句子要完整、流暢。不要用箭頭、破折號串接的片段或電報式縮寫；靠清楚的結構維持資訊密度，不要靠壓縮。
 - 避免 AI 腔：不用「這不是 X，而是 Y」的對仗句，不寫勵志式結尾，不把原文換句話說再倒回來。
@@ -216,39 +217,35 @@ const DECOMPOSE = `# 步驟一：先拆解（不輸出，作為內部工作）
 const BRIEF = `# 步驟二：輸出 (A) 第一性原理摘要
 格式如下：
 
-**標題**（headline 欄位）：兩句話。第一句講核心判斷，第二句講這帶來什麼能力或結果。
+**標題**：兩句話。第一句講核心判斷，第二句講這帶來什麼能力或結果。
 
-**第一性原理**（principle 欄位）：一段完整的散文，4 到 6 句，依序寫出前提、瓶頸、機制、複利或後果，讓讀者讀完就能自己重建整條推論。
+**第一性原理**：一段完整的散文，4 到 6 句，依序寫出前提、瓶頸、機制、複利或後果，讓讀者讀完就能自己重建整條推論。
 
-接著依講者內容分成 3 到 5 個主題區塊（groups 欄位。例如：起點、核心架構、實踐步驟、產權與防禦），每個區塊 2 到 5 個條列（points）。每個條列寫成完整句子，格式為「概念：一句說明」。凡是講者提出的「機制」，都要寫出它怎麼運作，不能只寫名稱。
+接著依講者內容分成 3 到 5 個主題區塊（例如：起點、核心架構、實踐步驟、產權與防禦），每個區塊 2 到 5 個條列。每個條列寫成完整句子，格式為「概念：一句說明」。凡是講者提出的「機制」，都要寫出它怎麼運作，不能只寫名稱。
 
-**核心提醒**（reminder 欄位）：一句可以立即執行的行動。`;
+**核心提醒**：一句可以立即執行的行動。`;
 
 const CHECK_SPEC = `# 步驟四：輸出 (C) 推論強弱檢查
 針對步驟一的推論鏈，逐環標出：
-- 哪幾環邏輯最穩，為什麼。（check.solid）
-- 哪幾環藏有未說明的假設。（check.assumptions）
-- 哪些證據來自講者本人或其利益相關機構、只能證明相關性，或無法歸因。（check.evidence）
-- 講者的主張和他自己的做法或其他段落之間，有沒有矛盾。（check.contradictions）
-直接點出問題，不需要迴避或平衡措辭。四個欄位都是條列，每條一個完整句子；某一項真的沒有，就給空陣列，不要硬湊。`;
+- 哪幾環邏輯最穩，為什麼。
+- 哪幾環藏有未說明的假設。
+- 哪些證據來自講者本人或其利益相關機構、只能證明相關性，或無法歸因。
+- 講者的主張和他自己的做法或其他段落之間，有沒有矛盾。
+直接點出問題，不需要迴避或平衡措辭。`;
 
 const SELF_CHECK = `# 最後自我檢查（不輸出）
-逐條比對每個條列與逐字稿：是否有誇大、誤讀、遺漏講者的限制條件，或術語前後不一致？發現問題就修正後再輸出。`;
+逐條比對 (A) 和 (B) 的每個條列與逐字稿：是否有誇大、誤讀、遺漏講者的限制條件，或術語前後不一致？發現問題就修正後再輸出。`;
 
 const SECTION = `# 步驟三：輸出 (B) 分段整理
-這一次只整理下面這一段。
-- role 欄位：先寫一兩句說明這段在整體論證中的作用。
-- points 欄位：再整理重點，3 到 7 個條列，每個條列寫成完整句子。
-- 遇到核心概念時，先給心智模型或類比，再講細節。凡是講者提出的「機制」，都要寫出它怎麼運作，不能只寫名稱。
-- tables 欄位：適合比較的內容（例如講者回應的質疑、兩種對照情境）用表格呈現，每個表格有標題（title）、欄名（headers）和每一列的儲存格（rows[].cells）。這一段沒有適合比較的內容就給空陣列，不要硬湊。
-- 引用原文要短，盡量轉述。
-- key 欄位：最能代表這一段的 1 到 2 個句子編號，要相鄰。`;
+- 依逐字稿的原始段落（含時間戳）逐段整理。若原文沒有分段，就依主題轉折自行分段並標註。
+- 每段先寫一兩句說明這段在整體論證中的作用，再整理重點。
+- 遇到核心概念時，先給心智模型或類比，再講細節。
+- 適合比較的內容（例如講者回應的質疑、兩種對照情境）用表格呈現。
+- 引用原文要短，盡量轉述。`;
 
 const EX_CHAPTER = `寫法對照（標題以外的欄位）：
 sum　 好：「他不拿創投，設計、程式、logo 全部自己來。點子兩週內上線，有人刷卡才算數。」
-　　　不好：「分享不拿創投的獨立開發模式，將點子做成微型產品並在兩週內上線，直接用用戶刷卡付款驗證需求。」
-take　好：「卡住的時候，給自己一個每月要上線一次的期限。」
-　　　不好：「陷入停滯時設定固定週期的上線挑戰，用強制發布逼迫自己持續產出。」`;
+　　　不好：「分享不拿創投的獨立開發模式，將點子做成微型產品並在兩週內上線，直接用用戶刷卡付款驗證需求。」`;
 
 /* ---------- ingest: meta -> transcribe (chunk by chunk) -> outline (-> seams -> synth for long videos) -> ready (-> translate -> analyse, in the background) ---------- */
 
@@ -329,7 +326,7 @@ export async function ingestStep(row, deps) {
   // Chapters are cut one hour of transcript at a time, so no single request grows with the length of the video.
   const CHAPTER_SPEC =
     `{"t":<這一章開始的秒數，必須是逐字稿裡某一行的秒數>,"en":"<原文語言的短標題>","zh":"<中文標題，格式是「概念：具體例子」，照下面「標題怎麼下」的規則寫>",` +
-    `"sum":"<兩三個短句，75 字內，講者實際說了或做了什麼，帶具體的數字、名稱、做法>","take":"<一句 40 字內可帶走的原則；純閒聊、或內容本身沒有可帶走的道理就留空字串，不要硬湊>","worth":<1 到 3 的整數，3 是核心>}`;
+    `"sum":"<兩三個短句，75 字內，講者實際說了或做了什麼，帶具體的數字、名稱、做法>","worth":<1 到 3 的整數，3 是核心>}`;
   const CHAPTER_RULES =
     `- 依講者的論點切換來分段，不要依時間平均切。\n` +
     `- 一段只講一個主要論點，通常是 3 到 10 分鐘的內容。任何一章都不要超過 15 分鐘。\n` +
@@ -341,7 +338,7 @@ export async function ingestStep(row, deps) {
   const cleanChapters = (list, starts) => {
     const snap = (t) => starts.reduce((best, x) => (Math.abs(x - t) < Math.abs(best - t) ? x : best), starts[0]);
     return (Array.isArray(list) ? list : [])
-      .map((c) => ({ t: snap(Number(c.t) || 0), en: String(c.en || ""), zh: String(c.zh || ""), sum: String(c.sum || ""), take: String(c.take || ""), worth: Math.min(3, Math.max(1, Math.round(Number(c.worth) || 1))) }))
+      .map((c) => ({ t: snap(Number(c.t) || 0), en: String(c.en || ""), zh: String(c.zh || ""), sum: String(c.sum || ""), take: "", worth: Math.min(3, Math.max(1, Math.round(Number(c.worth) || 1))) }))
       .sort((x, y) => x.t - y.t);
   };
   const finish = (meta, chapters) => {
@@ -442,12 +439,13 @@ export async function ingestStep(row, deps) {
 
   if (work.phase === "synth") {
     const chapters = work.chapters || [];
-    const list = chapters.map((c, i) => `${i}. [${clock(c.t)}] ${c.zh}：${c.sum}${c.take ? " → " + c.take : ""}`).join("\n");
+    const list = chapters.map((c, i) => `${i}. [${clock(c.t)}] ${c.zh}：${c.sum}`).join("\n");
     const all = work.turns.map((t) => `${t.speaker}: ${t.text}`).join("\n").slice(0, 600000);
     const prompt =
       `# 任務\n分析下方的逐字稿，產出兩份成果：(A) 第一性原理摘要，(C) 推論強弱檢查。（(B) 分段整理會逐段另外處理，這一次不用寫。）用 JSON 輸出。\n\n` +
       `${RULES}\n\n${DECOMPOSE}\n\n${BRIEF}\n\n${CHECK_SPEC}\n\n${SELF_CHECK}\n\n` +
-      `# 輸出\nJSON：{${META_SPEC}}\n\n` +
+      `# 輸出\n把 (A) 和 (C) 放進下面這個 JSON。(A) 的標題放 headline，第一性原理放 principle，主題區塊放 groups（每個區塊的名稱放 title，條列放 points），核心提醒放 reminder。` +
+      `(C) 的四項依序放 check 的 solid、assumptions、evidence、contradictions，每一項都是條列；哪一項沒有內容就給空陣列。\nJSON：{${META_SPEC}}\n\n` +
       `# 章節\n這支影片已經切好的章節，讓你知道內容的範圍。摘要和檢查要以逐字稿為準，要看完整份再寫。\n${list}\n\n# 逐字稿\n<transcript>\n${all}\n</transcript>`;
     const out = await llmJSON(deps, prompt, 16000, SCHEMA.synth);
     return finish(out, chapters);
@@ -563,20 +561,19 @@ export async function deepenStep(row, k, deps) {
   const numbered = flat.map((x, i) => `${i}. ${seg.turns[x.ti].sp}: ${x.p[0]}`).join("\n");
   const brief = content.brief || {};
   const prompt =
-    `# 任務\n分析下方的逐字稿。它是一支影片的其中一段，每句前面有編號。整支影片的 (A) 第一性原理摘要已經寫好，附在下面。請寫這一段的 (B) 分段整理，用 JSON 輸出。\n\n` +
+    `# 任務\n分析下方的逐字稿，產出 (B) 分段整理。這份逐字稿是一支影片依主題轉折分好的其中一段，這一次只整理這一段。整支影片的 (A) 第一性原理摘要已經寫好，附在下面，讓你知道整體論證。用 JSON 輸出。\n\n` +
     `${RULES}\n\n${SECTION}\n\n${SELF_CHECK}\n\n` +
-    `# 輸出\nJSON：{"role":"<這段在整體論證中的作用>","points":["<重點>"],"tables":[{"title":"<表格標題>","headers":["<欄名>"],"rows":[{"cells":["<儲存格>"]}]}],"key":[<句子編號>]}\n\n` +
-    `# 整支影片的論證\n${content.thesis || ""}\n${brief.principle || ""}\n\n這一章的主題：${seg.title}\n\n# 逐字稿\n<transcript>\n${numbered}\n</transcript>`;
+    `# 輸出\n這段在整體論證中的作用放 role，重點放 points（條列），表格放 tables（每個表格有 title、headers、rows，rows 的每一列是 cells）；沒有表格就給空陣列。\n` +
+    `JSON：{"role":"<這段在整體論證中的作用>","points":["<重點>"],"tables":[{"title":"<表格標題>","headers":["<欄名>"],"rows":[{"cells":["<儲存格>"]}]}]}\n\n` +
+    `# 整支影片的 (A) 第一性原理摘要\n${content.thesis || ""}\n${brief.principle || ""}\n\n這一章的主題：${seg.title}\n這一段開始的時間：${clock(seg.t)}\n\n# 逐字稿\n<transcript>\n${numbered}\n</transcript>`;
   const out = await llmJSON(deps, prompt, 8000, SCHEMA.analysis);
-  const keyIdx = (Array.isArray(out.key) ? out.key : []).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < total).slice(0, 2);
-  const key = (keyIdx.length ? keyIdx : [0]).map((n) => [flat[n].ti, flat[n].si]);
   const tables = (Array.isArray(out.tables) ? out.tables : []).map((t) => {
     const headers = (Array.isArray(t && t.headers) ? t.headers : []).map(String).slice(0, 5);
     const rows = (Array.isArray(t && t.rows) ? t.rows : []).map((r) => (Array.isArray(r && r.cells) ? r.cells : []).map(String).slice(0, headers.length)).filter((r) => r.length === headers.length && r.some(Boolean)).slice(0, 8);
     return { title: String((t && t.title) || ""), headers, rows };
-  }).filter((t) => t.headers.length >= 2 && t.rows.length >= 2).slice(0, 2);
-  ["spark", "sum", "core", "chain", "ask", "counter"].forEach((k) => { delete seg[k]; });   // the shape this replaced
-  Object.assign(seg, { deep: true, role: String(out.role || ""), points: (Array.isArray(out.points) ? out.points : []).map(String).filter(Boolean).slice(0, 8), tables, key });
+  }).filter((t) => t.headers.length >= 2 && t.rows.length >= 2).slice(0, 3);
+  ["spark", "sum", "core", "chain", "ask", "counter", "key"].forEach((k) => { delete seg[k]; });   // the shape this replaced
+  Object.assign(seg, { deep: true, role: String(out.role || ""), points: (Array.isArray(out.points) ? out.points : []).map(String).filter(Boolean).slice(0, 12), tables });
   if (sameLang) seg.turns.forEach((tu) => tu.s.forEach((p) => { if (p[1] == null) p[1] = p[0]; }));
   return { content, done: true, progress: { phase: "ready", done: total, total } };
 }
