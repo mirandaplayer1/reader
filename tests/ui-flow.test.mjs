@@ -106,8 +106,11 @@ await p.evaluate(() => document.querySelector('#seg-c1').scrollIntoView()); awai
 // 6. highlight, distill, card on generated content; state goes to the (stub) cloud
 await p.click('#seg-c1 .zh .s >> nth=4'); await p.click('#sheet [data-hl=y]'); await p.click('#a-done');
 await p.click('[data-tab=points]'); await p.waitForSelector('.pts');
-console.log('points: my lines', await p.locator('.pt:not(.ai)').count(), '| AI first principles', await p.locator('.pt.ai').count());
-await p.click('#p-pick'); await p.click('.pt.ai'); await p.click('.pt:not(.ai)'); await p.click('#p-write'); await p.fill('#k-text', '沒有人付錢之前都只是想像'); await p.click('#k-done'); await p.waitForSelector('.zcard'); await p.waitForTimeout(1500);
+const selAI = q => p.evaluate(q => { const el = document.querySelector(q), r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return el.textContent; }, q);
+await p.evaluate(() => setTab('read')); await selAI('#seg-c1 .core'); await p.waitForSelector('#selbar [data-ai-save]'); await p.click('#selbar [data-ai-save]:not([data-note])');
+await p.click('[data-tab=points]'); await p.waitForSelector('.pts');
+console.log('points: my lines', await p.locator('.pcard.hl').count(), '| AI passages I marked', await p.locator('.pcard.ai').count());
+await p.click('#p-pick'); await p.click('.pcard.ai'); await p.click('.pcard.hl'); await p.click('#p-write'); await p.fill('#k-text', '沒有人付錢之前都只是想像'); await p.click('#k-done'); await p.waitForSelector('.zcard'); await p.waitForTimeout(1500);
 console.log('cards', await p.locator('#side .zcard').count(), '| synced state saved:', states.has('AAAAAAAAAAA'), '| badge', await p.textContent('#sync'));
 await p.screenshot({ path: D + '/i-cards.png' });
 // 7. back home, reload: library and the finished video come back from the store

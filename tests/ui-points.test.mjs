@@ -60,23 +60,40 @@ await p.evaluate(() => setTab('points')); await p.waitForSelector('.pts');
 await p.click('[data-note-all]'); await p.waitForSelector('#n-text'); await p.fill('#n-text', '整支影片的想法'); await p.click('#n-done');
 s = await st(); assert(Object.values(s.memos).some(m => m.text === '這一章的想法' && m.t != null && !m.ids) && Object.values(s.memos).some(m => m.text === '整支影片的想法' && m.t == null && !m.ids), 'chapter note and whole-video note');
 
-// the points page
-const page = await p.evaluate(() => ({ blocks: [...document.querySelectorAll('.pt:not(.ai)')].map(e => e.querySelector('p').textContent.length), ai: document.querySelectorAll('.pt.ai').length,
-  memos: [...document.querySelectorAll('.memo span')].map(e => e.textContent), chapters: document.querySelectorAll('.pch').length }));
-console.log('points page: chapters', page.chapters, '| my blocks', page.blocks.length, '| AI first principles', page.ai, '| notes shown', page.memos.length);
-assert(page.ai >= 1, 'the AI first principle of each analysed chapter is there without doing anything');
+// the points page: nothing from the AI is there until I mark it
+await p.evaluate(() => setTab('points')); await p.waitForSelector('.pts');
+assert(await p.locator('.pcard.ai').count() === 0, 'no AI card appears by itself');
+const selAI = q => p.evaluate(q => { const el = document.querySelector(q), r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return el.textContent; }, q);
+await p.evaluate(() => setTab('read')); const core = await selAI('.absorb .core'); await p.waitForSelector('#selbar [data-ai-save]'); await p.click('#selbar [data-ai-save]:not([data-note])');
+assert(await p.locator('.absorb mark.aim').count() === 1, 'the AI passage I marked is painted where it stands');
+await selAI('.absorb li'); await p.waitForSelector('#selbar [data-ai-save][data-note]'); await p.click('#selbar [data-ai-save][data-note]'); await p.waitForSelector('#pt-note'); await p.fill('#pt-note', '對 AI 這句的想法'); await p.click('#pt-done');
+await p.evaluate(() => setTab('overview')); await p.waitForSelector('.ov .thesis'); await selAI('.ov .thesis'); await p.waitForSelector('#selbar [data-ai-save]'); await p.click('#selbar [data-ai-save]:not([data-note])');
+assert(await p.locator('#side mark.aim').count() === 1, 'a passage of the overview can be marked too');
+s = await st(); assert(Object.values(s.aip).length === 3 && Object.values(s.aip).some(a => a.text === core.replace(/\s+/g, ' ').trim() && a.t != null) && Object.values(s.aip).some(a => a.t == null), 'three AI passages saved, with the chapter they came from');
+await p.evaluate(() => setTab('points')); await p.waitForSelector('.pts');
+const page = await p.evaluate(() => ({ blocks: [...document.querySelectorAll('.pcard.hl')].map(e => e.querySelector('p').textContent.length), ai: document.querySelectorAll('.pcard.ai').length,
+  memos: [...document.querySelectorAll('.pcard.note p, .pcard .pn')].map(e => e.textContent), chapters: document.querySelectorAll('.pgroup').length }));
+console.log('points page: groups', page.chapters, '| my blocks', page.blocks.length, '| AI passages', page.ai, '| notes shown', page.memos.length);
+assert(page.ai === 3, 'each AI passage I marked is a card');
+// change the words of a card, then put them back; take a card away
+await p.click('.pcard.hl >> nth=0'); await p.waitForSelector('#pt-text'); const before = await p.inputValue('#pt-text'); await p.fill('#pt-text', '我改寫過的這一句'); await p.click('#pt-done');
+assert(await p.textContent('.pcard.hl >> nth=0 >> p >> nth=0') === '我改寫過的這一句' && Object.keys((await st()).hl).length === Object.keys(s.hl).length, 'the card shows my wording and the highlight is untouched');
+await p.click('.pcard.hl >> nth=0'); await p.click('#pt-reset'); assert(await p.textContent('.pcard.hl >> nth=0 >> p >> nth=0') === before, 'the original words come back');
+await p.click('.pcard.ai:has(.pn)'); await p.waitForSelector('#pt-text'); await p.fill('#pt-text', 'AI 這句我改短了'); await p.click('#pt-done');
+assert((await p.textContent('.pcard.ai:has(.pn)')).includes('AI 這句我改短了'), 'an AI card can be reworded');
+await p.evaluate(() => setTab('read')); assert(await p.locator('.absorb mark.aim').count() === 2, 'a reworded AI passage stays painted in the text');
+await p.evaluate(() => setTab('points')); await p.click('.pcard.ai:has(.pn)'); await p.click('#pt-del');
+assert(await p.locator('.pcard.ai').count() === 2 && Object.keys((await st()).aip).length === 2, 'deleting an AI card removes it');
 assert(page.memos.includes('舊筆記') && page.memos.includes('這三句是整段的重點') && page.memos.includes('這一章的想法') && page.memos.includes('整支影片的想法') && page.memos.includes('舊回答'), 'every note is on the page: ' + page.memos);
 assert(page.blocks.length < Object.keys(s.hl).length, 'consecutive sentences are merged into one block');
 await p.screenshot({ path: D + '/pt-points.png' });
 const md = await p.evaluate(() => pointsMarkdown());
-assert(md.includes('AI 整理的第一性原理') && md.includes('我的筆記：這三句是整段的重點') && md.includes('整支影片的想法'), 'markdown has the AI line and my notes');
-await p.click('[data-mine="1"]'); assert(await p.locator('.pt.ai').count() === 0, '只看我的 hides the AI lines');
-await p.click('[data-mine="0"]');
+assert(md.includes('（AI 整理）') && md.includes('我的筆記：這三句是整段的重點') && md.includes('整支影片的想法'), 'markdown has the AI passages and my notes');
 
 // pick a few, write a card
 const box = () => p.evaluate(() => JSON.parse(JSON.stringify(BOX.cards)));
 let cards = await box(); assert(cards.k1 && cards.k1.text === '收錢才能驗證市場' && cards.k1.vid, 'the old claim is in the box as a card');
-await p.click('#p-pick'); await p.click('.pt.ai'); await p.click('.pt:not(.ai)'); await p.screenshot({ path: D + '/pt-pick.png' });
+await p.click('#p-pick'); await p.click('.pcard.ai'); await p.click('.pcard.hl'); await p.screenshot({ path: D + '/pt-pick.png' });
 await p.click('#p-write'); await p.waitForSelector('#k-text');
 await p.fill('#k-title', '先收到錢再決定要不要做'); await p.fill('#k-text', '有人付錢是唯一不會騙人的訊號。註冊和稱讚都不用成本。');
 await p.fill('#k-topic', '找需求'); await p.dispatchEvent('#k-topic', 'change');
@@ -102,7 +119,11 @@ await open();
 await p.evaluate(() => setTab('read')); await p.click(`.s[data-lang="zh"][data-id="s1-0-0"]`); await p.waitForSelector('#a-note');
 assert(await p.inputValue('#a-note') === '舊筆記', 'the sentence sheet shows the note that was carried over');
 await p.click('.hl-row [data-hl=""]'); await p.click('#a-done');
-await p.evaluate(() => setTab('points')); assert((await p.$$eval('.memo span', x => x.map(e => e.textContent))).includes('舊筆記'), 'a note outlives its highlight');
+await p.evaluate(() => setTab('points')); assert((await p.$$eval('.pcard.note p', x => x.map(e => e.textContent))).includes('舊筆記'), 'a note outlives its highlight');
+// deleting a highlighted card removes the highlight itself
+const nHl = Object.keys((await st()).hl).length, nCards = await p.locator('.pcard.hl').count();
+await p.click('.pcard.hl >> nth=0'); await p.click('#pt-del');
+assert(await p.locator('.pcard.hl').count() === nCards - 1 && Object.keys((await st()).hl).length < nHl, 'deleting a card removes its highlight');
 
 await p.waitForTimeout(400); await p.reload(); await open(); s = await st();
 cards = await box(); assert(Object.keys(cards).length === 3 && Object.keys(s.memos).length === 5, 'everything survives a reload: cards ' + Object.keys(cards).length + ' memos ' + Object.keys(s.memos).length);

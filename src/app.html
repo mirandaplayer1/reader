@@ -245,7 +245,7 @@ function renderRead(){
     const body=!open?"":g.turns.map((tu,ti)=>{const ids=tu.s.map((p,si)=>p?`${tu._id}-${si}`:null);const line=l=>ids.map(id=>id?span(id,l):`<span class="gap">[…]</span>`).join(l==="en"?" ":"");
       return `<div class="turn sp-${tu.sp===V.host?"L":"P"}" data-turn="${tu._id}"><div class="who"><b>${esc(who(tu)).toUpperCase()}</b>${tlink(tu.t)}</div><p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></div>`}).join("");
     const tools=deep?"":`<div class="row segtools">${open?"":`<button class="btn sm line" data-open="${g.id}">顯示原文</button>`}<button class="btn sm" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):hasZh||mono?"補上摘要和第一性原理":"精讀這一章（翻譯＋第一性原理）"}</button></div>`;
-    const absorb=!deep?"":`<div class="absorb">
+    const absorb=!deep?"":`<div class="absorb" data-ai-t="${g.t}">
       <div class="eyebrow">這一段在說什麼</div><ul>${(g.sum||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
       <div class="eyebrow">第一性原理</div><p class="core">${esc(g.core)}</p>
       <details><summary>展開推理鏈（${(g.chain||[]).length} 步）</summary><ol class="chain">${(g.chain||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ol></details>
@@ -254,7 +254,7 @@ function renderRead(){
     </div>`;
     return `<section class="a-seg${deep||hasZh||mono?"":" raw"}" id="seg-${g.id}">
     <header><i>第 ${gi+1} 段，共 ${SEGS.length} 段</i><h3>${esc(g.title)}</h3>${tlink(g.t)}</header><div class="row segnote"><button class="btn sm line" data-note-t="${g.t}">＋ 這一章的筆記</button></div>${tools}${body}${absorb}</section>`}).join("")+`</div>`;
-  rscroll.scrollTop=top;nowId=null;
+  paintAI(rscroll);rscroll.scrollTop=top;nowId=null;
   $$("[data-mode]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===S.mode));
 }
 function markSent(id){$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>{const l=sentLook(id,e.dataset.lang||"zh");e.dataset.hl=l.hl;e.dataset.soft=l.soft;e.innerHTML=l.html;e.classList.toggle("has-note",noted(id))})}
@@ -298,20 +298,28 @@ function readSelection(){
 }
 let selT;document.addEventListener("selectionchange",()=>{clearTimeout(selT);selT=setTimeout(()=>{
   if(root.dataset.view==="home"||!sheetEl.hidden){selbar.hidden=true;return}
-  const ps=readSelection();if(ps.length){selParts=ps;selbar.hidden=false}else{selbar.hidden=true;selbar.innerHTML=BAR_MAIN}},180)});
+  const ps=readSelection();selAI=ps.length?null:aiSelection();
+  if(ps.length){selParts=ps;selbar.innerHTML=selbar.dataset.mode==="tags"?BAR_TAGS:BAR_MAIN;selbar.hidden=false}
+  else if(selAI){selParts=[];selbar.innerHTML=BAR_AI;selbar.hidden=false}
+  else{selbar.hidden=true;selbar.innerHTML=BAR_MAIN;delete selbar.dataset.mode}},180)});
 selbar.addEventListener("pointerdown",e=>e.preventDefault());   // keep the selection while the button is pressed
 const BAR_MAIN=`<button data-k="y"><i style="background:var(--hl-y)"></i>畫線</button><button data-k="y" data-note>畫線＋筆記</button><button data-tags>標記 ▸</button>`;
 const BAR_TAGS=`<button data-back aria-label="返回">‹</button><button data-k="i"><i style="background:var(--hl-i)"></i>洞見</button><button data-k="p"><i style="background:var(--hl-p)"></i>疑問</button><button data-k="g"><i style="background:var(--hl-g)"></i>要去做</button>`;
+const BAR_AI=`<button data-ai-save><i style="background:var(--hl-y)"></i>畫線</button><button data-ai-save data-note>畫線＋筆記</button>`;
+let selAI=null;
 selbar.innerHTML=BAR_MAIN;
 selbar.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
-  if(b.dataset.tags!=null){selbar.innerHTML=BAR_TAGS;return}
-  if(b.dataset.back!=null){selbar.innerHTML=BAR_MAIN;return}
+  if(b.dataset.aiSave!=null){if(!selAI)return;const k=uid("a");AIP()[k]={at:Date.now(),text:selAI.text,t:selAI.t};commit();
+    getSelection().removeAllRanges();selbar.hidden=true;selAI=null;paintAI(rscroll);if(ui.side==="overview")paintAI(side);else renderSide();
+    if(b.dataset.note!=null)pointSheet(k);else toast("已存成一張重點");return}
+  if(b.dataset.tags!=null){selbar.dataset.mode="tags";selbar.innerHTML=BAR_TAGS;return}
+  if(b.dataset.back!=null){delete selbar.dataset.mode;selbar.innerHTML=BAR_MAIN;return}
   const k=b.dataset.k,parts=selParts.filter(x=>SENT[x.id]),ids=[...new Set(parts.map(x=>x.id))];if(!k||!ids.length)return;
   parts.forEach(x=>{const whole=S.hl[x.id]&&!RNG()[x.id];S.hl[x.id]=k;
     if(x.full){const r=RNG()[x.id];if(r){delete r[x.lang];if(!Object.keys(r).length)delete RNG()[x.id]}}
     else if(!whole)RNG()[x.id]={...(RNG()[x.id]||{}),[x.lang]:[x.a,x.b]}});   // a sentence already drawn in full stays in full
   commit();ids.forEach(markSent);
-  getSelection().removeAllRanges();selbar.hidden=true;selbar.innerHTML=BAR_MAIN;selParts=[];
+  getSelection().removeAllRanges();selbar.hidden=true;selbar.innerHTML=BAR_MAIN;delete selbar.dataset.mode;selParts=[];
   if(b.dataset.note!=null)noteSheet({ids});else if(ui.side!=="overview")renderSide()});
 rscroll.addEventListener("input",e=>{const k=e.target.dataset&&e.target.dataset.refl;if(k==null)return;
   const g=SEGS.find(x=>String(x.t)===k),v=e.target.value;if(!g)return;
@@ -336,7 +344,7 @@ function renderOverview(){
     <h2>${esc(V.title)}</h2>
     ${briefHtml()}
     <div class="row"><div class="eyebrow" style="flex:1">章節</div><div class="chips"><button data-core="0" aria-pressed="${!ui.coreOnly}">全部</button><button data-core="1" aria-pressed="${ui.coreOnly}">只看核心</button></div></div>
-    <div class="chs">${list.map(({c,i,segs})=>`<article class="ch w${c.worth}">
+    <div class="chs">${list.map(({c,i,segs})=>`<article class="ch w${c.worth}" data-ai-t="${c.t}">
       <header><b><span class="t">${esc(c.zh)}</span><small>${esc(c.en)}</small></b><span class="w w${c.worth}">${["","可跳過","值得看","核心"][c.worth]}</span>${tlink(c.t)}</header>
       <p>${esc(c.sum)}</p>${c.take?`<p class="take">→ ${esc(c.take)}</p>`:""}
       <div class="row">${segs.map(g=>isDeep(g)?`<button class="btn sm" data-seg="${g.id}">精讀「${esc(g.title)}」</button>`
@@ -366,48 +374,85 @@ const joinText=ids=>{const cjk=S.mode!=="en"||/^zh/i.test(V.lang||"");return ids
 function quoteOf(id){if(String(id).startsWith("ai-")){const g=SEGS.find(x=>"ai-"+x.id===id||"ai-"+x.t===id);return g&&(g.core||g.spark)?{text:g.core||g.spark,t:g.t,ai:true}:null}
   return SENT[id]?{text:shown(id),t:SENT[id].t}:null}
 /* One chapter's worth: the AI's first principle, then runs of highlighted sentences, then notes. */
+/* A point is one thing I marked: a run of highlighted sentences, or a passage I highlighted in the AI's own summary.
+   Nothing gets on the points page by itself. */
+const AIP=()=>S.aip||(S.aip={});
+const EDITS=()=>S.edit||(S.edit={});
+const AI_SEL=".absorb li,.absorb .core,.absorb .ask,.ov .thesis,.brief-p p,.brief-g li,.brief-r,.ch>p";
 function pointsOf(g){
   const o=order(),ids=Object.keys(S.hl).filter(id=>SENT[id]&&SENT[id].seg===g).sort((a,b)=>o[a]-o[b]),blocks=[];
   ids.forEach(id=>{const last=blocks[blocks.length-1];
     if(last&&last.tag===S.hl[id]&&o[id]===o[last.ids[last.ids.length-1]]+1)last.ids.push(id);else blocks.push({key:"h-"+id,ids:[id],tag:S.hl[id],t:SENT[id].t})});
   const m=MEMOS(),mine=Object.keys(m).filter(k=>{const x=m[k];return x.ids&&x.ids.length?SENT[x.ids[0]]&&SENT[x.ids[0]].seg===g:x.t!=null&&segAt(x.t)===g});
-  blocks.forEach(b=>{b.text=joinText(b.ids);b.memos=mine.filter(k=>m[k].ids&&m[k].ids.some(x=>b.ids.includes(x)))});
-  const used=new Set(blocks.flatMap(b=>b.memos));
-  return {ai:isDeep(g)&&g.core?{key:"ai-"+g.t,text:g.core,t:g.t}:null,blocks,loose:mine.filter(k=>!used.has(k)).sort((a,b)=>(m[a].at||0)-(m[b].at||0))};
+  blocks.forEach(b=>{b.text=EDITS()[b.key]||joinText(b.ids);b.edited=!!EDITS()[b.key];b.memos=mine.filter(k=>m[k].ids&&m[k].ids.some(x=>b.ids.includes(x)))});
+  const used=new Set(blocks.flatMap(b=>b.memos)),a=AIP();
+  const ai=Object.keys(a).filter(k=>a[k].t!=null&&segAt(a[k].t)===g).sort((x,y)=>(a[x].at||0)-(a[y].at||0)).map(k=>({key:k,ai:true,text:a[k].text,note:a[k].note||"",t:g.t}));
+  return {ai,blocks,loose:mine.filter(k=>!used.has(k)).sort((a,b)=>(m[a].at||0)-(m[b].at||0))};
 }
 const wholeMemos=()=>{const m=MEMOS();return Object.keys(m).filter(k=>!(m[k].ids&&m[k].ids.length)&&m[k].t==null).sort((a,b)=>(m[a].at||0)-(m[b].at||0))};
-function memoHtml(k){const x=MEMOS()[k],quote=x.ids&&x.ids.length&&!S.hl[x.ids[0]]&&SENT[x.ids[0]]?`<small>「${esc(shown(x.ids[0]).slice(0,40))}」</small>`:"";
-  return `<button class="memo" data-memo="${esc(k)}">${x.q?`<small>${esc(x.q)}</small>`:quote}<span>${esc(x.text)}</span></button>`}
-/* An outline, not a wall: one row per chapter, opened where I have something. Lines are quotes, notes are plain text,
-   and the only filled shape on the page is the one I am ticking. */
+const wholeAI=()=>{const a=AIP();return Object.keys(a).filter(k=>a[k].t==null).sort((x,y)=>(a[x].at||0)-(a[y].at||0)).map(k=>({key:k,ai:true,text:a[k].text,note:a[k].note||"",t:null}))};
+/* Every point is a card: where it came from, the passage, my note. Tap to change or remove it. */
+function pointCard(c,pick){
+  const kind=c.memo?"note":c.ai?"ai":"hl",label=c.memo?(c.q?esc(c.q):"我的筆記"):c.ai?"AI 整理":fmt(c.t)+(TAGS[c.tag]?" · "+TAGS[c.tag]:"")+(c.edited?" · 改過":"");
+  return `<div class="pcard ${kind}" data-key="${esc(c.key)}"${c.tag?` data-hl="${c.tag}"`:""}>${pick&&!c.memo?`<i class="chk${pick.has(c.key)?" on":""}"></i>`:""}
+    <div><small>${label}</small><p>${esc(c.text)}</p>${c.note?`<p class="pn">${esc(c.note)}</p>`:""}${(c.memos||[]).map(k=>`<p class="pn">${esc(MEMOS()[k].text)}</p>`).join("")}</div></div>`}
+const memoCard=k=>({key:"m:"+k,memo:true,text:MEMOS()[k].text,q:MEMOS()[k].q||""});
 function renderPoints(){
-  const pick=ui.pick,nH=Object.keys(S.hl).filter(id=>SENT[id]).length,nM=Object.keys(MEMOS()).length,fold=ui.fold||(ui.fold={});
-  const box=key=>pick?`<i class="chk${pick.has(key)?" on":""}"></i>`:"";
-  let anyOpen=false;
-  const secs=SEGS.map(g=>{const p=pointsOf(g),n=p.blocks.length+p.loose.length;if(!n&&(ui.mine||!p.ai))return "";
-    const open=fold[g.t]!=null?fold[g.t]:n>0;if(open)anyOpen=true;
-    return `<section class="pch${open?" open":""}"><button class="prow" data-fold="${g.t}" aria-expanded="${open}"><i class="tw"></i><span><b>${esc(g.title)}</b>${!open&&p.ai&&!ui.mine?`<small>${esc(p.ai.text)}</small>`:""}</span>${n?`<em>${n}</em>`:""}</button>
-      ${open?`<div class="pbody">
-        ${p.ai&&!ui.mine?`<div class="pt ai" data-key="${p.ai.key}">${box(p.ai.key)}<div><p><span class="ailab">AI 整理</span>${esc(p.ai.text)}</p></div></div>`:""}
-        ${p.blocks.map(b=>`<div class="pt" data-key="${b.key}" data-hl="${b.tag}">${box(b.key)}<div><p>${esc(b.text)}</p>${b.memos.map(memoHtml).join("")}</div><time>${fmt(b.t)}${TAGS[b.tag]?"<br>"+TAGS[b.tag]:""}</time></div>`).join("")}
-        ${p.loose.map(memoHtml).join("")}
-        <div class="row pfoot"><button class="quiet" data-note-t="${g.t}">＋ 這一章的筆記</button><button class="quiet" data-seg="${g.id}">到逐字稿 ›</button></div></div>`:""}</section>`}).join("");
-  side.innerHTML=(pick?`<div class="banner"><span>點你要用的那幾則：已選 ${pick.size}</span><button class="btn sm line" id="p-cancel">取消</button><button class="btn sm" id="p-write" ${pick.size?"":"disabled"}>做成卡片</button></div>`:"")+
-    `<div class="pad pts${pick?" picking":""}"><div><div class="eyebrow">畫線 ${nH} · 筆記 ${nM}</div><h2>我的重點</h2></div>
-    <div class="row ptbar"><div class="chips"><button data-mine="0" aria-pressed="${!ui.mine}">全部</button><button data-mine="1" aria-pressed="${!!ui.mine}">只看我的</button></div><span class="sp"></span>
-      <button class="quiet" id="p-fold" data-open="${anyOpen?1:0}">${anyOpen?"全部收合":"全部展開"}</button><button class="quiet" id="p-copy">複製</button>${pick?"":`<button class="btn sm" id="p-pick">做成卡片</button>`}</div>
-    <div class="pwhole">${wholeMemos().map(memoHtml).join("")}<button class="quiet" data-note-all>＋ 對整支影片寫一則筆記</button></div>
-    <div class="outline">${secs||`<p class="meta">還沒有畫線。在「閱讀」裡選一段文字，按「畫線」。</p>`}</div></div>`;
+  const pick=ui.pick;let n=0;
+  const top=[...wholeAI(),...wholeMemos().map(memoCard)];n+=top.length;
+  const secs=SEGS.map(g=>{const p=pointsOf(g),cards=[...p.ai,...p.blocks,...p.loose.map(memoCard)];if(!cards.length)return "";n+=cards.length;
+    return `<section class="pgroup"><header><button class="quiet" data-seg="${g.id}">${esc(g.title)}</button><button class="quiet" data-note-t="${g.t}">＋筆記</button></header>${cards.map(c=>pointCard(c,pick)).join("")}</section>`}).join("");
+  side.innerHTML=(pick?`<div class="banner"><span>點你要用的那幾張：已選 ${pick.size}</span><button class="btn sm line" id="p-cancel">取消</button><button class="btn sm" id="p-write" ${pick.size?"":"disabled"}>做成卡片</button></div>`:"")+
+    `<div class="pad pts${pick?" picking":""}"><div><div class="eyebrow">${n} 張</div><h2>我的重點</h2></div>
+    <div class="row ptbar">${pick||!n?"":`<button class="btn sm" id="p-pick">挑幾張寫成卡片</button>`}<span class="sp"></span><button class="quiet" data-note-all>＋筆記</button>${n?`<button class="quiet" id="p-copy">複製</button>`:""}</div>
+    ${top.length?`<section class="pgroup"><header><span class="quiet">整支影片</span></header>${top.map(c=>pointCard(c,pick)).join("")}</section>`:""}
+    ${secs}
+    ${n?"":`<div class="pempty"><p>這裡只放你畫過線的東西。</p><p>在「閱讀」選一段逐字稿，或在「總覽」和每章的 AI 整理裡選一段文字，按「畫線」，它就會變成這裡的一張卡片。</p></div>`}</div>`;
 }
 function pointsMarkdown(){
-  const m=MEMOS(),L=[`# ${V.title}`,""];
-  const w=wholeMemos();if(w.length){L.push("## 整支影片的筆記","");w.forEach(k=>L.push("- "+m[k].text.replace(/\n+/g," ")));L.push("")}
-  SEGS.forEach(g=>{const p=pointsOf(g);if(!p.blocks.length&&!p.loose.length&&(ui.mine||!p.ai))return;
-    L.push(`## ${g.title}（${fmt(g.t)}）`,"");
-    if(p.ai&&!ui.mine)L.push("- AI 整理的第一性原理："+p.ai.text);
-    p.blocks.forEach(b=>{L.push(`- 「${b.text}」${TAGS[b.tag]?"（"+TAGS[b.tag]+"）":""}`);b.memos.forEach(k=>L.push("  - 我的筆記："+m[k].text.replace(/\n+/g," ")))});
-    p.loose.forEach(k=>L.push("- 我的筆記："+(m[k].q?"（"+m[k].q+"）":"")+m[k].text.replace(/\n+/g," ")));L.push("")});
+  const m=MEMOS(),L=[`# ${V.title}`,""],line=c=>{L.push(c.memo?"- 我的筆記："+(c.q?"（"+c.q+"）":"")+c.text.replace(/\n+/g," "):`- ${c.ai?"（AI 整理）":""}「${c.text.replace(/\n+/g," ")}」${TAGS[c.tag]?"（"+TAGS[c.tag]+"）":""}`);
+    if(c.note)L.push("  - 我的筆記："+c.note.replace(/\n+/g," "));(c.memos||[]).forEach(k=>L.push("  - 我的筆記："+m[k].text.replace(/\n+/g," ")))};
+  const top=[...wholeAI(),...wholeMemos().map(memoCard)];if(top.length){L.push("## 整支影片","");top.forEach(line);L.push("")}
+  SEGS.forEach(g=>{const p=pointsOf(g),cards=[...p.ai,...p.blocks,...p.loose.map(memoCard)];if(!cards.length)return;L.push(`## ${g.title}（${fmt(g.t)}）`,"");cards.forEach(line);L.push("")});
   return L.join("\n");
+}
+/* Highlighting inside the AI's text: the passage is kept as text, with the chapter it was under. */
+function aiSelection(){
+  const sel=getSelection();if(!sel.rangeCount||sel.isCollapsed)return null;const rg=sel.getRangeAt(0);
+  const el=(rg.startContainer.nodeType===1?rg.startContainer:rg.startContainer.parentElement).closest(AI_SEL);
+  if(!el||!el.contains(rg.endContainer))return null;const text=sel.toString().replace(/\s+/g," ").trim();if(text.length<2)return null;
+  const sc=el.closest("[data-ai-t]");return {text,t:sc?+sc.dataset.aiT:null};
+}
+function paintAI(rootEl){
+  const a=AIP(),keys=Object.keys(a);$$("mark.aim",rootEl).forEach(mk=>mk.replaceWith(document.createTextNode(mk.textContent)));if(!keys.length)return;
+  $$(AI_SEL,rootEl).forEach(el=>{el.normalize();const sc=el.closest("[data-ai-t]"),t=sc?+sc.dataset.aiT:null;
+    keys.forEach(k=>{if((a[k].t==null?null:+a[k].t)!==t)return;const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let nd;
+      while((nd=w.nextNode())){const at=nd.nodeValue.indexOf(a[k].src||a[k].text);if(at<0)continue;
+        const r=document.createRange();r.setStart(nd,at);r.setEnd(nd,at+(a[k].src||a[k].text).length);const mk=document.createElement("mark");mk.className="aim";mk.dataset.aip=k;r.surroundContents(mk);break}})});
+}
+/* One sheet for any card on the points page: change the words, add a note, or take it away. */
+function pointSheet(key){
+  const isAI=!!AIP()[key];let b=null,g=null;
+  if(!isAI){const first=key.slice(2);g=SENT[first]&&SENT[first].seg;if(!g)return;b=pointsOf(g).blocks.find(x=>x.key===key);if(!b)return}
+  const a=isAI?AIP()[key]:null,text=isAI?a.text:b.text,mid=isAI?null:(b.memos[0]||null);
+  openSheet(`<div class="eyebrow">${isAI?"AI 整理"+(a.t!=null?" · "+esc(segAt(a.t).title):""):esc(g.title)+" · "+fmt(b.t)}</div>
+    <textarea id="pt-text" class="big">${esc(text)}</textarea>
+    ${isAI?"":`<div class="hl-row">${[["y","畫線","var(--hl-y)"],["i","洞見","var(--hl-i)"],["p","疑問","var(--hl-p)"],["g","要去做","var(--hl-g)"]].map(([k,l,c])=>`<button data-hl="${k}" aria-pressed="${b.tag===k}"><i style="background:${c}"></i>${l}</button>`).join("")}</div>`}
+    <textarea id="pt-note" placeholder="我的筆記">${esc(isAI?(a.note||""):mid?MEMOS()[mid].text:"")}</textarea>
+    <div class="row"><button class="btn sm line" id="pt-del">刪除</button>${isAI?"":`<button class="btn sm line" id="pt-go">到逐字稿</button>${b.edited?`<button class="btn sm line" id="pt-reset">還原原文</button>`:""}`}<span class="sp"></span><button class="btn" id="pt-done">完成</button></div>`,
+    ()=>{if(b)b.ids.forEach(markSent);paintAI(rscroll);renderSide()});
+  const orig=isAI?null:joinText(b.ids);let memoKey=mid;
+  $("#pt-text").oninput=e=>{const v=e.target.value;if(isAI){if(AIP()[key]){AIP()[key]={...AIP()[key],src:AIP()[key].src||AIP()[key].text,text:v};commit()}}
+    else{if(v.trim()&&v!==orig)EDITS()[key]=v;else delete EDITS()[key];commit()}};
+  $("#pt-note").oninput=e=>{const v=e.target.value;
+    if(isAI){if(AIP()[key]){AIP()[key]={...AIP()[key],note:v};commit()}}
+    else if(!v.trim()){if(memoKey)delete MEMOS()[memoKey];commit()}
+    else{if(!memoKey)memoKey=uid("m");MEMOS()[memoKey]={...(MEMOS()[memoKey]||{}),at:(MEMOS()[memoKey]||{}).at||Date.now(),text:v,ids:b.ids};commit()}};
+  $$("[data-hl]",sheetEl).forEach(x=>x.onclick=()=>{b.ids.forEach(id=>{if(S.hl[id])S.hl[id]=x.dataset.hl});b.tag=x.dataset.hl;commit();$$("[data-hl]",sheetEl).forEach(y=>y.setAttribute("aria-pressed",y===x))});
+  $("#pt-done").onclick=closeSheet;
+  $("#pt-del").onclick=()=>{if(isAI)delete AIP()[key];else{b.ids.forEach(id=>{delete S.hl[id];delete RNG()[id]});delete EDITS()[key]}commit();closeSheet()};
+  const go=$("#pt-go");if(go)go.onclick=()=>{const first=b.ids[0];closeSheet();setTab("read");const el=$(`.s[data-id="${first}"]`,rscroll);if(el){el.scrollIntoView({block:"center"});lastUserScroll=Date.now()}};
+  const rs=$("#pt-reset");if(rs)rs.onclick=()=>{delete EDITS()[key];commit();closeSheet()};
 }
 async function copyString(t){try{await navigator.clipboard.writeText(t);toast("已複製")}catch(e){openSheet(`<div class="eyebrow">請手動複製</div><textarea class="big" id="cp">${esc(t)}</textarea><div class="row"><span class="sp"></span><button class="btn" id="cp-x">關閉</button></div>`);$("#cp").select();$("#cp-x").onclick=closeSheet}}
 /* A note: tied to some sentences, to a chapter, or to nothing (the whole video). mid edits an existing one. */
@@ -425,18 +470,6 @@ function noteSheet({ids,t,mid}){
     MEMOS()[key]={...old,at:old.at||Date.now(),text:v,...(ids&&ids.length?{ids}:{}),...(t!=null&&!(ids&&ids.length)?{t}:{})};commit()};
   $("#n-done").onclick=closeSheet;const d=$("#n-del");if(d)d.onclick=()=>{delete MEMOS()[key];commit();closeSheet()};
 }
-/* A line I drew, opened from the points page. */
-function blockSheet(key){
-  const first=key.slice(2),g=SENT[first]&&SENT[first].seg;if(!g)return;const b=pointsOf(g).blocks.find(x=>x.key===key);if(!b)return;
-  openSheet(`<div class="eyebrow">${esc(g.title)} · ${fmt(b.t)}</div><p class="q-zh">${esc(b.text)}</p>
-    <div class="hl-row">${[["y","畫線","var(--hl-y)"],["i","洞見","var(--hl-i)"],["p","疑問","var(--hl-p)"],["g","要去做","var(--hl-g)"]].map(([k,l,c])=>`<button data-hl="${k}" aria-pressed="${b.tag===k}"><i style="background:${c}"></i>${l}</button>`).join("")}</div>
-    <div class="row"><button class="btn sm line" id="b-go">到逐字稿</button><button class="btn sm line" id="b-note">${b.memos.length?"改筆記":"寫筆記"}</button><span class="sp"></span><button class="btn sm line" id="b-del">移除畫線</button></div>`,renderSide);
-  $$("[data-hl]",sheetEl).forEach(x=>x.onclick=()=>{b.ids.forEach(id=>{if(S.hl[id])S.hl[id]=x.dataset.hl});commit();b.ids.forEach(markSent);closeSheet()});
-  $("#b-go").onclick=()=>{closeSheet();setTab("read");const el=$(`.s[data-id="${first}"]`,rscroll);if(el){el.scrollIntoView({block:"center"});lastUserScroll=Date.now()}};
-  $("#b-note").onclick=()=>noteSheet({ids:b.ids});
-  $("#b-del").onclick=()=>{b.ids.forEach(id=>{delete S.hl[id];delete RNG()[id]});commit();b.ids.forEach(markSent);closeSheet()};
-}
-
 /* ---------- the card box ----------
    A card holds one idea in my own words. Cards do not belong to a video: they live in one box across everything I read,
    keep the lines they came from, and link to each other. Reading fills the box; writing draws from it. */
@@ -467,8 +500,8 @@ function cardHtml(k,pickList){const c=CARDS()[k],n=(c.links||[]).length+backlink
     ${pickList?`<i class="chk${at>=0?" on":""}">${at>=0?at+1:""}</i>`:""}<span class="zb"><b>${esc(cardTitle(c))}</b>${c.text&&c.title?`<span>${esc(c.text)}</span>`:""}
     <small>${[c.topic?"＃"+c.topic:"",c.vt||"",(c.quotes||[]).length?`${c.quotes.length} 則出處`:"",n?`連到 ${n} 張`:"",c.text&&c.text.trim()?"":"還沒用自己的話寫"].filter(Boolean).map(esc).join(" · ")}</small></span></button>`}
 function pickedQuotes(){const out=[];if(!ui.pick)return out;
-  SEGS.forEach(g=>{const p=pointsOf(g);if(p.ai&&ui.pick.has(p.ai.key))out.push({text:p.ai.text,t:p.ai.t,ai:true});
-    p.blocks.forEach(b=>{if(ui.pick.has(b.key))out.push({text:b.text,t:b.t})})});return out}
+  wholeAI().forEach(c=>{if(ui.pick.has(c.key))out.push({text:c.text,t:0,ai:true})});
+  SEGS.forEach(g=>{const p=pointsOf(g);[...p.ai,...p.blocks].forEach(c=>{if(ui.pick.has(c.key))out.push({text:c.text,t:c.t,...(c.ai?{ai:true}:{})})})});return out}
 /* Writing a card. Nothing is saved until something is typed; after that every keystroke is. */
 function cardSheet(k,seed){
   let key=k;const get=()=>key&&CARDS()[key]&&!CARDS()[key].gone?CARDS()[key]:null;
@@ -535,17 +568,17 @@ function renderBox(){
 
 /* ---------- shell ---------- */
 function meta(){
-  const h=Object.keys(S.hl).filter(id=>SENT[id]).length,v=V?liveCards().filter(k=>CARDS()[k].vid===V.vid).length:0;
+  const h=(V?SEGS.reduce((n,g)=>n+pointsOf(g).blocks.length,0):0)+Object.keys(AIP()).length,v=V?liveCards().filter(k=>CARDS()[k].vid===V.vid).length:0;
   $("#pips").innerHTML="";$("#n-d").textContent=h||"";$("#n-c").textContent=v||"";$("#steps").hidden=true;
 }
-function renderSide(){({overview:renderOverview,points:renderPoints,views:renderViews})[ui.side]();meta();
+function renderSide(){({overview:renderOverview,points:renderPoints,views:renderViews})[ui.side]();if(ui.side==="overview")paintAI(side);meta();
   $$("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===(ui.m==="read"?"read":ui.side)));root.dataset.m=ui.m}
 function setTab(t){closeSheet();const prev=ui.side;if(t==="read")ui.m="read";else{ui.m="side";ui.side=t}if(t!=="points")ui.pick=null;renderSide();if(t!=="read"&&t!==prev)side.scrollTop=0}
 function renderAll(){renderRead();renderSide()}
 $("#tabs").onclick=e=>{const b=e.target.closest("[data-tab]");if(b)setTab(b.dataset.tab)};
 side.addEventListener("click",e=>{
   const t=e.target.closest("button");if(!t)return;
-  if(ui.pick&&t.closest(".pt"))return;   // while picking, a tap anywhere on a line ticks it
+  if(ui.pick&&t.closest(".pcard"))return;
   if(t.dataset.core!=null){ui.coreOnly=t.dataset.core==="1";renderOverview()}
   else if(t.dataset.redo)reprocess(t.dataset.redo);
   else if(t.dataset.deepen!=null)deepen(+t.dataset.deepen);
@@ -565,10 +598,14 @@ side.addEventListener("click",e=>{
   else if(t.id==="v-box"){ui.box=true;ui.topic=null;ui.bpick=null;goHome()}
   else if(t.dataset.card)cardSheet(t.dataset.card);
 });
-// Lines and the AI's first principle are not buttons: in pick mode a tap ticks them, otherwise a line opens its sheet.
-side.addEventListener("click",e=>{if(e.target.closest("a")||(!ui.pick&&e.target.closest("button")))return;const pt=e.target.closest(".pt");if(!pt)return;const key=pt.dataset.key;
-  if(ui.pick){ui.pick.has(key)?ui.pick.delete(key):ui.pick.add(key);const top=side.scrollTop;renderPoints();side.scrollTop=top}
-  else if(key.startsWith("h-"))blockSheet(key)});
+// A card is not a button: while picking, a tap ticks it; otherwise it opens to be changed.
+side.addEventListener("click",e=>{if(e.target.closest("a,button"))return;
+  const mk=e.target.closest("mark.aim");if(mk&&getSelection().isCollapsed){pointSheet(mk.dataset.aip);return}
+  const pc=e.target.closest(".pcard");if(!pc)return;const key=pc.dataset.key;
+  if(key.startsWith("m:")){if(!ui.pick)noteSheet({mid:key.slice(2)});return}
+  if(ui.pick){ui.pick.has(key)?ui.pick.delete(key):ui.pick.add(key);const top=side.scrollTop,wy=window.scrollY;renderPoints();side.scrollTop=top;window.scrollTo(0,wy)}
+  else pointSheet(key)});
+rscroll.addEventListener("click",e=>{const mk=e.target.closest("mark.aim");if(mk&&getSelection().isCollapsed)pointSheet(mk.dataset.aip)});
 
 /* ---------- library, adding a video, processing ---------- */
 boxLoad();
