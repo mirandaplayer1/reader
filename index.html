@@ -627,6 +627,30 @@ textarea:focus,input:focus{border-color:var(--ink);box-shadow:none;outline:0}
 mark.aim{background:var(--hl-y);color:var(--ink);border-radius:2px 5px 3px 4px;padding:2px 0;cursor:pointer}
 .absorb li,.absorb .core,.absorb .ask,.ov .thesis,.brief-p p,.brief-g li,.brief-r,.ch>p{-webkit-user-select:text;user-select:text}
 
+/* Round 1 of the design pass: fewer repeated labels, things where the hand already is */
+.sync{display:inline-flex;align-items:center;gap:6px;max-width:46%;overflow:hidden;text-overflow:ellipsis}
+.sync.ok{font-size:0;gap:0} .sync.ok::before{content:"";width:8px;height:8px;border-radius:50%;background:#7C9A6B}
+@media(min-width:900px){.rin{max-width:38em}}
+.who.bare{float:right;margin:9px 0 0 12px} .who .tlink{opacity:.55} .turn:hover .who .tlink{opacity:1}
+.turn.screen{padding-top:4px;padding-bottom:4px} .turn.screen summary{font-size:13px;color:var(--mute);cursor:pointer;list-style:none;font-family:var(--f-t);letter-spacing:.05em}
+.turn.screen summary::-webkit-details-marker{display:none} .turn.screen summary::after{content:" ▸"} .turn.screen[open] summary::after{content:" ▾"}
+.turn.screen p{font-size:16px!important;line-height:1.7!important;color:var(--mute);margin-top:6px}
+.segmemos{display:grid;gap:8px;margin:14px 0 6px}
+.segmemo{text-align:left;padding:10px 14px 10px 34px;border-radius:12px;box-shadow:inset 0 0 0 1px var(--line);font-size:16px;line-height:1.7;white-space:pre-wrap;position:relative;color:var(--link)}
+.segmemo::before{content:"✎";position:absolute;left:13px;top:10px;font-size:13px;color:var(--accent)}
+.rfab{position:absolute;right:16px;bottom:16px;display:flex;gap:8px;z-index:4}
+.rfab button{padding:9px 15px;border-radius:999px;background:var(--surf);box-shadow:0 0 0 1px var(--line),0 4px 14px rgba(60,40,15,.14);font-family:var(--f-t);font-size:14px;color:var(--ink)}
+.rfab #fab-note{background:var(--indigo);color:#fff;box-shadow:0 4px 14px rgba(60,40,15,.22);font-family:inherit}
+.tonow{bottom:64px}
+.chaplist{display:grid;max-height:62vh;overflow-y:auto;margin:0 -6px}
+.chaplist button{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:baseline;text-align:left;padding:11px 8px;border-radius:10px;font-size:16px;line-height:1.5}
+.chaplist button+button{border-top:1px solid var(--line)} .chaplist i{font-style:normal;font-family:var(--f-t);font-size:13px;color:var(--mute)} .chaplist small{font-family:var(--f-t);font-size:12.5px;color:var(--mute)}
+.chaplist button[aria-current]{background:var(--surf2);font-weight:700} .chaplist button[aria-current] i{color:var(--accent)}
+.hl-row{display:grid;grid-template-columns:repeat(4,1fr)} #a-clear{justify-self:start}
+.ovname{display:grid;gap:3px} .ovname b{font-size:15px;line-height:1.5;font-weight:600} .ovname small{font-family:var(--f-t);font-size:12.5px;letter-spacing:.04em;color:var(--mute)}
+.ch header button.t{text-align:left;font:inherit;color:inherit} .ch header button.t:hover{text-decoration:underline;text-underline-offset:3px}
+.linked.near>div{align-items:center}
+
 </style>
 
 <div id="root" data-m="side" data-view="home">
@@ -645,10 +669,11 @@ mark.aim{background:var(--hl-y);color:var(--ink);border-radius:2px 5px 3px 4px;p
       <div class="rbar"><div class="seg3" role="group" aria-label="顯示語言"><button data-mode="zh">中</button><button data-mode="both">中英</button><button data-mode="en">EN</button></div><span class="sp" style="flex:1"></span><button class="mini" id="pmin">收起影片</button></div>
       <div class="scroll" id="rscroll"></div>
       <button class="tonow" id="tonow" hidden>▶ 回到播放位置</button>
+      <div class="rfab"><button id="chap" aria-label="章節目錄"></button><button id="fab-note" aria-label="寫筆記">✎ 筆記</button></div>
     </section>
     <section class="pane side"><div class="split" id="split" role="separator" aria-orientation="vertical" aria-label="拖曳調整左右欄寬度" tabindex="0"></div><div class="steps" id="steps" hidden></div><div class="scroll" id="side"></div></section>
   </div>
-  <nav class="tabs" id="tabs"><button data-tab="overview">總覽</button><button data-tab="read">閱讀</button><button data-tab="points">重點 <b id="n-d"></b></button><button data-tab="views">卡片 <b id="n-c"></b></button></nav>
+  <nav class="tabs" id="tabs"><button data-tab="overview">總覽</button><button data-tab="read">閱讀</button><button data-tab="points">畫線 <b id="n-d"></b></button><button data-tab="views">我的卡片 <b id="n-c"></b></button></nav>
 </div>
 <div id="scrim" hidden></div><div id="sheet" hidden></div><div id="toast" hidden></div>
 <div id="selbar" hidden role="toolbar" aria-label="畫線"></div>
@@ -905,7 +930,7 @@ function goToNow(){
   el.classList.add("now");nowId=nowTurn.id;lastUserScroll=0;el.scrollIntoView({block:"center",behavior:"smooth"});$("#tonow").hidden=true;
 }
 $("#tonow").onclick=goToNow;
-rscroll.addEventListener("scroll",()=>{if(nowTurn)showToNow()},{passive:true});
+rscroll.addEventListener("scroll",()=>{if(nowTurn)showToNow();if(Date.now()-lastUserScroll<4000)trackPos();else showChap()},{passive:true});
 ["wheel","touchmove"].forEach(ev=>rscroll.addEventListener(ev,()=>lastUserScroll=Date.now(),{passive:true}));
 $("#pmin").onclick=e=>{const m=root.classList.toggle("p-min");e.currentTarget.textContent=m?"顯示影片":"收起影片"};
 document.addEventListener("click",e=>{const a=e.target.closest("a[data-t]");if(!a)return;if(seek(+a.dataset.t)){e.preventDefault();if(a.dataset.goread!=null)setTab("read");else if(ui.m!=="read")toast("從 "+fmt(+a.dataset.t)+" 播放中")}});
@@ -924,10 +949,15 @@ function renderRead(){
   const top=rscroll.scrollTop,mono=/^zh/i.test(V.lang||"");
   root.classList.toggle("mono",mono);
   rscroll.className="scroll m-"+S.mode;
-  rscroll.innerHTML=`<div class="rin">`+SEGS.map((g,gi)=>{
+  const multi=new Set(SEGS.flatMap(g=>g.turns.filter(tu=>!isScreen(tu)).map(tu=>tu.sp))).size>1;
+  rscroll.innerHTML=`<div class="rin">`+SEGS.map((g,gi)=>{let prev=null;
     const deep=isDeep(g),hasZh=!deep&&g.turns.some(tu=>tu.s.some(p=>p&&p[1]&&p[1]!==p[0])),open=true,busy=ui.busy[g.id];
     const body=!open?"":g.turns.map((tu,ti)=>{const ids=tu.s.map((p,si)=>p?`${tu._id}-${si}`:null);const line=l=>ids.map(id=>id?span(id,l):`<span class="gap">[…]</span>`).join(l==="en"?" ":"");
-      return `<div class="turn sp-${tu.sp===V.host?"L":"P"}" data-turn="${tu._id}"><div class="who"><b>${esc(who(tu)).toUpperCase()}</b>${tlink(tu.t)}</div><p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></div>`}).join("");
+      if(isScreen(tu))return `<details class="turn screen" data-turn="${tu._id}"><summary>畫面</summary><p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></details>`;
+      const name=multi&&tu.sp!==prev?esc(who(tu)).toUpperCase():"";prev=tu.sp;const time=ti===0&&tu.t===g.t?"":tlink(tu.t);
+      return `<div class="turn sp-${tu.sp===V.host?"L":"P"}" data-turn="${tu._id}">${name||time?`<div class="who${name?"":" bare"}">${name?`<b>${name}</b>`:""}${time}</div>`:""}<p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></div>`}).join("");
+    const notes=Object.keys(MEMOS()).filter(k=>{const x=MEMOS()[k];return !(x.ids&&x.ids.length)&&x.t===g.t&&!(deep&&k==="r"+g.t)});
+    const segmemos=notes.length?`<div class="segmemos">${notes.map(k=>`<button class="segmemo" data-memo="${esc(k)}">${esc(MEMOS()[k].text)}</button>`).join("")}</div>`:"";
     const tools=deep?"":`<div class="row segtools">${open?"":`<button class="btn sm line" data-open="${g.id}">顯示原文</button>`}<button class="btn sm" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):hasZh||mono?"補上摘要和第一性原理":"精讀這一章（翻譯＋第一性原理）"}</button></div>`;
     const absorb=!deep?"":`<div class="absorb" data-ai-t="${g.t}">
       <div class="eyebrow">這一段在說什麼</div><ul>${(g.sum||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
@@ -937,22 +967,37 @@ function renderRead(){
       <textarea id="refl-${g.id}" data-refl="${g.t}" placeholder="寫一兩句就好">${esc((MEMOS()["r"+g.t]||{}).text||"")}</textarea>
     </div>`;
     return `<section class="a-seg${deep||hasZh||mono?"":" raw"}" id="seg-${g.id}">
-    <header><i>第 ${gi+1} 段，共 ${SEGS.length} 段</i><h3>${esc(g.title)}</h3>${tlink(g.t)}</header><div class="row segnote"><button class="btn sm line" data-note-t="${g.t}">＋ 這一章的筆記</button></div>${tools}${body}${absorb}</section>`}).join("")+`</div>`;
-  paintAI(rscroll);rscroll.scrollTop=top;nowId=null;
+    <header><i></i><h3>${esc(g.title)}</h3>${tlink(g.t)}</header>${tools}${body}${absorb}${segmemos}</section>`}).join("")+`</div>`;
+  paintAI(rscroll);rscroll.scrollTop=top;nowId=null;showChap();
   $$("[data-mode]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mode===S.mode));
 }
+const isScreen=tu=>/^(on[ -]?screen|screen|畫面)$/i.test(String(who(tu)||"").trim());
+/* Where I am in the video: the chapter whose heading has passed the top of the reading pane. It is shown on the chapter
+   button, and saved (by the chapter's second, never its number) so the video opens where I left it on any device. */
+function curSeg(){if(!rscroll.offsetParent)return (S.pos&&SEGS.find(g=>g.t===S.pos.t))||SEGS[0]||null;const top=rscroll.getBoundingClientRect().top+90;let g=SEGS[0]||null;
+  for(const x of SEGS){const el=document.getElementById("seg-"+x.id);if(el&&el.getBoundingClientRect().top<=top)g=x;else if(el)break}return g}
+function showChap(){const b=$("#chap");if(!b||!V)return;const g=curSeg(),i=SEGS.indexOf(g);b.textContent=SEGS.length?`${i+1} / ${SEGS.length}`:"";b.hidden=!SEGS.length;return g}
+let posT;function trackPos(){const g=showChap();if(!g||!V||V.demo||root.dataset.view!=="video"||root.dataset.m==="side"&&innerWidth<900)return;
+  clearTimeout(posT);posT=setTimeout(()=>{const i=SEGS.indexOf(g);if(S.pos&&S.pos.t===g.t)return;S.pos={t:g.t,i,n:SEGS.length};commit();savePos(VID,S.pos)},1500)}
+const posMap=()=>{try{return JSON.parse(localStorage.getItem("reader-pos")||"{}")}catch(e){return {}}};
+function savePos(vid,pos){const m=posMap();m[vid]={...pos,at:Date.now()};try{localStorage.setItem("reader-pos",JSON.stringify(m))}catch(e){}}
+function chapSheet(){const cur=curSeg();
+  openSheet(`<div class="eyebrow">章節 · 共 ${SEGS.length} 章</div><div class="chaplist">${SEGS.map((g,i)=>`<button data-chap="${g.id}"${g===cur?' aria-current="true"':""}><i>${String(i+1).padStart(2,"0")}</i><span>${esc(g.title)}</span><small>${fmt(g.t)}</small></button>`).join("")}</div>`);
+  $$("[data-chap]",sheetEl).forEach(b=>b.onclick=()=>{const id=b.dataset.chap;closeSheet();const el=document.getElementById("seg-"+id);if(el){el.scrollIntoView({block:"start"});lastUserScroll=Date.now();trackPos()}});
+  const on=$("[aria-current]",sheetEl);if(on)on.scrollIntoView({block:"center"})}
 function markSent(id){$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>{const l=sentLook(id,e.dataset.lang||"zh");e.dataset.hl=l.hl;e.dataset.soft=l.soft;e.innerHTML=l.html;e.classList.toggle("has-note",noted(id))})}
 function sentSheet(id){
   const s=SENT[id];if(!s)return;$$(`.s[data-id="${id}"]`,rscroll).forEach(e=>e.classList.add("on"));
   const mid=memoFor([id])||"n-"+id;
   openSheet(`<p class="q-zh">${esc(s.zh)}</p>${s.zh===s.en?"":`<p class="q-en">${esc(s.en)}</p>`}
-    <div class="hl-row">${[["y","畫線","var(--hl-y)"],["i","洞見","var(--hl-i)"],["p","疑問","var(--hl-p)"],["g","要去做","var(--hl-g)"],["","不畫","transparent"]].map(([k,l,c])=>`<button data-hl="${k}" aria-pressed="${(S.hl[id]||"")===k}"><i style="background:${c}"></i>${l}</button>`).join("")}</div>
+    <div class="hl-row">${[["y","畫線","var(--hl-y)"],["i","洞見","var(--hl-i)"],["p","疑問","var(--hl-p)"],["g","要去做","var(--hl-g)"]].map(([k,l,c])=>`<button data-hl="${k}" aria-pressed="${(S.hl[id]||"")===k}"><i style="background:${c}"></i>${l}</button>`).join("")}</div>
+    <button class="quiet" id="a-clear" data-hl="" ${S.hl[id]?"":"hidden"}>取消畫線</button>
     ${S.hl[id]&&RNG()[id]?`<p class="meta" id="a-part">只畫了：「${esc(picked(id))}」 <button class="btn sm line" id="a-whole">改成整句</button></p>`:""}
     <textarea id="a-note" placeholder="這句讓你想到什麼？">${esc((MEMOS()[mid]||{}).text||"")}</textarea>
     <div class="ai-out" id="a-aiout" hidden></div>
     <div class="row">${tlink(s.t,"▶ 從這段播放 "+fmt(s.t))}<span class="sp"></span><button class="btn sm ghost ai-only" id="a-ask">請 AI 解釋這句</button><button class="btn sm" id="a-done">完成</button></div>`,
     ()=>{$$(".s.on",rscroll).forEach(e=>e.classList.remove("on"));if(ui.side!=="overview")renderSide()});
-  $$("[data-hl]",sheetEl).forEach(b=>b.onclick=()=>{const k=b.dataset.hl;if(k)S.hl[id]=k;else{delete S.hl[id];delete RNG()[id];const pp=$("#a-part");if(pp)pp.hidden=true}commit();markSent(id);$$("[data-hl]",sheetEl).forEach(x=>x.setAttribute("aria-pressed",x===b))});
+  $$("[data-hl]",sheetEl).forEach(b=>b.onclick=()=>{const k=b.dataset.hl;if(k)S.hl[id]=k;else{delete S.hl[id];delete RNG()[id];const pp=$("#a-part");if(pp)pp.hidden=true}commit();markSent(id);$$(".hl-row [data-hl]",sheetEl).forEach(x=>x.setAttribute("aria-pressed",x===b));$("#a-clear").hidden=!S.hl[id]});
   // S can be replaced under an open sheet when another device syncs in, so the memo is looked up afresh on every keystroke.
   $("#a-note").oninput=e=>{const v=e.target.value,old=MEMOS()[mid];
     if(v.trim()){MEMOS()[mid]={...(old||{ids:[id]}),at:Date.now(),text:v};if(!S.hl[id])S.hl[id]="y"}else delete MEMOS()[mid];commit();markSent(id)};
@@ -962,8 +1007,10 @@ function sentSheet(id){
 }
 rscroll.addEventListener("click",e=>{const s=e.target.closest(".s"),o=e.target.closest("[data-open]"),d=e.target.closest("[data-deepen]");
   if(s&&!getSelection().isCollapsed)return;
-  const nt=e.target.closest("[data-note-t]");
-  if(nt)noteSheet({t:+nt.dataset.noteT});else if(s)sentSheet(s.dataset.id);else if(o){ui.open.add(o.dataset.open);renderRead()}else if(d)deepen(+d.dataset.deepen)});
+  const nt=e.target.closest("[data-note-t]"),mm=e.target.closest("[data-memo]");
+  if(mm)noteSheet({mid:mm.dataset.memo});else if(nt)noteSheet({t:+nt.dataset.noteT});else if(s)sentSheet(s.dataset.id);else if(o){ui.open.add(o.dataset.open);renderRead()}else if(d)deepen(+d.dataset.deepen)});
+$("#chap").onclick=chapSheet;
+$("#fab-note").onclick=()=>{const g=curSeg();noteSheet(g?{t:g.t}:{})};
 rscroll.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.classList.contains("s"))sentSheet(e.target.dataset.id)});
 /* Select text to highlight from any point to any point, inside one sentence or across several. */
 const selbar=$("#selbar");let selParts=[];
@@ -1020,18 +1067,17 @@ function briefHtml(){const b=V.brief;
     ${(b.groups||[]).map(g=>`<section class="brief-g"><h3>${esc(g.title)}</h3><ul>${(g.points||[]).map(point).join("")}</ul></section>`).join("")}
     ${b.reminder?`<p class="brief-r"><b>核心提醒</b>${esc(b.reminder)}</p>`:""}`}
 function renderOverview(){
-  const list=CH.map((c,i)=>({c,i,segs:segsIn(i)})).filter(x=>!ui.coreOnly||x.c.worth===3);
+  const list=CH.map((c,i)=>({c,i,segs:segsIn(i)}));
   const nDeep=SEGS.filter(isDeep).length;
   side.innerHTML=`<div class="pad ov">
-    <div class="eyebrow">${V.duration?fmtDur(V.duration)+" · ":""}${CH.length} 個章節${V.channel?" · "+esc(V.channel):""}</div>
+    <div class="ovname"><b>${esc(V.title)}</b><small>${[V.channel?esc(V.channel):"",V.duration?fmtDur(V.duration):"",CH.length+" 章"].filter(Boolean).join(" · ")}</small></div>
     <p class="thesis">${esc(THESIS)}</p>
-    <h2>${esc(V.title)}</h2>
     ${briefHtml()}
-    <div class="row"><div class="eyebrow" style="flex:1">章節</div><div class="chips"><button data-core="0" aria-pressed="${!ui.coreOnly}">全部</button><button data-core="1" aria-pressed="${ui.coreOnly}">只看核心</button></div></div>
+    <div class="eyebrow">章節</div>
     <div class="chs">${list.map(({c,i,segs})=>`<article class="ch w${c.worth}" data-ai-t="${c.t}">
-      <header><b><span class="t">${esc(c.zh)}</span><small>${esc(c.en)}</small></b><span class="w w${c.worth}">${["","可跳過","值得看","核心"][c.worth]}</span>${tlink(c.t)}</header>
+      <header><b>${segs.length===1?`<button class="t" data-seg="${segs[0].id}">${esc(c.zh)}</button>`:`<span class="t">${esc(c.zh)}</span>`}<small>${esc(c.en)}</small></b>${tlink(c.t)}</header>
       <p>${esc(c.sum)}</p>${c.take?`<p class="take">→ ${esc(c.take)}</p>`:""}
-      <div class="row">${segs.map(g=>isDeep(g)?`<button class="btn sm" data-seg="${g.id}">精讀「${esc(g.title)}」</button>`
+      <div class="row">${segs.map(g=>isDeep(g)?(segs.length>1?`<button class="btn sm line" data-seg="${g.id}">${esc(g.title)}</button>`:"")
         :`<button class="btn sm" data-deepen="${SEGS.indexOf(g)}" ${ui.busy[g.id]?"disabled":""}>${ui.busy[g.id]?esc(ui.busy[g.id]):"精讀這一章"}</button><button class="btn sm line" data-seg="${g.id}" data-raw>看原文</button>`).join("")
         ||`<a class="btn sm ghost" data-t="${c.t}" data-goread href="${yt(c.t)}" target="_blank" rel="noopener">播放這一章</a>`}</div>
     </article>`).join("")}</div>
@@ -1087,7 +1133,7 @@ function renderPoints(){
   const secs=SEGS.map(g=>{const p=pointsOf(g),cards=[...p.ai,...p.blocks,...p.loose.map(memoCard)];if(!cards.length)return "";n+=cards.length;
     return `<section class="pgroup"><header><button class="quiet" data-seg="${g.id}">${esc(g.title)}</button><button class="quiet" data-note-t="${g.t}">＋筆記</button></header>${cards.map(c=>pointCard(c,pick)).join("")}</section>`}).join("");
   side.innerHTML=(pick?`<div class="banner"><span>點你要用的那幾張：已選 ${pick.size}</span><button class="btn sm line" id="p-cancel">取消</button><button class="btn sm" id="p-write" ${pick.size?"":"disabled"}>做成卡片</button></div>`:"")+
-    `<div class="pad pts${pick?" picking":""}"><div><div class="eyebrow">${n} 張</div><h2>我的重點</h2></div>
+    `<div class="pad pts${pick?" picking":""}"><div><div class="eyebrow">${n} 張</div><h2>我的畫線</h2></div>
     <div class="row ptbar">${pick||!n?"":`<button class="btn sm" id="p-pick">挑幾張寫成卡片</button>`}<span class="sp"></span><button class="quiet" data-note-all>＋筆記</button>${n?`<button class="quiet" id="p-copy">複製</button>`:""}</div>
     ${top.length?`<section class="pgroup"><header><span class="quiet">整支影片</span></header>${top.map(c=>pointCard(c,pick)).join("")}</section>`:""}
     ${secs}
@@ -1147,7 +1193,7 @@ function noteSheet({ids,t,mid}){
   openSheet(`<div class="eyebrow">筆記 · ${g?esc(g.title):"整支影片"}</div>${head}${x&&x.q?`<p class="meta" style="margin:0">${esc(x.q)}</p>`:""}
     <textarea id="n-text" class="big" placeholder="${ids&&ids.length?"這段讓你想到什麼？":g?"對這一章的想法":"對整支影片的想法"}">${esc(x?x.text:"")}</textarea>
     <div class="row">${key?`<button class="btn sm line" id="n-del">刪除</button>`:""}<span class="sp"></span><button class="btn" id="n-done">完成</button></div>`,
-    ()=>{if(ids)ids.forEach(markSent);if(ui.side!=="overview")renderSide()});
+    ()=>{if(ids)ids.forEach(markSent);else if(t!=null)renderRead();if(ui.side!=="overview")renderSide()});
   const ta=$("#n-text");setTimeout(()=>ta.focus(),60);
   ta.oninput=()=>{const v=ta.value;if(!v.trim()){if(key)delete MEMOS()[key];commit();return}
     if(!key)key=uid("m");const old=MEMOS()[key]||{};
@@ -1187,6 +1233,14 @@ function pickedQuotes(){const out=[];if(!ui.pick)return out;
   wholeAI().forEach(c=>{if(ui.pick.has(c.key))out.push({text:c.text,t:0,ai:true})});
   SEGS.forEach(g=>{const p=pointsOf(g);[...p.ai,...p.blocks].forEach(c=>{if(ui.pick.has(c.key))out.push({text:c.text,t:c.t,...(c.ai?{ai:true}:{})})})});return out}
 /* Writing a card. Nothing is saved until something is typed; after that every keystroke is. */
+/* How alike two cards are, by the pairs of characters (and the words) they share. Done here, no model, nothing sent anywhere. */
+function grams(t){const out=new Set(),x=String(t||"").toLowerCase();(x.match(/[a-z0-9]{3,}/g)||[]).forEach(w=>out.add(w));
+  const zh=x.replace(/[^\u4e00-\u9fff]/g," ");for(let i=0;i<zh.length-1;i++){const g=zh.slice(i,i+2);if(!g.includes(" "))out.add(g)}return out}
+const cardGrams=c=>grams((c.title||"")+" "+(c.text||"")+" "+(c.topic||"")+" "+(c.quotes||[]).map(q=>q.text).join(" "));
+function nearCards(key,c){const a=cardGrams(c);if(a.size<4)return [];const linked=new Set([...(c.links||[]),...(key?backlinks(key):[])]);
+  return liveCards().filter(k=>k!==key&&!linked.has(k)).map(k=>{const b=cardGrams(CARDS()[k]);let n=0;a.forEach(g=>{if(b.has(g))n++});return {k,score:n/Math.sqrt(a.size*(b.size||1)),n}})
+    .filter(x=>x.n>=3&&x.score>=.08).sort((x,y)=>y.score-x.score).slice(0,3).map(x=>x.k)}
+const unlinked=k=>!(CARDS()[k].links||[]).some(x=>CARDS()[x]&&!CARDS()[x].gone)&&!backlinks(k).length;
 function cardSheet(k,seed){
   let key=k;const get=()=>key&&CARDS()[key]&&!CARDS()[key].gone?CARDS()[key]:null;
   const draft={title:"",text:"",topic:"",quotes:[],links:[],...(seed||{})};
@@ -1200,6 +1254,7 @@ function cardSheet(k,seed){
       <div class="eyebrow">連到的卡片</div>
       <div class="linked">${(c.links||[]).filter(x=>CARDS()[x]&&!CARDS()[x].gone).map(x=>`<div><button class="go" data-go="${esc(x)}">${esc(cardTitle(CARDS()[x]))}</button><button class="x" data-unlink="${esc(x)}" aria-label="拿掉連結">×</button></div>`).join("")}
         ${back.map(x=>`<div><button class="go" data-go="${esc(x)}">${esc(cardTitle(CARDS()[x]))}</button><small>連過來的</small></div>`).join("")}</div>
+      ${(near=>near.length?`<div class="eyebrow">可能有關的卡片</div><div class="linked near">${near.map(x=>`<div><button class="go" data-go="${esc(x)}">${esc(cardTitle(CARDS()[x]))}</button><button class="btn sm line" data-near="${esc(x)}">連起來</button></div>`).join("")}</div>`:"")(nearCards(key,c))}
       <div class="row"><button class="btn sm line" id="k-link">＋ 連到另一張卡片</button></div>
       <div class="row">${get()?`<button class="btn sm line" id="k-del">刪除</button>`:""}<span class="sp"></span><button class="btn" id="k-done">完成</button></div>`,
       ()=>{ui.pick=null;if(root.dataset.view==="home")renderHome();else renderSide()});
@@ -1209,6 +1264,7 @@ function cardSheet(k,seed){
     $$("[data-qx]",sheetEl).forEach(b=>b.onclick=()=>{save({quotes:cur().quotes.filter((_,n)=>n!==+b.dataset.qx)});draw()});
     $$("[data-unlink]",sheetEl).forEach(b=>b.onclick=()=>{save({links:cur().links.filter(x=>x!==b.dataset.unlink)});draw()});
     $$("[data-go]",sheetEl).forEach(b=>b.onclick=()=>cardSheet(b.dataset.go));
+    $$("[data-near]",sheetEl).forEach(b=>b.onclick=()=>{save({links:[...new Set([...(cur().links||[]),b.dataset.near])]});draw()});
     $("#k-link").onclick=()=>{if(!get()){const c=cur();if(!(c.title||c.text||"").trim()&&!(c.quotes||[]).length){toast("先寫一點內容，再連到別的卡片");return}save({})}linkPicker()};
     $("#k-done").onclick=()=>{const made=get();closeSheet();if(made&&root.dataset.view==="video"&&ui.side!=="views")setTab("views")};
     const d=$("#k-del");if(d)d.onclick=()=>{dropCard(key);closeSheet()};
@@ -1227,22 +1283,21 @@ function cardSheet(k,seed){
 /* Inside a video: the cards that came out of it. */
 function renderViews(){
   const keys=liveCards().filter(k=>CARDS()[k].vid===V.vid);
-  side.innerHTML=`<div class="pad pts"><div><div class="eyebrow">這支影片 ${keys.length} 張 · 盒子裡共 ${liveCards().length} 張</div><h2>卡片</h2>
-      <p class="meta" style="margin:6px 0 0">一張卡片只放一個想法，用你自己的話寫。畫線是別人的話，卡片才是你的。</p></div>
-    <div class="row"><button class="btn sm" id="v-from">從重點挑幾則來寫</button><button class="btn sm line" id="v-new">＋ 空白卡片</button><span class="sp"></span><button class="btn sm line" id="v-box">打開卡片盒</button></div>
+  side.innerHTML=`<div class="pad pts"><div><div class="eyebrow">這支影片 ${keys.length} 張</div><h2>我的卡片</h2></div>
+    <div class="row"><button class="btn sm" id="v-new">＋ 寫一張卡片</button><span class="sp"></span><button class="quiet" id="v-box">卡片盒（共 ${liveCards().length} 張）›</button></div>
     <div class="cards">${keys.map(k=>cardHtml(k)).join("")}</div>
-    ${keys.length?"":`<p class="meta">還沒有卡片。到「重點」勾幾則畫線或 AI 整理的第一性原理，寫下你自己的看法。</p>`}</div>`;
+    ${keys.length?"":`<p class="meta">一張卡片放一個想法，用自己的話寫。也可以到「畫線」挑幾張當出處再寫。</p>`}</div>`;
 }
 /* The whole box, across every video. Opened from the home screen. */
 function boxOutline(keys){return keys.map(k=>{const c=CARDS()[k];return `## ${cardTitle(c)}\n\n${c.text&&c.title?c.text+"\n\n":""}${(c.quotes||[]).map(q=>"> "+q.text.replace(/\n+/g," ")).join("\n")}${(c.quotes||[]).length?"\n\n":""}`}).join("").trim()}
 function renderBox(){
-  const all=liveCards(),tp=topics(),f=ui.topic,keys=all.filter(k=>f==null?true:f===""?!CARDS()[k].topic:CARDS()[k].topic===f),pick=ui.bpick;
+  const all=liveCards(),tp=topics(),f=ui.topic,keys=all.filter(k=>f==null?true:f==="~"?unlinked(k):f===""?!CARDS()[k].topic:CARDS()[k].topic===f),pick=ui.bpick,lone=all.filter(unlinked).length;
   homeEl.innerHTML=`<div class="pad home boxpage">
     <div><button class="btn sm line" id="bx-back">‹ 全部影片</button></div>
     <div><div class="eyebrow">${all.length} 張卡片 · 來自 ${new Set(all.map(k=>CARDS()[k].vid).filter(Boolean)).size} 支影片</div><h2>卡片盒</h2>
       <p class="meta">讀的時候往裡面放，寫的時候從裡面拿。一張卡片一個想法。</p></div>
     <div class="row"><input id="bx-q" placeholder="搜尋卡片" style="flex:1;min-width:8em"><button class="btn sm" id="bx-new">＋ 新卡片</button></div>
-    ${tp.length?`<div class="chips wrap"><button data-topic="*" aria-pressed="${f==null}">全部</button>${tp.map(t=>`<button data-topic="${esc(t)}" aria-pressed="${f===t}">＃${esc(t)}</button>`).join("")}<button data-topic="" aria-pressed="${f===""}">還沒分主題</button></div>`:""}
+    ${tp.length||all.length>1?`<div class="chips wrap"><button data-topic="*" aria-pressed="${f==null}">全部</button>${tp.map(t=>`<button data-topic="${esc(t)}" aria-pressed="${f===t}">＃${esc(t)}</button>`).join("")}${tp.length?`<button data-topic="" aria-pressed="${f===""}">還沒分主題</button>`:""}${lone&&all.length>1?`<button data-topic="~" aria-pressed="${f==="~"}">還沒連結 ${lone}</button>`:""}</div>`:""}
     ${pick?`<div class="banner"><span>照點的順序排：已選 ${pick.length} 張</span><button class="btn sm line" id="bx-cancel">取消</button><button class="btn sm" id="bx-copy" ${pick.length?"":"disabled"}>複製成大綱</button></div>`
       :all.length>1?`<div class="row"><button class="btn sm line" id="bx-pick">挑幾張排成大綱</button></div>`:""}
     <div class="cards">${keys.map(k=>cardHtml(k,pick)).join("")}</div>
@@ -1252,12 +1307,12 @@ function renderBox(){
 
 /* ---------- shell ---------- */
 function meta(){
-  const h=(V?SEGS.reduce((n,g)=>n+pointsOf(g).blocks.length,0):0)+Object.keys(AIP()).length,v=V?liveCards().filter(k=>CARDS()[k].vid===V.vid).length:0;
+  const h=V?SEGS.reduce((n,g)=>{const p=pointsOf(g);return n+p.ai.length+p.blocks.length+p.loose.length},0)+wholeAI().length+wholeMemos().length:0,v=V?liveCards().filter(k=>CARDS()[k].vid===V.vid).length:0;
   $("#pips").innerHTML="";$("#n-d").textContent=h||"";$("#n-c").textContent=v||"";$("#steps").hidden=true;
 }
 function renderSide(){({overview:renderOverview,points:renderPoints,views:renderViews})[ui.side]();if(ui.side==="overview")paintAI(side);meta();
   $$("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===(ui.m==="read"?"read":ui.side)));root.dataset.m=ui.m}
-function setTab(t){closeSheet();const prev=ui.side;if(t==="read")ui.m="read";else{ui.m="side";ui.side=t}if(t!=="points")ui.pick=null;renderSide();if(t!=="read"&&t!==prev)side.scrollTop=0}
+function setTab(t){closeSheet();const prev=ui.side;if(t==="read")ui.m="read";else{ui.m="side";ui.side=t}if(t!=="points")ui.pick=null;renderSide();if(t!=="read"&&t!==prev)side.scrollTop=0;if(t==="read"){const g=ui.resume;ui.resume=null;const el=g&&document.getElementById("seg-"+g.id);if(el&&rscroll.scrollTop<4)rscroll.scrollTop=el.offsetTop-rscroll.offsetTop;showChap()}}
 function renderAll(){renderRead();renderSide()}
 $("#tabs").onclick=e=>{const b=e.target.closest("[data-tab]");if(b)setTab(b.dataset.tab)};
 side.addEventListener("click",e=>{
@@ -1300,6 +1355,7 @@ function setLib(vid,patch){let it=LIB.find(x=>x.video_id===vid&&!x.demo);if(!it)
 async function loadLibrary(){if(!canIngest())return;
   const {data,error}=await sb.from("videos").select("video_id,title,status,progress,error,updated_at,list,seq,duration:content->>duration").order("updated_at",{ascending:false});
   if(error)return;LIB=[LIB.find(x=>x.demo),...data];renderHome();
+  try{const r2=await sb.from("reader_state").select("video_id,at,pos:state->pos");((r2&&r2.data)||[]).forEach(r=>{if(r.pos&&r.video_id!=="__box__")POS[r.video_id]={...r.pos,at:r.at}});if(Object.keys(POS).length&&root.dataset.view==="home")renderHome()}catch(e){}
   data.filter(v=>v.status==="queued"||v.status==="processing").forEach(v=>drive(v.video_id));
 }
 /* Resolves once the page is visible and the browser reports a connection. */
@@ -1398,11 +1454,13 @@ const seenMap=()=>{try{return JSON.parse(localStorage.getItem("reader-seen")||"{
 const markSeen=vid=>{const m=seenMap();m[vid]=Date.now();try{localStorage.setItem("reader-seen",JSON.stringify(m))}catch(e){}};
 const dur=s=>{s=+s||0;if(!s)return "";const h=Math.floor(s/3600),m=Math.round(s%3600/60);return h?`${h} 小時 ${m} 分`:`${m} 分`};
 const thumb=it=>it.demo?THUMB:`https://i.ytimg.com/vi/${it.video_id}/mqdefault.jpg`;
-function itemHtml(it,n){const seen=!it.demo&&seenMap()[it.video_id],d=it.status==="ready"?dur(it.duration):"";
+const POS={};const posOf=vid=>{const a=POS[vid],b=posMap()[vid];return a&&b?((b.at||0)>(a.at||0)?b:a):a||b||null};
+const wasSeen=vid=>seenMap()[vid]||(posOf(vid)||{}).at||0;
+function itemHtml(it,n){const seen=!it.demo&&wasSeen(it.video_id),pos=!it.demo&&posOf(it.video_id),d=it.status==="ready"?dur(it.duration):"";
   return `<div class="item-row">${n?`<i class="idx">${n}</i>`:""}<button class="item${it.status==="ready"?"":" wait"}" data-vid="${it.video_id}" data-status="${it.status}"${it.demo?" data-demo":""}>
       <img alt="" src="${thumb(it)}" onerror="this.style.visibility='hidden'">
-      <span><b>${esc(it.title||"（讀取中）"+it.video_id)}</b><small class="${it.status==="error"?"err":""}">${esc(d&&statusLine(it)==="可以閱讀"?d:statusLine(it)+(d?" · "+d:""))}${seen?` · <u>讀過</u>`:""}</small>${it.status==="error"?`<em>點這裡從中斷的地方重試</em>`:""}</span></button>${it.demo||!canIngest()?"":`<button class="more" data-more="${it.video_id}" aria-label="更多">⋯</button>`}</div>`}
-function listStats(name){const items=inList(name),seen=seenMap(),total=items.reduce((a,it)=>a+(+it.duration||0),0),read=items.filter(it=>seen[it.video_id]).length;
+      <span><b>${esc(it.title||"（讀取中）"+it.video_id)}</b><small class="${it.status==="error"?"err":""}">${esc(d&&statusLine(it)==="可以閱讀"?d:statusLine(it)+(d?" · "+d:""))}${pos&&pos.n?` · <u>讀到 ${Math.min(pos.i+1,pos.n)} / ${pos.n} 章</u>`:seen?` · <u>讀過</u>`:""}</small>${it.status==="error"?`<em>點這裡從中斷的地方重試</em>`:""}</span></button>${it.demo||!canIngest()?"":`<button class="more" data-more="${it.video_id}" aria-label="更多">⋯</button>`}</div>`}
+function listStats(name){const items=inList(name),total=items.reduce((a,it)=>a+(+it.duration||0),0),read=items.filter(it=>wasSeen(it.video_id)).length;
   return {items,read,total,line:[`${items.length} 支`,dur(total),read?`讀過 ${read}`:""].filter(Boolean).join(" · ")}}
 /* The home screen is a shelf. Each list is a notebook with its own cover; the card box sits at the front.
    A cover is drawn, not uploaded: a colour picked from the list's name, a typed label, and the first video taped on like a photo. */
@@ -1418,8 +1476,8 @@ function libHtml(){
   return `<div class="shelf">${boxBook()}${names.map(listCard).join("")}</div>
     ${loose.length?`<div class="eyebrow">${names.length?"還沒放進清單的影片":"我的影片"}</div><div class="lib">${loose.map(it=>itemHtml(it)).join("")}</div>`:""}`;
 }
-function nextInList(name){const st=listStats(name),seen=seenMap(),ready=st.items.filter(it=>it.status==="ready");
-  return ready.find(it=>!seen[it.video_id])||ready.slice().sort((a,b)=>(seen[b.video_id]||0)-(seen[a.video_id]||0))[0]||null}
+function nextInList(name){const st=listStats(name),ready=st.items.filter(it=>it.status==="ready");
+  return ready.slice().sort((a,b)=>wasSeen(b.video_id)-wasSeen(a.video_id)).find(it=>{const p=posOf(it.video_id);return wasSeen(it.video_id)&&p&&p.n&&p.i+1<p.n})||ready.find(it=>!wasSeen(it.video_id))||ready.slice().sort((a,b)=>wasSeen(b.video_id)-wasSeen(a.video_id))[0]||null}
 function listHtml(name,why){const st=listStats(name),pct=st.items.length?Math.round(st.read/st.items.length*100):0;
   return `<div class="pad home lpage">
     <div><button class="btn sm line" id="l-back">‹ 全部</button></div>
@@ -1534,6 +1592,9 @@ function openVideo(c){
   $("#vt").textContent=c.title+(c.channel?" · "+c.channel:"");
   ui.side="overview";ui.m="side";ui.pick=null;ui.fold={};ui.open=new Set();
   root.dataset.view="video";renderAll();initYT();rscroll.scrollTop=0;side.scrollTop=0;
+  const at=S.pos&&SEGS.find(g=>g.t===S.pos.t),el=at&&SEGS.indexOf(at)>0&&document.getElementById("seg-"+at.id);
+  if(el){ui.resume=at;requestAnimationFrame(()=>{rscroll.scrollTop=el.offsetTop-rscroll.offsetTop;showChap()})}else ui.resume=null;
+  if(S.pos)savePos(VID,S.pos);
 }
 function goHome(){closeSheet();try{if(player&&ytOK)player.pauseVideo()}catch(e){} root.dataset.view="home";$("#vt").textContent="";renderHome()}
 $("#gohome").onclick=()=>{if(root.dataset.view==="home"){ui.list=null;ui.box=false}goHome()};

@@ -55,7 +55,9 @@ assert(memo && memo.ids.length === 3 && ids.every(i => s.hl[i] === 'y'), 'note t
 await select(10, 10, 1, 3); await p.waitForSelector('#selbar:not([hidden])'); await p.click('#selbar [data-k="y"]:not([data-note])');
 s = await st(); assert(!s.rng[ids[1]], 'a sentence drawn in full stays in full');
 // a note for the chapter, and one for the whole video
-await p.click('[data-note-t]'); await p.waitForSelector('#n-text'); await p.fill('#n-text', '這一章的想法'); await p.click('#n-done');
+await p.click('#fab-note'); await p.waitForSelector('#n-text'); await p.fill('#n-text', '這一章的想法'); await p.click('#n-done');
+assert((await p.$$eval('.segmemo', x => x.map(e => e.textContent))).includes('這一章的想法'), 'a chapter note shows at the end of its chapter');
+await p.click('#chap'); await p.waitForSelector('.chaplist [aria-current]'); assert(await p.locator('.chaplist button').count() === await p.evaluate(() => SEGS.length), 'the chapter button lists every chapter'); await p.evaluate(() => closeSheet());
 await p.evaluate(() => setTab('points')); await p.waitForSelector('.pts');
 await p.click('[data-note-all]'); await p.waitForSelector('#n-text'); await p.fill('#n-text', '整支影片的想法'); await p.click('#n-done');
 s = await st(); assert(Object.values(s.memos).some(m => m.text === '這一章的想法' && m.t != null && !m.ids) && Object.values(s.memos).some(m => m.text === '整支影片的想法' && m.t == null && !m.ids), 'chapter note and whole-video note');
@@ -118,7 +120,7 @@ await open();
 // removing a line keeps its note visible
 await p.evaluate(() => setTab('read')); await p.click(`.s[data-lang="zh"][data-id="s1-0-0"]`); await p.waitForSelector('#a-note');
 assert(await p.inputValue('#a-note') === '舊筆記', 'the sentence sheet shows the note that was carried over');
-await p.click('.hl-row [data-hl=""]'); await p.click('#a-done');
+await p.click('#a-clear'); await p.click('#a-done');
 await p.evaluate(() => setTab('points')); assert((await p.$$eval('.pcard.note p', x => x.map(e => e.textContent))).includes('舊筆記'), 'a note outlives its highlight');
 // deleting a highlighted card removes the highlight itself
 const nHl = Object.keys((await st()).hl).length, nCards = await p.locator('.pcard.hl').count();
