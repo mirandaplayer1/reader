@@ -405,7 +405,7 @@ function renderOverview(){
     <div class="eyebrow">章節</div>
     <div class="chs">${list.map(({c,i,segs})=>`<article class="ch w${c.worth}" data-ai-t="${c.t}">
       <header><b>${segs.length===1?`<button class="t" data-seg="${segs[0].id}">${esc(c.zh)}</button>`:`<span class="t">${esc(c.zh)}</span>`}<small>${esc(c.en)}</small></b>${tlink(c.t)}</header>
-      <p>${esc(c.sum)}</p>${c.take?`<p class="take">→ ${esc(c.take)}</p>`:""}
+      <p>${esc(segs.length===1&&segs[0].role?segs[0].role:c.sum)}</p>
       ${(btns=>btns?`<div class="row">${btns}</div>`:"")(segs.map(g=>isDeep(g)?(segs.length>1?`<button class="btn sm line" data-seg="${g.id}">${esc(g.title)}</button>`:"")
         :`<button class="btn sm" data-deepen="${SEGS.indexOf(g)}" ${ui.busy[g.id]?"disabled":""}>${ui.busy[g.id]?esc(ui.busy[g.id]):"精讀這一章"}</button><button class="btn sm line" data-seg="${g.id}" data-raw>看原文</button>`).join(""))}
     </article>`).join("")}</div>

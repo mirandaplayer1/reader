@@ -59,8 +59,14 @@ assert(row.work.phase==='translate'&&row.progress.phase==='translate','translati
  assert(aCalls<=tr.content.segs.length-same+6*same,'failing chapter is bounded: '+aCalls);
  console.log('analyse ok: steps',n,'chapters done',deepN,'of',tr.content.segs.length,'analysis calls',aCalls)}
 let d=0,r;do{r=await deepenStep(row,1,deps);if(r.content)row.content=r.content;d++;assert(d<200,'runaway deepen')}while(!r.done);
-const g=row.content.segs[1];assert(g.deep&&g.turns.every(t=>t.s.every(p=>p[1])),'translated');assert(g.key.length===2&&g.points.length===4&&g.role==='作用'&&g.tables.length===1&&g.tables[0].rows.length===2&&g.core===undefined,'chapter notes: role, points, one well-formed table, old fields gone');
-console.log('deepen ok: calls',d,'sentences',g.turns.reduce((a,t)=>a+t.s.length,0),'key',JSON.stringify(g.key));
+const g=row.content.segs[1];assert(g.deep&&g.turns.every(t=>t.s.every(p=>p[1])),'translated');assert(g.key===undefined&&g.points.length===4&&g.role==='作用'&&g.tables.length===1&&g.tables[0].rows.length===2&&g.core===undefined,'chapter notes: role, points, one well-formed table, old fields gone');
+console.log('deepen ok: calls',d,'sentences',g.turns.reduce((a,t)=>a+t.s.length,0));
+// the owner's prompt reaches the model word for word
+{const her=fs.readFileSync(new URL('./fixtures/owner-prompt.txt',import.meta.url),'utf8');const src=fs.readFileSync(new URL('../supabase/functions/ingest/pipeline.js',import.meta.url),'utf8');
+ const block=n=>src.match(new RegExp('const '+n+' = `([\\s\\S]*?)`;'))[1];
+ for(const n of ['RULES','DECOMPOSE','BRIEF','SECTION','CHECK_SPEC'])assert(her.includes(block(n)),n+' is no longer the owner\'s text word for word');
+ assert(her.replace(/\s+/g,'').includes(block('SELF_CHECK').replace(/\s+/g,'')),'SELF_CHECK differs');assert(c.chapters.every(x=>x.take===''),'chapters carry no take line');
+ console.log('owner prompt ok: six blocks match her text')}
 // a failed unit must not lose progress
 const bad={...deps,fetch:async()=>({ok:false,status:503,json:async()=>({error:{message:'overloaded'}})})};
 let threw=false;try{await deepenStep({...row,content:JSON.parse(JSON.stringify(row.content))},2,bad)}catch(e){threw=e.message==='overloaded'}assert(threw,'error surfaces');

@@ -9,7 +9,7 @@ Miranda 決定之後由本機的 Claude Code CLI 接手。雲端這邊的每小�
 | | 狀態 |
 |---|---|
 | 前端 | `main` 是最新，已上線。最後合併的是 PR #26 |
-| 後端 | Edge function `ingest` **第 13 版**（2026-11-23，commit `02d209c` 的內容）。repo 裡的 `supabase/functions/ingest/` 就是部署的版本 |
+| 後端 | Edge function `ingest` **第 14 版**（2026-11-23，commit `f6bf6e6` 的內容）。repo 裡的 `supabase/functions/ingest/` 就是部署的版本 |
 | 資料庫 | 跟 `supabase/schema.sql` 一致，沒有待套用的變更 |
 | 測試 | 五組全過（見 `CLAUDE.md` 的測試一節） |
 | 沒推上去的東西 | 沒有 |
@@ -79,7 +79,8 @@ AI 聽寫回來的 turn 大約每 20–30 秒切一刀，四成切在句子中�
 
 Miranda 給了一份完整的提示詞：(A) 第一性原理摘要、(B) 分段整理、(C) 推論強弱檢查。全文在 `PROMPTS.md`。
 
-- 她的原文拆成 `pipeline.js` 的 `RULES`／`DECOMPOSE`／`BRIEF`／`SECTION`／`CHECK_SPEC`／`SELF_CHECK`，**字句是她的，不要沒問過就改**。我加的只有括號裡的欄位名稱。
+- 她的原文拆成 `pipeline.js` 的 `RULES`／`DECOMPOSE`／`BRIEF`／`SECTION`／`CHECK_SPEC`／`SELF_CHECK`，**跟她的原文一字不差，不要改**。她明確要求過「不要做修改」。原文存在 `tests/fixtures/owner-prompt.txt`，`pipeline.test.mjs` 會逐字比對。欄位對應寫在每次呼叫的「# 輸出」段，不放進她的文字。
+- 第 14 版另外拿掉了章節的 `take`（總覽每章下面那行「→ …」，她說分段摘要不需要洞見）。總覽的章節清單在該章分析完成後顯示 `role`，還沒完成或舊影片顯示 `sum`。每章的 `key` 也不再產生。
 - 流程：每支影片都是「切章節 → 總覽」兩步（以前一小時內的影片是一次做完）。總覽那一步（`synth`）寫 A 和 C；每章那一步（`deepenStep`）寫 B，會把總覽的標題和第一性原理附給它，讓它寫「這段在整體論證中的作用」。
 - 新的資料格式：`content.brief.check = {solid, assumptions, evidence, contradictions}`；每章 `seg.role`、`seg.points`、`seg.tables[{title,headers,rows[][]}]`、`seg.key`。舊欄位（`sum`／`core`／`chain`／`ask`／`counter`／`spark`）在新分析寫入時刪掉。
 - 前端兩種格式都能顯示：有 `role` 或 `points` 就用新版面，否則照舊。舊的「換到你身上」提問在新格式裡沒有了，她以前寫的回答還在（存成筆記，顯示在章末和畫線頁）。
