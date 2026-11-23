@@ -25,10 +25,11 @@ const fetchStub = async (url, opt) => {
     out = { turns: real.filter(t => t.t >= a && t.t < b), visuals: a === 0 ? [{ t: 30, text: 'nomadlist.com' }] : [], reached_end: b > 2200 };
   } else {
     const p = parts[0].text;
-    if (p.includes('"chapters"')) out = { lang: 'en', title: 'x', host: 'Lex Fridman', thesis: '一個人靠快速上線的小實驗找到會賺錢的產品。', tldr: ['重點一', '重點二', '重點三'],
+    if (p.includes('推論強弱檢查')) out = { lang: 'en', title: 'x', host: 'Lex Fridman', headline: '一個人靠快速上線的小實驗找到會賺錢的產品。', principle: '沒有人能事先知道哪個點子會成，所以要讓每次嘗試都便宜。', groups: [{ title: '起點', points: ['付款驗證：有人刷卡才算數。', '兩週上線。'] }], reminder: '先放一個付款按鈕。', check: { solid: ['付款是有成本的訊號。'], assumptions: ['假設每個產品都能兩週做完。'], evidence: [], contradictions: [] } };
+    else if (p.includes('"chapters"')) out = { lang: 'en', title: 'x', host: 'Lex Fridman', thesis: '一個人靠快速上線的小實驗找到會賺錢的產品。', tldr: ['重點一', '重點二', '重點三'],
       chapters: [{ t: 0, en: 'Introduction', zh: '開場', sum: '介紹來賓。', take: '', worth: 1 }, { t: 125, en: 'Startup philosophy', zh: '不募資快速驗證', sum: '兩週上線，付錢才算驗證。', take: '用付款驗證需求。', worth: 3 }, { t: 574, en: 'Low points', zh: '低潮', sum: '月收 500 美元。', take: '先動手。', worth: 2 }, { t: 1195, en: 'Travel', zh: '旅居', sum: '清邁。', take: '', worth: 1 }] };
     else if (p.includes('"zh":[')) out = { zh: p.split('\n').filter(l => /^\d+\. /.test(l)).map(l => '（譯）' + l.replace(/^\d+\. /, '').slice(0, 24)) };
-    else out = { title: '先收錢再相信', spark: '有人付錢才算驗證', sum: ['兩週上線', '付錢才算', '多數失敗'], core: '真正能經營的是每次實驗的成本。', chain: ['一', '二', '三', '四'], ask: '你的點子能兩週收錢嗎？', key: [4, 5], counter: '高單價產品適用嗎？' };
+    else out = { role: '這一段提出整場的核心機制：用付款當作驗證。', points: ['付款驗證：有人刷卡才算數，註冊和稱讚不算。', '兩週上線一個小產品。', '多數嘗試會失敗。'], tables: [{ title: '兩種做法', headers: ['做法', '代價'], rows: [{ cells: ['先募資', '時間長'] }, { cells: ['先上線', '兩週'] }] }], key: [4, 5] };
   }
   return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(out) }] } }] }) };
 };

@@ -652,6 +652,15 @@ mark.aim{background:var(--hl-y);color:var(--ink);border-radius:2px 5px 3px 4px;p
 .linked.near>div{align-items:center}
 #root.no-yt .rbar .mini.keep{display:inline-flex} .rbar .mini:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 
+/* Chapter notes and the reasoning check written from the owner's prompt */
+.absorb ul{display:grid;gap:8px} .absorb li b{font-weight:700}
+.tblwrap{overflow-x:auto;margin:6px -2px 2px} .tblwrap table{border-collapse:collapse;width:100%;font-size:15px;line-height:1.6}
+.tblwrap caption{text-align:left;font-family:var(--f-t);font-size:12.5px;letter-spacing:.05em;color:var(--mute);padding:0 0 6px}
+.tblwrap th,.tblwrap td{text-align:left;vertical-align:top;padding:8px 10px;border-top:1px solid var(--line);min-width:7em} .tblwrap th{font-weight:700;border-top:0;border-bottom:1px solid color-mix(in srgb,var(--ink) 30%,transparent)}
+.brief-c{display:grid;gap:6px;padding-top:14px;border-top:1px solid var(--line)} .brief-c h4{margin:8px 0 0;font-size:15.5px;font-weight:700}
+.brief-c ul{margin:0;padding-left:20px;display:grid;gap:6px} .brief-c li{font-size:16px;line-height:1.7}
+.absorb td,.brief-c li{-webkit-user-select:text;user-select:text}
+
 </style>
 
 <div id="root" data-m="side" data-view="home">
@@ -967,10 +976,14 @@ function renderRead(){
       if(u.screen)return `<details class="turn screen" data-turn="${tu._id}" data-turns="${all}"><summary>畫面</summary><p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></details>`;
       const name=multi&&tu.sp!==prev?esc(who(tu)).toUpperCase():"";prev=tu.sp;const time=tu.t===lastT?"":tlink(tu.t);lastT=tu.t;
       return `<div class="turn sp-${tu.sp===V.host?"L":"P"}" data-turn="${tu._id}" data-turns="${all}">${name||time?`<div class="who${name?"":" bare"}">${name?`<b>${name}</b>`:""}${time}</div>`:""}<p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></div>`}).join("");
-    const notes=Object.keys(MEMOS()).filter(k=>{const x=MEMOS()[k];return !(x.ids&&x.ids.length)&&x.t===g.t&&!(deep&&k==="r"+g.t)});
+    const notes=Object.keys(MEMOS()).filter(k=>{const x=MEMOS()[k];return !(x.ids&&x.ids.length)&&x.t===g.t&&!(deep&&g.ask&&k==="r"+g.t)});
     const segmemos=notes.length?`<div class="segmemos">${notes.map(k=>`<button class="segmemo" data-memo="${esc(k)}">${esc(MEMOS()[k].text)}</button>`).join("")}</div>`:"";
     const tools=deep?"":`<div class="row segtools">${open?"":`<button class="btn sm line" data-open="${g.id}">顯示原文</button>`}<button class="btn sm" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):hasZh||mono?"補上摘要和第一性原理":"精讀這一章（翻譯＋第一性原理）"}</button></div>`;
-    const absorb=!deep?"":`<div class="absorb" data-ai-t="${g.t}">
+    const absorb=!deep?"":g.role!=null||g.points?`<div class="absorb" data-ai-t="${g.t}">
+      ${g.role?`<div class="eyebrow">這一段的作用</div><p class="core">${esc(g.role)}</p>`:""}
+      ${(g.points||[]).length?`<div class="eyebrow">重點</div><ul>${g.points.map(pointLi).join("")}</ul>`:""}
+      ${(g.tables||[]).map(t=>`<div class="tblwrap"><table>${t.title?`<caption>${esc(t.title)}</caption>`:""}<thead><tr>${t.headers.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${t.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`).join("")}
+    </div>`:`<div class="absorb" data-ai-t="${g.t}">
       <div class="eyebrow">這一段在說什麼</div><ul>${(g.sum||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
       <div class="eyebrow">第一性原理</div><p class="core">${esc(g.core)}</p>
       <details><summary>展開推理鏈（${(g.chain||[]).length} 步）</summary><ol class="chain">${(g.chain||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ol></details>
@@ -1091,12 +1104,15 @@ $$("[data-mode]").forEach(b=>b.onclick=()=>{S.mode=b.dataset.mode;commit();rscro
 /* ---------- overview ---------- */
 const segsIn=i=>SEGS.filter(g=>g.t>=CH[i].t&&(i===CH.length-1||g.t<CH[i+1].t));
 /* The top of the overview: the argument of the whole video. Older videos only have three bullet points. */
+const pointLi=x=>{const m=/^([^：:，。]{1,14})[：:]\s*(.+)$/.exec(x);return m?`<li><b>${esc(m[1])}</b>：${esc(m[2])}</li>`:`<li>${esc(x)}</li>`};
+function checkHtml(ck){const rows=[["邏輯最穩的幾環",ck.solid],["沒有說明的假設",ck.assumptions],["證據的限制",ck.evidence],["前後矛盾的地方",ck.contradictions]].filter(x=>x[1]&&x[1].length);
+  return rows.length?`<section class="brief-c"><div class="eyebrow">推論強弱檢查</div>${rows.map(([h,l])=>`<h4>${h}</h4><ul>${l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`).join("")}</section>`:""}
 function briefHtml(){const b=V.brief;
   if(!b||!(b.principle||(b.groups||[]).length))return `<ul>${TLDR.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`;
-  const point=x=>{const m=/^([^：:，。]{1,12})[：:]\s*(.+)$/.exec(x);return m?`<li><b>${esc(m[1])}</b>：${esc(m[2])}</li>`:`<li>${esc(x)}</li>`};
+  const point=pointLi;
   return `${b.principle?`<div class="brief-p"><div class="eyebrow">第一性原理</div><p>${esc(b.principle)}</p></div>`:""}
     ${(b.groups||[]).map(g=>`<section class="brief-g"><h3>${esc(g.title)}</h3><ul>${(g.points||[]).map(point).join("")}</ul></section>`).join("")}
-    ${b.reminder?`<p class="brief-r"><b>核心提醒</b>${esc(b.reminder)}</p>`:""}`}
+    ${b.reminder?`<p class="brief-r"><b>核心提醒</b>${esc(b.reminder)}</p>`:""}${checkHtml(b.check||{})}`}
 function renderOverview(){
   const list=CH.map((c,i)=>({c,i,segs:segsIn(i)}));
   const nDeep=SEGS.filter(isDeep).length;
@@ -1131,14 +1147,14 @@ const segAt=t=>{let g=SEGS[0];for(const x of SEGS)if(x.t<=t)g=x;return g};
 // What the reader sees for a highlighted sentence: the part that was drawn, in the language being read.
 const shown=id=>{const r=S.hl[id]&&RNG()[id];if(r)return r.zh?cut(id,"zh"):cut(id,"en");return S.mode==="en"?SENT[id].en:SENT[id].zh};
 const joinText=ids=>{const cjk=S.mode!=="en"||/^zh/i.test(V.lang||"");return ids.map(shown).join(cjk?"":" ")};
-function quoteOf(id){if(String(id).startsWith("ai-")){const g=SEGS.find(x=>"ai-"+x.id===id||"ai-"+x.t===id);return g&&(g.core||g.spark)?{text:g.core||g.spark,t:g.t,ai:true}:null}
+function quoteOf(id){if(String(id).startsWith("ai-")){const g=SEGS.find(x=>"ai-"+x.id===id||"ai-"+x.t===id);return g&&(g.core||g.role||g.spark)?{text:g.core||g.role||g.spark,t:g.t,ai:true}:null}
   return SENT[id]?{text:shown(id),t:SENT[id].t}:null}
 /* One chapter's worth: the AI's first principle, then runs of highlighted sentences, then notes. */
 /* A point is one thing I marked: a run of highlighted sentences, or a passage I highlighted in the AI's own summary.
    Nothing gets on the points page by itself. */
 const AIP=()=>S.aip||(S.aip={});
 const EDITS=()=>S.edit||(S.edit={});
-const AI_SEL=".absorb li,.absorb .core,.absorb .ask,.ov .thesis,.brief-p p,.brief-g li,.brief-r,.ch>p";
+const AI_SEL=".absorb li,.absorb .core,.absorb .ask,.absorb td,.ov .thesis,.brief-p p,.brief-g li,.brief-c li,.brief-r,.ch>p";
 function pointsOf(g){
   const o=order(),ids=Object.keys(S.hl).filter(id=>SENT[id]&&SENT[id].seg===g).sort((a,b)=>o[a]-o[b]),blocks=[];
   ids.forEach(id=>{const last=blocks[blocks.length-1];

@@ -648,3 +648,12 @@ mark.aim{background:var(--hl-y);color:var(--ink);border-radius:2px 5px 3px 4px;p
 .ch header button.t{text-align:left;font:inherit;color:inherit} .ch header button.t:hover{text-decoration:underline;text-underline-offset:3px}
 .linked.near>div{align-items:center}
 #root.no-yt .rbar .mini.keep{display:inline-flex} .rbar .mini:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+
+/* Chapter notes and the reasoning check written from the owner's prompt */
+.absorb ul{display:grid;gap:8px} .absorb li b{font-weight:700}
+.tblwrap{overflow-x:auto;margin:6px -2px 2px} .tblwrap table{border-collapse:collapse;width:100%;font-size:15px;line-height:1.6}
+.tblwrap caption{text-align:left;font-family:var(--f-t);font-size:12.5px;letter-spacing:.05em;color:var(--mute);padding:0 0 6px}
+.tblwrap th,.tblwrap td{text-align:left;vertical-align:top;padding:8px 10px;border-top:1px solid var(--line);min-width:7em} .tblwrap th{font-weight:700;border-top:0;border-bottom:1px solid color-mix(in srgb,var(--ink) 30%,transparent)}
+.brief-c{display:grid;gap:6px;padding-top:14px;border-top:1px solid var(--line)} .brief-c h4{margin:8px 0 0;font-size:15.5px;font-weight:700}
+.brief-c ul{margin:0;padding-left:20px;display:grid;gap:6px} .brief-c li{font-size:16px;line-height:1.7}
+.absorb td,.brief-c li{-webkit-user-select:text;user-select:text}
