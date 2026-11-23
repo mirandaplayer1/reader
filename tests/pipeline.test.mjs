@@ -57,6 +57,13 @@ assert(row.work.phase==='translate'&&row.progress.phase==='translate','translati
  const dead={...deps,fetch:async()=>({ok:false,status:503,json:async()=>({error:{message:'overloaded'}})})};let t2=false;try{await ingestStep(JSON.parse(snap),dead)}catch(e){t2=e.message==='overloaded'}assert(t2,'all requests failing fails the step');
  console.log('translate ok: steps',k,'sentences',all.length);
  tr={...tr,...await ingestStep(tr,deps)};assert(tr.work.phase==='ready'&&tr.status==='ready','nothing left after translation: the sections were written with the overview')}
+// an analysis written outside is assembled without asking the model anything, on a video that is already finished
+{const before=calls,done=JSON.parse(JSON.stringify(row)),ts=done.content.segs.flatMap(g=>g.turns.map(x=>x.t));
+ const given={lang:'en',title:'x',host:'',headline:'外面寫的',principle:'p',groups:[{title:'g',points:['一']}],reminder:'r',check:{solid:['s'],assumptions:[],evidence:[],contradictions:[]},sections:[{t:ts[0],title:'第一段',role:'作用一',points:['x'],tables:[]},{t:ts[200],title:'第二段',role:'作用二',points:['y'],tables:[]}]};
+ const out=await ingestStep({...done,status:'processing',work:{phase:'outline',given}},deps);
+ assert(calls===before&&out.status==='ready'&&out.content.thesis==='外面寫的'&&out.content.segs.length===2&&out.content.segs[1].title==='第二段'&&out.content.segs[1].turns[0].t===ts[200],'given analysis used as it is, no request');
+ assert(out.content.segs.flatMap(g=>g.turns.flatMap(x=>x.s.map(p=>p[0]))).join(' ')===done.content.segs.flatMap(g=>g.turns.flatMap(x=>x.s.map(p=>p[0]))).join(' '),'transcript unchanged');
+ console.log('given ok')}
 // one section written again from the reader
 row.content.segs[1].deep=false;row.content.segs[1].turns.forEach(tu=>tu.s.forEach(p=>{p[1]=null}));
 let d=0,r;do{r=await deepenStep(row,1,deps);if(r.content)row.content=r.content;d++;assert(d<200,'runaway deepen')}while(!r.done);

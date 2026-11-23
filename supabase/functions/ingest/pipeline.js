@@ -342,6 +342,10 @@ export async function ingestStep(row, deps) {
   };
 
   if (work.phase === "outline" || work.phase === "seams" || work.phase === "synth") {
+    // An analysis written outside (work.given, in the same shape the model returns) is used as it is: no request is made.
+    // It can be put on a finished video directly; the transcript is then taken from what the video already has.
+    if (!work.turns.length && row.content) Object.assign(work, reprocessPatch(row, "text").work, { given: work.given });
+    if (work.given && Array.isArray(work.given.sections)) return finish(work.given, work.given.sections);
     const first = work.turns[0].t, last = work.turns[work.turns.length - 1].t;
     if (last - first <= ONE_REQUEST) {
       const prompt =
