@@ -369,9 +369,8 @@ function renderOverview(){
     <div class="chs">${list.map(({c,i,segs})=>`<article class="ch w${c.worth}" data-ai-t="${c.t}">
       <header><b>${segs.length===1?`<button class="t" data-seg="${segs[0].id}">${esc(c.zh)}</button>`:`<span class="t">${esc(c.zh)}</span>`}<small>${esc(c.en)}</small></b>${tlink(c.t)}</header>
       <p>${esc(c.sum)}</p>${c.take?`<p class="take">→ ${esc(c.take)}</p>`:""}
-      <div class="row">${segs.map(g=>isDeep(g)?(segs.length>1?`<button class="btn sm line" data-seg="${g.id}">${esc(g.title)}</button>`:"")
-        :`<button class="btn sm" data-deepen="${SEGS.indexOf(g)}" ${ui.busy[g.id]?"disabled":""}>${ui.busy[g.id]?esc(ui.busy[g.id]):"精讀這一章"}</button><button class="btn sm line" data-seg="${g.id}" data-raw>看原文</button>`).join("")
-        ||`<a class="btn sm ghost" data-t="${c.t}" data-goread href="${yt(c.t)}" target="_blank" rel="noopener">播放這一章</a>`}</div>
+      ${(btns=>btns?`<div class="row">${btns}</div>`:"")(segs.map(g=>isDeep(g)?(segs.length>1?`<button class="btn sm line" data-seg="${g.id}">${esc(g.title)}</button>`:"")
+        :`<button class="btn sm" data-deepen="${SEGS.indexOf(g)}" ${ui.busy[g.id]?"disabled":""}>${ui.busy[g.id]?esc(ui.busy[g.id]):"精讀這一章"}</button><button class="btn sm line" data-seg="${g.id}" data-raw>看原文</button>`).join(""))}
     </article>`).join("")}</div>
     <p class="meta">${V.demo?"這支範例只把 5 段展開成逐字稿。其餘章節的摘要讀的是完整逐字稿，可以直接播放。":`已精讀 ${nDeep} / ${SEGS.length} 章。還沒精讀的章節可以先看原文，或按「精讀」產生翻譯和第一性原理。`}</p>
     ${V.demo?"":`<details class="redo"><summary>重新處理這支影片</summary>
