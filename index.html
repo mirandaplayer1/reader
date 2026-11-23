@@ -1128,7 +1128,7 @@ function briefHtml(){const b=V.brief;
   const point=pointLi;
   return `${b.principle?`<div class="brief-p"><div class="eyebrow">第一性原理</div><p>${esc(b.principle)}</p></div>`:""}
     ${(b.groups||[]).map(g=>`<section class="brief-g"><h3>${esc(g.title)}</h3><ul>${(g.points||[]).map(point).join("")}</ul></section>`).join("")}
-    ${b.reminder?`<p class="brief-r"><b>核心提醒</b>${esc(b.reminder)}</p>`:""}${checkHtml(b.check||{})}`}
+    ${b.reminder?`<p class="brief-r"><b>核心提醒</b>${esc(b.reminder)}</p>`:""}`}   /* the reasoning check (C) is still stored in brief.check; she asked for it off the page */
 /* While the chapter notes are still being written in the background, an open video picks them up as they arrive. */
 const pending=()=>{const it=LIB.find(x=>x&&x.video_id===VID&&!x.demo);return !!(it&&it.status==="ready"&&it.progress&&["translate","analyse"].includes(it.progress.phase))};
 let watchT=null;
