@@ -604,3 +604,22 @@ textarea:focus,input:focus{border-color:var(--ink);box-shadow:none;outline:0}
 @media (max-width:560px){.lhead{grid-template-columns:120px 1fr}}
 .lcard.book,.book{gap:0}
 .bk.tbox{margin-top:0}
+
+/* Points as cards: one thing I marked per card */
+.pgroup{display:grid;gap:10px;padding-top:6px}
+.pgroup>header{display:flex;gap:12px;align-items:baseline;justify-content:space-between;padding:10px 2px 0;border-top:1px solid var(--line)}
+.pgroup>header .quiet:first-child{flex:1;min-width:0;font-family:var(--f-t);font-size:13px;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:16px;background:var(--surf);box-shadow:0 0 0 1px var(--line),0 1px 0 rgba(60,40,15,.05);cursor:pointer;transition:box-shadow .12s}
+.pcard:hover{box-shadow:0 0 0 1px color-mix(in srgb,var(--ink) 34%,transparent)}
+.pcard>div{flex:1;min-width:0;display:grid;gap:6px}
+.pcard small{font-family:var(--f-t);font-size:12px;letter-spacing:.05em;color:var(--mute);display:flex;align-items:center;gap:7px}
+.pcard small::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--hl-y);box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.pcard[data-hl="i"] small::before{background:var(--hl-i)} .pcard[data-hl="p"] small::before{background:var(--hl-p)} .pcard[data-hl="g"] small::before{background:var(--hl-g)}
+.pcard.ai small{color:var(--accent)} .pcard.ai small::before{background:var(--accent);box-shadow:none}
+.pcard.note{background:none;box-shadow:inset 0 0 0 1px var(--line)} .pcard.note small::before{display:none}
+.pcard p{margin:0;font-size:16.5px;line-height:1.7;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
+.pcard .pn{font-size:15px;color:var(--link);padding-left:20px;position:relative;-webkit-line-clamp:4} .pcard .pn::before{content:"✎";position:absolute;left:0;top:0;font-size:13px;color:var(--accent)}
+.picking .pcard.note{opacity:.45;cursor:default}
+.pempty{padding:26px 20px;border-radius:16px;box-shadow:inset 0 0 0 1px var(--line);color:var(--mute);display:grid;gap:8px} .pempty p{margin:0;font-size:15.5px;line-height:1.7} .pempty p:first-child{color:var(--ink);font-weight:600}
+mark.aim{background:var(--hl-y);color:var(--ink);border-radius:2px 5px 3px 4px;padding:2px 0;cursor:pointer}
+.absorb li,.absorb .core,.absorb .ask,.ov .thesis,.brief-p p,.brief-g li,.brief-r,.ch>p{-webkit-user-select:text;user-select:text}
