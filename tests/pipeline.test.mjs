@@ -20,13 +20,13 @@ const fetchStub=async(url,opt)=>{calls++;
     const rel=(a/300)%3===2;out={turns:turns.map(t=>({ts:mmss(rel?t.t-a:t.t),speaker:t.speaker,text:t.text})),visuals:[],reached_end:true}}
   else{const p=parts[0].text,ts=[...p.matchAll(/^\[(\d+)\]/gm)].map(m=>+m[1]);
     const meta={lang:'en',title:'x',host:'Lex Fridman',headline:'主旨',principle:'原理',groups:[{title:'起點',points:['甲：一','二']},{title:'空',points:[]}],reminder:'提醒',check:{solid:['穩'],assumptions:['假設一','假設二'],evidence:[],contradictions:['矛盾']}};
-    const sec=(t,title)=>({t,title,role:'作用'+title,points:['a','b','c','d'],tables:[{title:'對照',headers:['質疑','回應'],rows:[{cells:['一','二']},{cells:['三','四']},{cells:['壞掉的列']}]},{title:'太小',headers:['只有一欄'],rows:[]}]});
+    const sec=(t,title)=>({t,title,body:'  作用'+title+'\n\n- a\n- b\n\n| 質疑 | 回應 |\n|---|---|\n| 一 | 二 |  '});
     if(p.includes('"sections"')){fullCalls+=p.includes('"headline"')?1:0;partCalls+=p.includes('"headline"')?0:1;
-      const sections=[sec(ts[0]+1,'甲'),sec(ts[Math.floor(ts.length/2)],'乙'),sec(ts[Math.floor(ts.length/2)],'重複的時間'),{t:ts[3],title:'',role:'',points:[],tables:[]}];
+      const sections=[sec(ts[0]+1,'甲'),sec(ts[Math.floor(ts.length/2)],'乙'),sec(ts[Math.floor(ts.length/2)],'重複的時間'),{t:ts[3],title:'',body:''}];
       out=p.includes('"headline"')?{...meta,sections}:{sections}}
     else if(p.includes('推論強弱檢查')){overviewCalls++;out=meta}
     else if(p.includes('"zh":['))out={zh:p.split('\n').filter(l=>/^\d+\. /.test(l)).map(l=>'譯:'+l.slice(0,12))};
-    else out={role:'作用',points:['a','b','c','d'],tables:[]}}
+    else out={body:'重寫的一段\n\n- a'}}
   return {ok:true,json:async()=>({candidates:[{content:{parts:[{text:'```json\n'+JSON.stringify(out)+'\n```'}]}}]})}};
 const deps={fetch:fetchStub,geminiKey:'k',videoModel:'m',textModel:'m'};
 let row={video_id:'oFtjKbXKqbg',url:'u',title:'',status:'queued',work:{},content:null};let steps=0;
@@ -35,8 +35,8 @@ const c=row.content;console.log('ingest ok: steps',steps,'chapters',c.chapters.l
 const kept=c.segs.flatMap(g=>g.turns.flatMap(t=>t.s.map(p=>p[0]))).join(' ').replace(/\s+/g,' ');const want=[...real].sort((p,q)=>p.t-q.t).map(t=>t.text).join(' ').replace(/\s+/g,' ');assert(kept===want,'every word kept once, in order');assert(c.duration===13409,'duration from token count');
 // a video too long for one answer: (A)+(C) from the whole transcript and (B) an hour at a time, all in the same step
 assert(fullCalls===0&&overviewCalls===1&&partCalls===4,'long video: one overview and one request per hour: '+[fullCalls,overviewCalls,partCalls]);
-assert(c.chapters.length===8&&c.segs.every(g=>g.deep===true&&g.role&&g.points.length===4&&g.tables.length===1&&g.tables[0].rows.length===2),'every section arrives written, tables tidied: '+c.chapters.length);
-assert(c.chapters[0].t===c.segs[0].turns[0].t&&c.chapters.every((x,i)=>x.zh===c.segs[i].title&&x.sum===c.segs[i].role&&x.take===''),'sections start at the first line; the list shows what her prompt wrote');
+assert(c.chapters.length===8&&c.segs.every(g=>g.deep===true&&g.body.startsWith('作用')&&g.body.endsWith('| 一 | 二 |')&&g.role===undefined&&g.points===undefined),'every section arrives written, as free text: '+c.chapters.length);
+assert(c.chapters[0].t===c.segs[0].turns[0].t&&c.chapters.every((x,i)=>x.zh===c.segs[i].title&&x.sum===''&&x.take===''),'sections start at the first line; the list shows what her prompt wrote');
 assert(c.thesis==='主旨'&&c.brief.principle==='原理'&&c.brief.reminder==='提醒'&&c.brief.groups.length===1&&c.brief.groups[0].points.length===2,'overview: headline, principle, groups without empty ones, reminder');
 assert(c.brief.check.solid.length===1&&c.brief.check.assumptions.length===2&&c.brief.check.evidence.length===0&&c.brief.check.contradictions[0]==='矛盾','overview keeps the reasoning check');
 // a video that fits: ONE request carries her whole prompt and the whole transcript, and the model decides the sections
@@ -67,7 +67,7 @@ assert(row.work.phase==='translate'&&row.progress.phase==='translate','translati
 // one section written again from the reader
 row.content.segs[1].deep=false;row.content.segs[1].turns.forEach(tu=>tu.s.forEach(p=>{p[1]=null}));
 let d=0,r;do{r=await deepenStep(row,1,deps);if(r.content)row.content=r.content;d++;assert(d<200,'runaway deepen')}while(!r.done);
-const g=row.content.segs[1];assert(g.deep&&g.turns.every(t=>t.s.every(p=>p[1])),'translated');assert(g.points.length===4&&g.role==='作用'&&row.content.chapters[1].sum==='作用','one section rewritten, and the list follows');
+const g=row.content.segs[1];assert(g.deep&&g.turns.every(t=>t.s.every(p=>p[1])),'translated');assert(g.body==='重寫的一段\n\n- a'&&g.role===undefined,'one section rewritten');
 console.log('deepen ok: calls',d,'sentences',g.turns.reduce((a,t)=>a+t.s.length,0));
 // the owner's prompt reaches the model word for word
 {const her=fs.readFileSync(new URL('./fixtures/owner-prompt.txt',import.meta.url),'utf8');const src=fs.readFileSync(new URL('../supabase/functions/ingest/pipeline.js',import.meta.url),'utf8');

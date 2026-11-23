@@ -101,13 +101,13 @@ const OBJ = (properties) => ({ type: "OBJECT", properties, required: Object.keys
 const CHECK = OBJ({ solid: LIST(STR), assumptions: LIST(STR), evidence: LIST(STR), contradictions: LIST(STR) });
 const META = { lang: STR, title: STR, host: STR, headline: STR, principle: STR, groups: LIST(OBJ({ title: STR, points: LIST(STR) })), reminder: STR, check: CHECK };
 const TABLES = LIST(OBJ({ title: STR, headers: LIST(STR), rows: LIST(OBJ({ cells: LIST(STR) })) }));
-const SECTION_ITEM = OBJ({ t: INT, title: STR, role: STR, points: LIST(STR), tables: TABLES });
+const SECTION_ITEM = OBJ({ t: INT, title: STR, body: STR });
 const SCHEMA = {
   full: OBJ({ ...META, sections: LIST(SECTION_ITEM) }),
   sections: OBJ({ sections: LIST(SECTION_ITEM) }),
   synth: OBJ(META),
   translate: OBJ({ zh: LIST(STR) }),
-  analysis: OBJ({ role: STR, points: LIST(STR), tables: TABLES }),
+  analysis: OBJ({ body: STR }),
 };
 
 async function gemini(deps, model, parts, maxTokens = 32768, schema = null) {
@@ -210,6 +210,12 @@ const tidyTables = (list) => (Array.isArray(list) ? list : []).map((t) => {
   const rows = (Array.isArray(t && t.rows) ? t.rows : []).map((r) => (Array.isArray(r && r.cells) ? r.cells : []).map(String).slice(0, headers.length)).filter((r) => r.length === headers.length && r.some(Boolean)).slice(0, 8);
   return { title: String((t && t.title) || ""), headers, rows };
 }).filter((t) => t.headers.length >= 2 && t.rows.length >= 2).slice(0, 3);
+// What (B) says about one section. It is free text, laid out the way her prompt asks: prose, lists, steps and tables as the content calls for.
+// Analyses written before this kept a role line, a list of points and tables in separate fields; those are still accepted.
+const BODY = `這一段的整理全文放 body，是一段文字，照步驟三的寫法自由安排：段落之間空一行，條列每行用「- 」開頭，有先後的步驟用「1. 」編號，要強調的引導詞用 **粗體**，表格用 | 欄 | 欄 | 的寫法（第一列是欄名）。`;
+const written = (x) => (x && String(x.body || "").trim()
+  ? { body: String(x.body).trim() }
+  : { role: String((x && x.role) || ""), points: tidyPoints(x && x.points), tables: tidyTables(x && x.tables) });
 const tidyPoints = (list) => (Array.isArray(list) ? list : []).map(String).filter(Boolean).slice(0, 12);
 
 /* ---------- ingest: meta -> transcribe (chunk by chunk) -> outline (the whole analysis, one request) -> ready (-> translate, in the background) ---------- */
@@ -296,10 +302,9 @@ export async function ingestStep(row, deps) {
     `"headline":"<(A) 的標題>","principle":"<(A) 的第一性原理>","groups":[{"title":"<主題區塊的名稱>","points":["<條列>"]}],"reminder":"<(A) 的核心提醒>",` +
     `"check":{"solid":["<邏輯最穩的一環和原因>"],"assumptions":["<未說明的假設>"],"evidence":["<證據的問題>"],"contradictions":["<矛盾>"]}`;
   const SECTION_SPEC =
-    `{"t":<這一段開始的秒數，必須是逐字稿裡某一行開頭方括號裡的數字>,"title":"<你為這一段標註的標題>","role":"<這段在整體論證中的作用>","points":["<重點>"],` +
-    `"tables":[{"title":"<表格標題>","headers":["<欄名>"],"rows":[{"cells":["<儲存格>"]}]}]}`;
+    `{"t":<這一段開始的秒數，必須是逐字稿裡某一行開頭方括號裡的數字>,"title":"<你為這一段標註的標題>","body":"<這一段的整理全文>"}`;
   const OUT_A = `(A) 的標題放 headline，第一性原理放 principle，主題區塊放 groups（每個區塊的名稱放 title，條列放 points），核心提醒放 reminder。`;
-  const OUT_B = `(B) 的每一段是 sections 裡的一項，照時間順序，第一段從逐字稿第一行開始，整份逐字稿都要分到：t 是這一段開始的秒數，title 是這一段的標題，這段的作用放 role，重點放 points（條列），表格放 tables（每個表格有 title、headers、rows，rows 的每一列是 cells）；這一段沒有表格就給空陣列。`;
+  const OUT_B = `(B) 的每一段是 sections 裡的一項，照時間順序，第一段從逐字稿第一行開始，整份逐字稿都要分到：t 是這一段開始的秒數，title 是這一段的標題，${BODY}`;
   const OUT_C = `(C) 的四項依序放 check 的 solid、assumptions、evidence、contradictions，每一項都是條列；哪一項沒有內容就給空陣列。`;
   const STAMP = `每一行開頭的方括號是那一行開始的秒數，這就是時間戳。`;
   const lines = (turns) => turns.map((t) => `[${t.t}] ${t.speaker}: ${t.text}`).join("\n");
@@ -309,16 +314,17 @@ export async function ingestStep(row, deps) {
     const starts = work.turns.map((t) => t.t);
     const snap = (t) => starts.reduce((best, x) => (Math.abs(x - t) < Math.abs(best - t) ? x : best), starts[0]);
     const sections = (Array.isArray(list) ? list : [])
-      .map((x) => ({ t: snap(Number(x && x.t) || 0), title: String((x && x.title) || "").trim(), role: String((x && x.role) || ""), points: tidyPoints(x && x.points), tables: tidyTables(x && x.tables) }))
+      .map((x) => ({ t: snap(Number(x && x.t) || 0), title: String((x && x.title) || "").trim(), ...written(x) }))
       .filter((x) => x.title).sort((x, y) => x.t - y.t).filter((x, i, arr) => i === 0 || x.t > arr[i - 1].t);
     if (!sections.length) throw new Error("沒有產生分段，請重試。");
     sections[0].t = starts[0];
-    const chapters = sections.map((x) => ({ t: x.t, en: "", zh: x.title, sum: x.role, take: "", worth: 2 }));
+    const chapters = sections.map((x) => ({ t: x.t, en: "", zh: x.title, sum: x.role || "", take: "", worth: 2 }));
     const segs = sections.map((x, i) => {
       const end = i + 1 < sections.length ? sections[i + 1].t : Infinity;
       const turns = work.turns.filter((t) => t.t >= x.t && t.t < end)
         .map((t) => ({ sp: t.speaker, t: t.t, s: splitSentences(t.text).map((y) => [y, (work.zh && work.zh[y]) || null]) }));
-      return { id: "c" + i, t: x.t, title: x.title, deep: true, role: x.role, points: x.points, tables: x.tables, turns };
+      const { t, title, ...text } = x;
+      return { id: "c" + i, t, title, deep: true, ...text, turns };
     });
     const content = {
       vid: row.video_id, lang: String(meta.lang || "en"), title: row.title || String(meta.title || ""), channel: work.channel || "",
@@ -486,13 +492,13 @@ export async function deepenStep(row, k, deps) {
   const prompt =
     `# 任務\n分析下方的逐字稿，產出 (B) 分段整理。這份逐字稿是一支影片依主題轉折分好的其中一段，這一次只整理這一段。整支影片的 (A) 第一性原理摘要已經寫好，附在下面，讓你知道整體論證。\n\n` +
     `${RULES}\n\n${SECTION}\n\n${SELF_CHECK}\n\n` +
-    `# 輸出\n這段在整體論證中的作用放 role，重點放 points（條列），表格放 tables（每個表格有 title、headers、rows，rows 的每一列是 cells）；沒有表格就給空陣列。\n` +
-    `JSON：{"role":"<這段在整體論證中的作用>","points":["<重點>"],"tables":[{"title":"<表格標題>","headers":["<欄名>"],"rows":[{"cells":["<儲存格>"]}]}]}\n\n` +
+    `# 輸出\n${BODY}\nJSON：{"body":"<這一段的整理全文>"}\n\n` +
     `# 整支影片的 (A) 第一性原理摘要\n${content.thesis || ""}\n${brief.principle || ""}\n\n這一章的主題：${seg.title}\n這一段開始的時間：${clock(seg.t)}\n\n# 逐字稿\n<transcript>\n${numbered}\n</transcript>`;
   const out = await llmJSON(deps, prompt, 8000, SCHEMA.analysis);
   ["spark", "sum", "core", "chain", "ask", "counter", "key"].forEach((k) => { delete seg[k]; });   // the shape this replaced
-  Object.assign(seg, { deep: true, role: String(out.role || ""), points: tidyPoints(out.points), tables: tidyTables(out.tables) });
-  const ch = (content.chapters || []).find((c) => c.t === seg.t); if (ch) ch.sum = seg.role;
+  ["role", "points", "tables"].forEach((k) => { delete seg[k]; });
+  Object.assign(seg, { deep: true, ...written(out) });
+  const ch = (content.chapters || []).find((c) => c.t === seg.t); if (ch) ch.sum = seg.role || "";
   if (sameLang) seg.turns.forEach((tu) => tu.s.forEach((p) => { if (p[1] == null) p[1] = p[0]; }));
   return { content, done: true, progress: { phase: "ready", done: total, total } };
 }

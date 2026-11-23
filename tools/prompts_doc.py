@@ -6,7 +6,8 @@ OWNER = re.search(r'const OWNER = `(.*?)`;', src, re.S).group(1)
 def line(name):
     m = re.search(r'const ' + name + r' =\s*\n?\s*((?:`[^`]*`(?:\s*\+\s*\n\s*)?)+);', src)
     return ''.join(re.findall(r'`([^`]*)`', m.group(1)))
-OUT_A, OUT_B, OUT_C, STAMP, META, SECTION = (line(n) for n in ('OUT_A', 'OUT_B', 'OUT_C', 'STAMP', 'META_SPEC', 'SECTION_SPEC'))
+OUT_A, OUT_B, OUT_C, STAMP, META, SECTION, BODY = (line(n) for n in ('OUT_A', 'OUT_B', 'OUT_C', 'STAMP', 'META_SPEC', 'SECTION_SPEC', 'BODY'))
+OUT_B = OUT_B.replace('${BODY}', BODY)
 F = '```'
 doc = f'''# Reader：影片分析流程與所有 AI 提示詞
 
@@ -72,9 +73,7 @@ JSON：{{{META},"sections":[{SECTION}]}}
 | reminder | 總覽「核心提醒」 |
 | check | 總覽「推論強弱檢查」的四類 |
 | sections[].title | 章節標題 |
-| sections[].role | 閱讀頁每段的「這一段的作用」，也顯示在總覽的章節清單 |
-| sections[].points | 閱讀頁每段的「重點」 |
-| sections[].tables | 重點下面的表格 |
+| sections[].body | 每段的整理全文。顯示在總覽的「分段整理」和閱讀頁每段逐字稿下面 |
 
 ## 三、① 聽寫逐字稿
 
@@ -109,7 +108,7 @@ Return JSON only: {{"turns":[{{"ts":"MM:SS","speaker":"name","text":"..."}}],"vi
 
 ## 五、不在自動流程裡的
 
-- **重寫單一段**：某一段的整理失敗或你想重寫時，閱讀頁會出現「整理這一段」。它送出你的寫作規範、步驟三和最後自我檢查，加上那一段的逐字稿。
+- **重寫單一段**：某一段的整理失敗或你想重寫時，閱讀頁會出現「整理這一段」。它送出你的寫作規範、步驟三和最後自我檢查，加上那一段的逐字稿，回來的一樣是那一段的整理全文。
 - **請 AI 解釋這句**（點句子後的面板）：只在 Claude 預覽頁有作用，部署版沒有接上。
 '''
 open(ROOT + '/PROMPTS.md', 'w', encoding='utf8').write(doc)
