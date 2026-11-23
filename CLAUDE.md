@@ -62,6 +62,27 @@ UI 測試讀的是建好的 `index.html`，所以先 `python3 build.py`。
 
 前端和後端有相依時（例如新欄位），先部署後端和資料庫，再合併前端。
 
+## Backlog
+
+Miranda 用 Notion 的 **Dev** 資料庫管要做的事（在她的 Notion：Miranda Home / Dev / Dev，只看 `Project = reader` 的列）。
+她用 `Status` 表達決定，不用留言：
+
+| Status | 意思 | 你該做什麼 |
+|---|---|---|
+| Not started | 她核准了 | 做。開工時改成 In progress |
+| To Be Approved | 等她看 | 不要動 |
+| In progress | 正在做 | |
+| Done | 做完 | 做完改成這個，並在該頁最後加一段「做了什麼、怎麼驗證」 |
+| Closed (Not approved) | 她不要 | 不要做，也不要再提 |
+
+- 依標題的 `P` 編號順序做。`Type` 是 `Epic (PRD)` 的列和標題是 `Goal:` 開頭的列是說明，不是待辦。
+- 她會自己開新的列寫「設計不好的地方」（截圖加幾條描述，像 `improvement` 那頁）。這種列留在 Not started 就是要做。
+- 你自己想到的建議：開新列，`Type = Backlog`、`Project = reader`、`Status = To Be Approved`，寫清楚現在的問題、要改什麼、工作量、取捨。不要直接做。
+- 需要新的提示詞：把草稿寫在該頁，`Status` 設 To Be Approved，等她改回 Not started。
+- 她判斷建議的標準：一個人能維護、不增加她的操作步驟。會增加步驟的要明講，並設計成不用就不存在。
+
+CLI 裡打 `/backlog` 會照這個流程跑一輪（`.claude/commands/backlog.md`）。
+
 ## 不要做的事
 
 - 不要把金鑰寫進 repo 或貼進對話。Gemini 金鑰只存在 Supabase 的 function secret `GEMINI_API_KEY`。
