@@ -647,3 +647,4 @@ mark.aim{background:var(--hl-y);color:var(--ink);border-radius:2px 5px 3px 4px;p
 .ovname{display:grid;gap:3px} .ovname b{font-size:15px;line-height:1.5;font-weight:600} .ovname small{font-family:var(--f-t);font-size:12.5px;letter-spacing:.04em;color:var(--mute)}
 .ch header button.t{text-align:left;font:inherit;color:inherit} .ch header button.t:hover{text-decoration:underline;text-underline-offset:3px}
 .linked.near>div{align-items:center}
+#root.no-yt .rbar .mini.keep{display:inline-flex} .rbar .mini:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}

@@ -650,6 +650,7 @@ mark.aim{background:var(--hl-y);color:var(--ink);border-radius:2px 5px 3px 4px;p
 .ovname{display:grid;gap:3px} .ovname b{font-size:15px;line-height:1.5;font-weight:600} .ovname small{font-family:var(--f-t);font-size:12.5px;letter-spacing:.04em;color:var(--mute)}
 .ch header button.t{text-align:left;font:inherit;color:inherit} .ch header button.t:hover{text-decoration:underline;text-underline-offset:3px}
 .linked.near>div{align-items:center}
+#root.no-yt .rbar .mini.keep{display:inline-flex} .rbar .mini:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 
 </style>
 
@@ -666,7 +667,7 @@ mark.aim{background:var(--hl-y);color:var(--ink);border-radius:2px 5px 3px 4px;p
       <div class="player"><div id="yt"></div>
         <a class="pfall" id="pfall" target="_blank" rel="noopener"><img alt="" id="pthumb" onerror="this.hidden=true"><span><b>在 YouTube 開啟影片 ↗</b><small id="pfmsg">影片載入中…</small></span></a>
       </div>
-      <div class="rbar"><div class="seg3" role="group" aria-label="顯示語言"><button data-mode="zh">中</button><button data-mode="both">中英</button><button data-mode="en">EN</button></div><span class="sp" style="flex:1"></span><button class="mini" id="pmin">收起影片</button></div>
+      <div class="rbar"><div class="seg3" role="group" aria-label="顯示語言"><button data-mode="zh">中</button><button data-mode="both">中英</button><button data-mode="en">EN</button></div><span class="sp" style="flex:1"></span><button class="mini keep" id="tcopy">複製逐字稿</button><button class="mini" id="pmin">收起影片</button></div>
       <div class="scroll" id="rscroll"></div>
       <button class="tonow" id="tonow" hidden>▶ 回到播放位置</button>
       <div class="rfab"><button id="chap" aria-label="章節目錄"></button><button id="fab-note" aria-label="寫筆記">✎ 筆記</button></div>
@@ -932,6 +933,14 @@ function goToNow(){
 $("#tonow").onclick=goToNow;
 rscroll.addEventListener("scroll",()=>{if(nowTurn)showToNow();if(Date.now()-lastUserScroll<4000)trackPos();else showChap()},{passive:true});
 ["wheel","touchmove"].forEach(ev=>rscroll.addEventListener(ev,()=>lastUserScroll=Date.now(),{passive:true}));
+/* The whole transcript as text: chapter headings with their time, then the same paragraphs the page shows, in the language(s) on screen. */
+function transcriptText(){const mono=/^zh/i.test(V.lang||""),lead=leads(),L=[`# ${V.title}`,""];
+  const txt=(u,k)=>u.parts.map(({tu,from,to})=>tu.s.slice(from,to).filter(Boolean).map(p=>(k?p[1]:p[0])||p[0]).join(k?"":" ")).join(k?"":" ").replace(/\s+/g," ").replace(/([\u3000-\u9fff\uff00-\uffef])\s+(?=[\u3000-\u9fff\uff00-\uffef])/g,"$1").trim();
+  SEGS.forEach((g,gi)=>{L.push(`## ${g.title}（${fmt(g.t)}）`,"");const tr=!mono&&g.turns.some(tu=>tu.s.some(p=>p&&p[1]&&p[1]!==p[0]));
+    paragraphs(gi,lead).forEach(u=>{if(u.screen)return;const en=txt(u,0),zh=tr?txt(u,1):"";
+      if(tr&&S.mode!=="en")L.push(zh,"");if(!tr||S.mode!=="zh")L.push(en,"")})});
+  return L.join("\n").trim()+"\n"}
+$("#tcopy").onclick=()=>copyString(transcriptText());
 $("#pmin").onclick=e=>{const m=root.classList.toggle("p-min");e.currentTarget.textContent=m?"顯示影片":"收起影片"};
 document.addEventListener("click",e=>{const a=e.target.closest("a[data-t]");if(!a)return;if(seek(+a.dataset.t)){e.preventDefault();if(a.dataset.goread!=null)setTab("read");else if(ui.m!=="read")toast("從 "+fmt(+a.dataset.t)+" 播放中")}});
 

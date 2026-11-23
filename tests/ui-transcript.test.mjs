@@ -35,4 +35,7 @@ const ids = await p.$$eval('.zh .s', x => x.map(e => e.dataset.id));
 console.log('paragraphs', JSON.stringify(paras));
 if (JSON.stringify(paras) !== JSON.stringify([['第一句講完了。', '第二句講到一半，這是第二句的後半。', '第三句又被章節切斷了。'], ['新章節的第一句。']])) { console.error('FAIL: paragraphs should end at sentence ends'); process.exit(1); }
 if (ids.length !== 6 || new Set(ids).size !== 6 || ids.join() !== await p.evaluate(() => Object.keys(SENT).join())) { console.error('FAIL: every sentence once, ids unchanged', ids); process.exit(1); }
+const copied = await p.evaluate(() => transcriptText());
+if (copied !== '# 切段\n\n## 甲（0:00）\n\n第一句講完了。\n\n第二句講到一半，這是第二句的後半。\n\n第三句又被章節切斷了。\n\n## 乙（1:00）\n\n新章節的第一句。\n') { console.error('FAIL: copied transcript', JSON.stringify(copied)); process.exit(1); }
+if (!(await p.isVisible('#tcopy'))) { console.error('FAIL: copy button not visible'); process.exit(1); }
 console.log('page errors', errs); await b.close(); if (errs.length) process.exit(1);
