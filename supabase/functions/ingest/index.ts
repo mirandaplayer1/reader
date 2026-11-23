@@ -29,7 +29,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const BOOT = Date.now();
 const WALL = 150_000, MARGIN = 8_000;
 // Longest each kind of step is expected to take, in seconds. A step only starts on a worker with that much life left.
-const NEED: Record<string, number> = { meta: 30, transcribe: 75, outline: 125, seams: 125, synth: 125, translate: 60, analyse: 60 };
+const NEED: Record<string, number> = { meta: 30, transcribe: 75, outline: 125, seams: 125, synth: 125, translate: 60, analyse: 90 };
 const need = (phase: unknown) => (NEED[String(phase || "meta")] ?? 125) * 1000;
 const fits = (phase: unknown) => Date.now() - BOOT + need(phase) + MARGIN <= WALL;
 const KILLED = "這一步沒有回報就中斷了，多半是超過 150 秒的執行時間上限。";
