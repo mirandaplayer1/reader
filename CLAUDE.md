@@ -89,7 +89,8 @@ CLI 裡打 `/backlog` 會照這個流程跑一輪（`.claude/commands/backlog.md
   `src/config.json` 裡的 anon key 是公開的，可以留在 repo。不要使用或要求 service_role key。
 - 不要沒問過就重跑 Miranda 的影片。重跑會重做章節和分析、花 API 費用，處理期間影片打不開。
   要驗證提示詞，把逐字稿複製到測試帳號 `e2e-test@reader.invalid` 重跑。
-- 不要沒問過就改提示詞的寫法。`pipeline.js` 裡的 `STYLE`、`TITLES`、`BRIEF` 是她逐字決定的。
+- 不要改 `pipeline.js` 裡的 `OWNER`。那是她自己寫的提示詞，要求一字不差（原文在 `tests/fixtures/owner-prompt.txt`，測試會比對）。
+  分段、標題、摘要都由這份提示詞決定，不要另外加規則。要動任何提示詞先問她。
 - 不要刪她的資料。
 
 ## 幾個容易踩到的地方
@@ -102,7 +103,7 @@ CLI 裡打 `/backlog` 會照這個流程跑一輪（`.claude/commands/backlog.md
   不可以呼叫 `commit()` 或改 `S.at`，否則一台很久沒開的裝置一打開就會把別台的新內容蓋掉。`push()` 寫入前會先看伺服器上有沒有沒看過的版本。
 - 存進使用者資料的鍵不要用章節序號（`c3`）。章節重切後序號會變。用秒數。
 - 句子的 id 是 `t{秒數}-{句序}`，使用者的畫線和筆記靠它對應。改切句邏輯（`splitSentences`）會讓既有的畫線對不上。
-- 中文影片不翻譯；英文影片先可讀、再背景翻譯、再背景寫每章分析。影片在 `status=ready` 之後 `work.phase` 還會經過 `translate`、`analyse`。
+- 中文影片不翻譯；英文影片先可讀（分析都在了）、再背景翻譯。影片在 `status=ready` 之後 `work.phase` 可能還是 `translate`。
 
 ## 查問題
 

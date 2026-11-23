@@ -657,3 +657,4 @@ mark.aim{background:var(--hl-y);color:var(--ink);border-radius:2px 5px 3px 4px;p
 .brief-c{display:grid;gap:6px;padding-top:14px;border-top:1px solid var(--line)} .brief-c h4{margin:8px 0 0;font-size:15.5px;font-weight:700}
 .brief-c ul{margin:0;padding-left:20px;display:grid;gap:6px} .brief-c li{font-size:16px;line-height:1.7}
 .absorb td,.brief-c li{-webkit-user-select:text;user-select:text}
+.segwait{margin:0 0 8px;font-size:14px} .ch header b,.ch.w1 header b{color:var(--ink);font-weight:700}
