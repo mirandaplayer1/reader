@@ -29,7 +29,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const BOOT = Date.now();
 const WALL = 150_000, MARGIN = 8_000;
 // Longest each kind of step is expected to take, in seconds. A step only starts on a worker with that much life left.
-const NEED: Record<string, number> = { meta: 30, transcribe: 75, outline: 125, seams: 125, synth: 125, translate: 60, analyse: 90 };
+const NEED: Record<string, number> = { meta: 30, transcribe: 75, outline: 125, seams: 125, synth: 125, translate: 60, analyse: 70 };
 const need = (phase: unknown) => (NEED[String(phase || "meta")] ?? 125) * 1000;
 const fits = (phase: unknown) => Date.now() - BOOT + need(phase) + MARGIN <= WALL;
 const KILLED = "這一步沒有回報就中斷了，多半是超過 150 秒的執行時間上限。";
@@ -85,9 +85,25 @@ async function runStep(db: any, row: any, deps: any) {
 
 // Called every minute by the database (see schema.sql). Works on whatever is waiting for as long as this worker
 // has life left, so videos finish with the page closed. Takes no input and only advances work a signed-in owner queued.
+// When this worker runs out of life with work still waiting, it asks for a fresh one instead of leaving the rest to the
+// next minute's schedule. Once per worker and never from a worker that did nothing, so it cannot turn into a loop.
+let kicked = false;
+async function relay(db: any, did: number) {
+  if (kicked || !did) return;
+  const { data: rows } = await db.from("videos").select("video_id").or(WAITING).limit(1);
+  if (!rows || !rows.length) return;
+  kicked = true;
+  const key = Deno.env.get("SUPABASE_ANON_KEY")!;
+  await fetch(Deno.env.get("SUPABASE_URL") + "/functions/v1/ingest", { method: "POST", headers: { "content-type": "application/json", apikey: key, Authorization: "Bearer " + key }, body: JSON.stringify({ action: "tick" }) }).catch(() => {});
+}
+
 function tick(deps: any) {
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  let did = 0;
   return (async () => {
+    try { await work(); } finally { await relay(db, did); }
+  })();
+  async function work() {
     while (fits("meta")) {
       const { data: rows } = await db.from("videos").select("user_id,video_id,lock_until,phase:work->>phase").or(WAITING).order("updated_at").limit(50);
       if (!rows || !rows.length) return;
@@ -98,9 +114,9 @@ function tick(deps: any) {
       if (!(await claim(db, pick))) { await sleep(1000); continue; }
       const { data: row } = await mine(db.from("videos").select("*"), pick).maybeSingle();
       if (!row || !waiting(row) || !fits(row.work?.phase)) { await mine(db.from("videos").update({ lock_until: null }), pick); if (row && waiting(row)) return; continue; }
-      await runStep(db, row, deps);
+      await runStep(db, row, deps); did++;
     }
-  })();
+  }
 }
 
 Deno.serve(async (req) => {

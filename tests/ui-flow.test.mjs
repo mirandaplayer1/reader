@@ -25,9 +25,9 @@ const fetchStub = async (url, opt) => {
     out = { turns: real.filter(t => t.t >= a && t.t < b), visuals: a === 0 ? [{ t: 30, text: 'nomadlist.com' }] : [], reached_end: b > 2200 };
   } else {
     const p = parts[0].text;
-    if (p.includes('推論強弱檢查')) out = { lang: 'en', title: 'x', host: 'Lex Fridman', headline: '一個人靠快速上線的小實驗找到會賺錢的產品。', principle: '沒有人能事先知道哪個點子會成，所以要讓每次嘗試都便宜。', groups: [{ title: '起點', points: ['付款驗證：有人刷卡才算數。', '兩週上線。'] }], reminder: '先放一個付款按鈕。', check: { solid: ['付款是有成本的訊號。'], assumptions: ['假設每個產品都能兩週做完。'], evidence: [], contradictions: [] } };
-    else if (p.includes('"chapters"')) out = { lang: 'en', title: 'x', host: 'Lex Fridman', thesis: '一個人靠快速上線的小實驗找到會賺錢的產品。', tldr: ['重點一', '重點二', '重點三'],
-      chapters: [{ t: 0, en: 'Introduction', zh: '開場', sum: '介紹來賓。', take: '', worth: 1 }, { t: 125, en: 'Startup philosophy', zh: '不募資快速驗證', sum: '兩週上線，付錢才算驗證。', take: '用付款驗證需求。', worth: 3 }, { t: 574, en: 'Low points', zh: '低潮', sum: '月收 500 美元。', take: '先動手。', worth: 2 }, { t: 1195, en: 'Travel', zh: '旅居', sum: '清邁。', take: '', worth: 1 }] };
+    const sec = (t, title) => ({ t, title, role: '這一段提出整場的核心機制：用付款當作驗證。', points: ['付款驗證：有人刷卡才算數，註冊和稱讚不算。', '兩週上線一個小產品。', '多數嘗試會失敗。'], tables: [{ title: '兩種做法', headers: ['做法', '代價'], rows: [{ cells: ['先募資', '時間長'] }, { cells: ['先上線', '兩週'] }] }] });
+    if (p.includes('"sections"')) out = { lang: 'en', title: 'x', host: 'Lex Fridman', headline: '一個人靠快速上線的小實驗找到會賺錢的產品。', principle: '沒有人能事先知道哪個點子會成，所以要讓每次嘗試都便宜。', groups: [{ title: '起點', points: ['付款驗證：有人刷卡才算數。', '兩週上線。'] }], reminder: '先放一個付款按鈕。', check: { solid: ['付款是有成本的訊號。'], assumptions: ['假設每個產品都能兩週做完。'], evidence: [], contradictions: [] },
+      sections: [sec(0, '開場'), sec(125, '不募資快速驗證'), sec(574, '低潮'), sec(1195, '旅居')] };
     else if (p.includes('"zh":[')) out = { zh: p.split('\n').filter(l => /^\d+\. /.test(l)).map(l => '（譯）' + l.replace(/^\d+\. /, '').slice(0, 24)) };
     else out = { role: '這一段提出整場的核心機制：用付款當作驗證。', points: ['付款驗證：有人刷卡才算數，註冊和稱讚不算。', '兩週上線一個小產品。', '多數嘗試會失敗。'], tables: [{ title: '兩種做法', headers: ['做法', '代價'], rows: [{ cells: ['先募資', '時間長'] }, { cells: ['先上線', '兩週'] }] }], key: [4, 5] };
   }
@@ -95,11 +95,14 @@ await p.click('.item-row:nth-child(2) .item'); await p.waitForTimeout(400);
 console.log('overview chapters', await p.locator('.ch').count(), '| thesis', (await p.textContent('.thesis')).slice(0, 20), '| deepen buttons', await p.locator('.ch [data-deepen]').count());
 await p.screenshot({ path: D + '/i-overview.png' });
 // 4. read the raw transcript of a chapter that is not translated yet
-await p.click('.ch:nth-child(3) [data-raw]'); await p.waitForTimeout(300);
+await p.click('.ch:nth-child(3) button.t'); await p.waitForTimeout(300);
 console.log('raw turns shown', await p.locator('#seg-c2 .turn').count());
 await p.screenshot({ path: D + '/i-raw.png' });
 // 5. deepen chapter 2 (index 1) from the read tab
-await p.click('#seg-c1 [data-deepen]');
+// 5. the sections arrived written with the overview; the translation is finished in the background (here: by hand) and shows on reopening
+if (await p.locator('#seg-c1 .absorb').count() !== 1 || await p.locator('[data-deepen]').count() !== 0) { console.error('FAIL: sections should be written already, with no button to ask for them'); process.exit(1); }
+for (const r of rows.values()) { let n = 0; while (['translate', 'analyse'].includes(r.work?.phase) && n++ < 200) Object.assign(r, await ingestStep(r, deps)); }
+await p.click('#gohome'); await p.waitForTimeout(300); await p.click('.item-row:nth-child(2) .item'); await p.waitForTimeout(500); await p.evaluate(() => setTab('read'));
 await p.waitForFunction(() => !!document.querySelector('#seg-c1 .absorb'), null, { timeout: 60000 });
 const zh = await p.textContent('#seg-c1 .turn:nth-of-type(2) .zh'); const en = await p.textContent('#seg-c1 .turn:nth-of-type(2) .en');
 console.log('deepened: zh starts', zh.slice(0, 16), '| en starts', en.slice(0, 30), '| core', await p.textContent('#seg-c1 .core'));

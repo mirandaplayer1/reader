@@ -660,6 +660,7 @@ mark.aim{background:var(--hl-y);color:var(--ink);border-radius:2px 5px 3px 4px;p
 .brief-c{display:grid;gap:6px;padding-top:14px;border-top:1px solid var(--line)} .brief-c h4{margin:8px 0 0;font-size:15.5px;font-weight:700}
 .brief-c ul{margin:0;padding-left:20px;display:grid;gap:6px} .brief-c li{font-size:16px;line-height:1.7}
 .absorb td,.brief-c li{-webkit-user-select:text;user-select:text}
+.segwait{margin:0 0 8px;font-size:14px} .ch header b,.ch.w1 header b{color:var(--ink);font-weight:700}
 
 </style>
 
@@ -978,7 +979,7 @@ function renderRead(){
       return `<div class="turn sp-${tu.sp===V.host?"L":"P"}" data-turn="${tu._id}" data-turns="${all}">${name||time?`<div class="who${name?"":" bare"}">${name?`<b>${name}</b>`:""}${time}</div>`:""}<p class="zh">${line("zh")}</p><p class="en">${line("en")}</p></div>`}).join("");
     const notes=Object.keys(MEMOS()).filter(k=>{const x=MEMOS()[k];return !(x.ids&&x.ids.length)&&x.t===g.t&&!(deep&&g.ask&&k==="r"+g.t)});
     const segmemos=notes.length?`<div class="segmemos">${notes.map(k=>`<button class="segmemo" data-memo="${esc(k)}">${esc(MEMOS()[k].text)}</button>`).join("")}</div>`:"";
-    const tools=deep?"":`<div class="row segtools">${open?"":`<button class="btn sm line" data-open="${g.id}">顯示原文</button>`}<button class="btn sm" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):hasZh||mono?"補上摘要和第一性原理":"精讀這一章（翻譯＋第一性原理）"}</button></div>`;
+    const tools=deep?"":pending()&&!busy?`<p class="meta segwait">這一段的整理還在寫…</p>`:`<div class="row segtools"><button class="btn sm line" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):hasZh||mono?"整理這一段":"翻譯並整理這一段"}</button></div>`;
     const absorb=!deep?"":g.role!=null||g.points?`<div class="absorb" data-ai-t="${g.t}">
       ${g.role?`<div class="eyebrow">這一段的作用</div><p class="core">${esc(g.role)}</p>`:""}
       ${(g.points||[]).length?`<div class="eyebrow">重點</div><ul>${g.points.map(pointLi).join("")}</ul>`:""}
@@ -1113,6 +1114,15 @@ function briefHtml(){const b=V.brief;
   return `${b.principle?`<div class="brief-p"><div class="eyebrow">第一性原理</div><p>${esc(b.principle)}</p></div>`:""}
     ${(b.groups||[]).map(g=>`<section class="brief-g"><h3>${esc(g.title)}</h3><ul>${(g.points||[]).map(point).join("")}</ul></section>`).join("")}
     ${b.reminder?`<p class="brief-r"><b>核心提醒</b>${esc(b.reminder)}</p>`:""}${checkHtml(b.check||{})}`}
+/* While the chapter notes are still being written in the background, an open video picks them up as they arrive. */
+const pending=()=>{const it=LIB.find(x=>x&&x.video_id===VID&&!x.demo);return !!(it&&it.status==="ready"&&it.progress&&["translate","analyse"].includes(it.progress.phase))};
+let watchT=null;
+function watchNotes(){clearInterval(watchT);if(!V||V.demo||!canIngest()||!pending())return;const vid=VID;let seen=JSON.stringify((LIB.find(x=>x&&x.video_id===VID&&!x.demo)||{}).progress||{});
+  watchT=setInterval(async()=>{if(VID!==vid||root.dataset.view!=="video"){clearInterval(watchT);return}if(document.hidden)return;
+    const {data}=await sb.from("videos").select("progress,content").eq("video_id",vid).maybeSingle();if(!data||!data.content||VID!==vid)return;
+    setLib(vid,{progress:data.progress});const now=JSON.stringify(data.progress||{}),more=now!==seen,over=!["translate","analyse"].includes((data.progress||{}).phase);
+    if((more||over)&&sheetEl.hidden&&getSelection().isCollapsed&&!Object.keys(ui.busy).length){const a=rscroll.scrollTop,b=side.scrollTop;V=data.content;SEGS=V.segs;CH=V.chapters;indexContent();renderAll();rscroll.scrollTop=a;side.scrollTop=b;seen=now;delete cache[vid]}
+    if(over)clearInterval(watchT)},10000)}
 function renderOverview(){
   const list=CH.map((c,i)=>({c,i,segs:segsIn(i)}));
   const nDeep=SEGS.filter(isDeep).length;
@@ -1121,12 +1131,13 @@ function renderOverview(){
     <p class="thesis">${esc(THESIS)}</p>
     ${briefHtml()}
     <div class="eyebrow">章節</div>
-    <div class="chs">${list.map(({c,i,segs})=>`<article class="ch w${c.worth}" data-ai-t="${c.t}">
-      <header><b>${segs.length===1?`<button class="t" data-seg="${segs[0].id}">${esc(c.zh)}</button>`:`<span class="t">${esc(c.zh)}</span>`}<small>${esc(c.en)}</small></b>${tlink(c.t)}</header>
-      <p>${esc(segs.length===1&&segs[0].role?segs[0].role:c.sum)}</p>
+    <div class="chs">${list.map(({c,i,segs})=>{const one=segs.length===1?segs[0]:null,text=one&&one.role?one.role:c.sum||"",wait=pending()&&segs.some(g=>!isDeep(g));
+      return `<article class="ch" data-ai-t="${c.t}">
+      <header><b>${one?`<button class="t" data-seg="${one.id}">${esc(c.zh)}</button>`:`<span class="t">${esc(c.zh)}</span>`}${c.en?`<small>${esc(c.en)}</small>`:""}</b>${tlink(c.t)}</header>
+      ${text?`<p>${esc(text)}</p>`:wait?`<p class="meta">整理中…</p>`:""}
       ${(btns=>btns?`<div class="row">${btns}</div>`:"")(segs.map(g=>isDeep(g)?(segs.length>1?`<button class="btn sm line" data-seg="${g.id}">${esc(g.title)}</button>`:"")
-        :`<button class="btn sm" data-deepen="${SEGS.indexOf(g)}" ${ui.busy[g.id]?"disabled":""}>${ui.busy[g.id]?esc(ui.busy[g.id]):"精讀這一章"}</button><button class="btn sm line" data-seg="${g.id}" data-raw>看原文</button>`).join(""))}
-    </article>`).join("")}</div>
+        :wait?"":`<button class="btn sm line" data-deepen="${SEGS.indexOf(g)}" ${ui.busy[g.id]?"disabled":""}>${ui.busy[g.id]?esc(ui.busy[g.id]):"整理這一段"}</button>`).join(""))}
+    </article>`}).join("")}</div>
     <p class="meta">${V.demo?"這支範例只把 5 段展開成逐字稿。其餘章節的摘要讀的是完整逐字稿，可以直接播放。":`已精讀 ${nDeep} / ${SEGS.length} 章。還沒精讀的章節可以先看原文，或按「精讀」產生翻譯和第一性原理。`}</p>
     ${V.demo?"":`<details class="redo"><summary>重新處理這支影片</summary>
       <p class="meta">摘要寫得不好、或規則更新之後，可以重跑。</p>
@@ -1458,7 +1469,7 @@ async function deepen(k){
   }
   delete ui.busy[g.id];delete cache[vid];
   const c=await fetchContent(vid);
-  if(c&&VID===vid){V=c;SEGS=c.segs;CH=c.chapters;indexContent();renderAll();toast("這一章精讀好了")}
+  if(c&&VID===vid){V=c;SEGS=c.segs;CH=c.chapters;indexContent();renderAll();toast("這一段整理好了")}
 }
 async function reprocess(mode){
   if(!canIngest()){toast("先登入才能重新處理");return}
@@ -1641,6 +1652,7 @@ function openVideo(c){
   const at=S.pos&&SEGS.find(g=>g.t===S.pos.t),el=at&&SEGS.indexOf(at)>0&&document.getElementById("seg-"+at.id);
   if(el){ui.resume=at;requestAnimationFrame(()=>{rscroll.scrollTop=el.offsetTop-rscroll.offsetTop;showChap()})}else ui.resume=null;
   if(S.pos)savePos(VID,S.pos);
+  watchNotes();
 }
 function goHome(){closeSheet();try{if(player&&ytOK)player.pauseVideo()}catch(e){} root.dataset.view="home";$("#vt").textContent="";renderHome()}
 $("#gohome").onclick=()=>{if(root.dataset.view==="home"){ui.list=null;ui.box=false}goHome()};
