@@ -1,5 +1,8 @@
 # 由 Claude 寫一支影片的分析，寫回資料庫
 
+**2026-11-25 起這件事由桌機自動做**（`tools/desk/`，流程見 `PROMPTS.md`）。這一頁是手動做法，只在桌機 worker 不能用時才照做。
+手動這條路不會存每段的第一性原理和名詞說明。
+
 Miranda 的決定（2026-11-23）：影片的分析預設由 Claude 寫，不用 Gemini；Claude 沒辦法跑時才用 Gemini。
 這份文件是做這件事的作業說明，一次處理一支影片。需要 Supabase 的 MCP 工具（`execute_sql`），專案 `azgtjxznqdppistljerl`。
 

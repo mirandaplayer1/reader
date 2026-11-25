@@ -153,7 +153,7 @@ async function llmJSON(deps, prompt, maxTokens = 16000, schema = null) {
 // The owner's prompt (2026-11-23), whole and WORD FOR WORD, up to where the transcript is pasted in. Do not edit it:
 // tests compare it with tests/fixtures/owner-prompt.txt. It goes out once with the whole transcript, and the model
 // decides where the sections are. What the app adds comes after it: which heading goes into which JSON field.
-const OWNER = `# 任務
+export const OWNER = `# 任務
 分析下方的逐字稿，產出兩份成果：(A) 第一性原理摘要，(B) 分段整理。最後附上 (C) 推論強弱檢查。
 
 # 寫作規範
@@ -405,13 +405,13 @@ export function reprocessPatch(row, mode) {
 }
 
 // Translates a list of consecutive sentences. Returns one translation per sentence, in order.
-async function translateList(deps, list, title) {
-  const prompt =
+export const translatePrompt = (list, title) =>
     `把下面 ${list.length} 個句子翻成繁體中文（台灣用語）。它們是同一段訪談或演講裡連續的句子。\n` +
     `輸出 JSON：{"zh":["<第 1 句的翻譯>", ...]}，陣列長度必須剛好是 ${list.length}，順序一一對應。\n` +
     `規則：\n- 忠於原意，不要加原文沒有的內容，不要省略。\n- 翻成台灣人講話的樣子，像好的字幕。原文是口語就翻口語，短句就翻短句。\n- 不要書面連接詞（透過、藉由、進而、然而、此外），不要把動詞翻成名詞（「進行了討論」寫成「聊了」）。\n- 產品名、人名、技術名詞保留原文。「you know」「I mean」這類贅字可以順掉。\n\n` +
     `這一章的主題：${title}\n\n` + list.map((x, i) => `${i + 1}. ${x}`).join("\n");
-  const out = await llmJSON(deps, prompt, 12000, SCHEMA.translate);
+async function translateList(deps, list, title) {
+  const out = await llmJSON(deps, translatePrompt(list, title), 12000, SCHEMA.translate);
   const zh = Array.isArray(out.zh) ? out.zh : [];
   if (zh.length !== list.length) throw new Error("翻譯句數對不上（要 " + list.length + " 句，拿到 " + zh.length + " 句），請重試。");
   return zh.map((z, i) => String(z || "").trim() || list[i]);

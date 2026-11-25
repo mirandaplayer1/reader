@@ -261,7 +261,7 @@ function renderRead(){
     const notes=Object.keys(MEMOS()).filter(k=>{const x=MEMOS()[k];return !(x.ids&&x.ids.length)&&x.t===g.t&&!(deep&&g.ask&&k==="r"+g.t)});
     const segmemos=notes.length?`<div class="segmemos">${notes.map(k=>`<button class="segmemo" data-memo="${esc(k)}">${esc(MEMOS()[k].text)}</button>`).join("")}</div>`:"";
     const tools=deep?"":pending()&&!busy?`<p class="meta segwait">這一段的整理還在寫…</p>`:`<div class="row segtools"><button class="btn sm line" data-deepen="${gi}" ${busy?"disabled":""}>${busy?esc(busy):hasZh||mono?"整理這一段":"翻譯並整理這一段"}</button></div>`;
-    const absorb=!deep?"":g.body?`<div class="absorb md" data-ai-t="${g.t}">${md(g.body)}</div>`:g.role!=null||g.points?`<div class="absorb" data-ai-t="${g.t}">
+    const absorb=!deep?"":g.body?`<div class="absorb md" data-ai-t="${g.t}">${md(g.body)}${segExtra(g)}</div>`:g.role!=null||g.points?`<div class="absorb" data-ai-t="${g.t}">
       ${g.role?`<div class="eyebrow">這一段的作用</div><p class="core">${esc(g.role)}</p>`:""}
       ${(g.points||[]).length?`<div class="eyebrow">重點</div><ul>${g.points.map(pointLi).join("")}</ul>`:""}
       ${(g.tables||[]).map(t=>`<div class="tblwrap"><table>${t.title?`<caption>${esc(t.title)}</caption>`:""}<thead><tr>${t.headers.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${t.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`).join("")}
@@ -396,6 +396,8 @@ function md(src){const out=[];let list=null,tbl=null;
     if(m=/^[-*•]\s+(.+)$/.exec(l)){if(tbl||list&&list.tag!=="ul")flush();(list=list||{tag:"ul",items:[]}).items.push(m[1]);return}
     if(m=/^\d+[.、)]\s*(.+)$/.exec(l)){if(tbl||list&&list.tag!=="ol")flush();(list=list||{tag:"ol",items:[]}).items.push(m[1]);return}
     flush();out.push(`<p>${inl(l)}</p>`)});flush();return out.join("")}
+/* What the desktop analysis adds to a section: its own first principle, and a few names or hard words explained. */
+const segExtra=g=>`${g.principle?`<div class="eyebrow">這一段的第一性原理</div><p class="core">${esc(g.principle)}</p>`:""}${(g.terms||[]).length?`<div class="eyebrow">名詞</div><dl class="terms">${g.terms.map(x=>`<div><dt>${esc(x.term)}</dt><dd>${esc(x.note)}</dd></div>`).join("")}</dl>`:""}`;
 const pointLi=x=>{const m=/^([^：:，。]{1,14})[：:]\s*(.+)$/.exec(x);return m?`<li><b>${esc(m[1])}</b>：${esc(m[2])}</li>`:`<li>${esc(x)}</li>`};
 function checkHtml(ck){const rows=[["邏輯最穩的幾環",ck.solid],["沒有說明的假設",ck.assumptions],["證據的限制",ck.evidence],["前後矛盾的地方",ck.contradictions]].filter(x=>x[1]&&x[1].length);
   return rows.length?`<section class="brief-c"><div class="eyebrow">推論強弱檢查</div>${rows.map(([h,l])=>`<h4>${h}</h4><ul>${l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`).join("")}</section>`:""}
@@ -705,6 +707,7 @@ async function loadLibrary(){if(!canIngest())return;
   if(error)return;LIB=[LIB.find(x=>x.demo),...data];renderHome();
   try{const r2=await sb.from("reader_state").select("video_id,at,pos:state->pos");((r2&&r2.data)||[]).forEach(r=>{if(r.pos&&r.video_id!=="__box__")POS[r.video_id]={...r.pos,at:r.at}});if(Object.keys(POS).length&&root.dataset.view==="home")renderHome()}catch(e){}
   data.filter(v=>v.status==="queued"||v.status==="processing").forEach(v=>drive(v.video_id));
+  deskWatch();
 }
 /* Resolves once the page is visible and the browser reports a connection. */
 function back(){return new Promise(res=>{const ok=()=>!document.hidden&&navigator.onLine!==false;if(ok())return res();
@@ -735,15 +738,40 @@ async function drive(vid){
     if(j.status==="error")break;
   }}finally{driving.delete(vid)}
 }
+/* Desktop mode (config "ingest":"desk"): a video is only put in line here. The owner's own computer picks it up,
+   reads the captions (or listens, when there are none) and writes the analysis with Claude. See tools/desk/. */
+const DESK=CFG.ingest==="desk";
+const vidOf=u=>{const m=/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/|\/live\/)([A-Za-z0-9_-]{11})/.exec(u);return m?m[1]:null};
+const deskWork=redo=>({phase:"desk",req:String(Date.now()),...(redo?{redo}:{})});
+const DESK_WAIT={phase:"desk-wait",done:0,total:null};
+async function deskStart(url){const vid=vidOf(url);if(!vid)return {error:"這不是 YouTube 影片網址。"};
+  const {data:ex}=await sb.from("videos").select("video_id,title,status,progress,error").eq("video_id",vid).maybeSingle();
+  if(ex&&ex.status!=="error")return ex;
+  if(ex){const j=await deskQueue(vid);return j.error?j:{...ex,...j}}
+  const row={video_id:vid,url:url.slice(0,500),title:"",status:"desk",work:deskWork(),progress:DESK_WAIT,error:null,content:null};
+  const {error}=await sb.from("videos").insert(row);return error?{error:error.message}:row}
+/* Puts a video back in line. Without `redo` an earlier try carries on where it stopped; a video that already has a
+   transcript keeps it (and so keeps its highlights) unless the whole video is asked for again. */
+async function deskQueue(vid,redo){let work=null;
+  if(!redo){const {data}=await sb.from("videos").select("work,had:content->>vid").eq("video_id",vid).maybeSingle();
+    work=data&&data.work&&data.work.phase==="desk"?data.work:deskWork(data&&data.had?"text":"")}
+  const patch={status:"desk",work:work||deskWork(redo),progress:DESK_WAIT,error:null,fails:0,lock_until:null};
+  const {error}=await sb.from("videos").update(patch).eq("video_id",vid);if(error)return {error:error.message};
+  setLib(vid,{status:"desk",progress:DESK_WAIT,error:null,note:""});deskWatch();return patch}
+/* While something is in line, look again every 15 seconds so the list shows what the desktop is doing. */
+let deskT=null;
+function deskWatch(){clearTimeout(deskT);const waiting=LIB.filter(x=>x&&!x.demo&&x.status==="desk").map(x=>x.video_id);if(!waiting.length)return;
+  deskT=setTimeout(async()=>{if(document.hidden||!canIngest()){deskWatch();return}await loadLibrary();
+    waiting.forEach(v=>{const it=LIB.find(x=>x&&x.video_id===v&&!x.demo);if(it&&it.status==="ready"){delete cache[v];toast("處理完成："+(it.title||v))}})},15000)}
 async function addVideo(url,list){
   const msg=$("#add-msg");
   if(!/(youtube\.com|youtu\.be)/.test(url)){msg.textContent="請貼上 YouTube 影片的網址。";return}
   if(!canIngest()){msg.textContent="先登入才能加入影片。";syncEl.click();return}
-  msg.textContent="加入中…";const j=await fn({action:"start",url});
+  msg.textContent="加入中…";const j=DESK?await deskStart(url):await fn({action:"start",url});
   if(j.error){msg.textContent="沒有加入："+j.error;return}
   msg.textContent="";$("#add-url").value="";setLib(j.video_id,j);
   if(list)setList(j.video_id,list);
-  if(j.status!=="ready")drive(j.video_id);
+  if(j.status==="desk")deskWatch();else if(j.status!=="ready")drive(j.video_id);
 }
 async function deepen(k){
   const g=SEGS[k];if(!g||isDeep(g)||ui.busy[g.id])return;
@@ -770,9 +798,9 @@ async function reprocess(mode){
     <div class="row"><span class="sp"></span><button class="btn line" id="rp-no">取消</button><button class="btn" id="rp-go">開始</button></div>`);
   $("#rp-no").onclick=closeSheet;
   $("#rp-go").onclick=async e=>{e.currentTarget.disabled=true;
-    const j=await fn({action:"reprocess",video_id:vid,mode});
+    const j=DESK?await deskQueue(vid,mode==="all"?"all":"text"):await fn({action:"reprocess",video_id:vid,mode});
     if(j.error){closeSheet();toast("沒有開始："+j.error);return}
-    closeSheet();delete cache[vid];goHome();setLib(vid,{title:j.title||title,status:j.status,progress:j.progress,error:null,note:""});drive(vid)};
+    closeSheet();delete cache[vid];goHome();setLib(vid,{title:j.title||title,status:j.status,progress:j.progress,error:null,note:""});if(!DESK)drive(vid)};
 }
 async function fetchContent(vid){
   if(cache[vid])return cache[vid];
@@ -783,12 +811,13 @@ async function fetchContent(vid){
   return c;
 }
 const STEP={meta:"讀取影片資訊",transcribe:"讀影片內容",outline:"整理章節和摘要",seams:"檢查整點的章節接縫",synth:"寫整支影片的總覽",ready:"完成"};
-function statusLine(it){const t=statusText(it);return it.demo||it.status==="ready"||it.status==="error"?t:t+" · 可以關掉頁面，會在背景跑完"}
+function statusLine(it){const t=statusText(it);return it.demo||it.status==="ready"||it.status==="error"?t:it.status==="desk"?t+" · 可以關掉這一頁":t+" · 可以關掉頁面，會在背景跑完"}
 function statusText(it){
   if(it.demo)return "範例 · 只有 5 段節錄";
   if(it.status==="ready"){const p=it.progress||{};return p.phase==="translate"?`可以閱讀 · 翻譯中 ${p.done||0} / ${p.total} 句`:p.phase==="analyse"?`可以閱讀 · 整理各章重點 ${p.done||0} / ${p.total} 章`:"可以閱讀"}
   if(it.status==="error")return "沒有完成："+(it.error||"未知的問題");
   if(it.note)return it.note;
+  if(it.status==="desk")return ({"desk-transcript":"桌機正在抓字幕","desk-listen":"沒有字幕，桌機正在聽寫（一小時的影片約 5 到 10 分鐘）","desk-tidy":"桌機正在替逐字稿補標點","desk-analysis":"Claude 正在寫分析"})[(it.progress||{}).phase]||"等桌機接手（桌機開著才會開始）";
   const p=it.progress||{};
   if(p.phase==="transcribe")return p.total?`正在讀影片內容，${p.done||0} / ${p.total} 段（每段 5 分鐘）`:`正在讀影片內容，已完成 ${p.done||0} 段（每段 5 分鐘）`;
   if(p.phase==="outline"&&p.total>1)return `正在整理章節和摘要，${p.done||0} / ${p.total}`;
@@ -911,7 +940,9 @@ function renderHome(){
 }
 async function openItem(vid,st,demo){
   if(demo){openVideo(DEMO);return}
+  if(st==="error"&&DESK){const j=await deskQueue(vid);if(j.error)toast("沒有重新排入："+j.error);return}
   if(st==="error"){setLib(vid,{status:"processing",error:null,note:"重新開始…"});drive(vid);return}
+  if(st==="desk"){toast("桌機處理完就能打開。桌機要開著才會動");return}
   if(st!=="ready"){toast("還在處理中。可以先離開，後端會接著跑完");return}
   const c=await fetchContent(vid);if(!c){toast("讀不到這支影片的內容，請稍後再試");return}
   markSeen(vid);openVideo(c);

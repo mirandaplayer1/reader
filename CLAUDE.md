@@ -1,6 +1,7 @@
 # Reader：給在這個 repo 工作的 agent
 
-Miranda 的個人工具：貼 YouTube 網址 → AI 聽寫、切章節、寫總覽和每章的第一性原理 → 她畫重點、寫筆記、整理成觀點卡。
+Miranda 的個人工具：貼 YouTube 網址 → 她桌機上的 Claude 抓逐字稿、寫總覽和分段整理 → 她畫重點、寫筆記、整理成觀點卡。
+分析由桌機做（`tools/desk/`，2026-11-25 起）。後端的 Gemini 流程還在程式裡，網頁不再呼叫。
 回覆她用繁體中文，直接、簡潔，不要 AI 腔。
 
 這個 repo 同時有兩個 agent 在改：雲端的 Claude Code（claude.ai/code）和她本機的 Claude Code CLI。
@@ -35,6 +36,10 @@ supabase/functions/ingest/
 supabase/schema.sql             資料表、權限、排程的定義（文件用途，實際變更要另外套用到資料庫）
 tests/                          測試
 tools/prompts_doc.py            重建 PROMPTS.md
+tools/desk/                     桌機 worker：抓字幕或聽寫 → 叫本機的 claude 寫分析 → 寫回資料庫
+  worker.mjs                    主程式。排程每 2 分鐘跑一次；`--dry <網址>` 不碰資料庫試跑一支
+  prompts.mjs                   桌機流程的提示詞（她的原文從 pipeline.js 匯入，不另存一份）
+  transcript.mjs, claude.mjs, supa.mjs, login.mjs, install.sh
 PROMPTS.md                      流程圖和每個提示詞的說明，給 Miranda 讀和改
 ```
 
@@ -46,6 +51,8 @@ node tests/ui-flow.test.mjs         # 整個前端流程，後端是假的。需
 node tests/ui-highlight.test.mjs    # 選取文字畫重點
 node tests/ui-points.test.mjs       # 畫線、筆記、重點頁、觀點、舊資料轉換、兩台裝置不互相覆蓋
 node tests/ui-transcript.test.mjs   # 中文影片和未翻譯影片的逐字稿顯示
+node tests/desk.test.mjs            # 桌機 worker，YouTube／Whisper／Claude／資料庫都是假的。改 tools/desk/ 必跑
+node tests/ui-desk.test.mjs         # 桌機模式的網頁：排隊、進度、每段的第一性原理和名詞
 ```
 
 UI 測試讀的是建好的 `index.html`，所以先 `python3 build.py`。
@@ -59,6 +66,11 @@ UI 測試讀的是建好的 `index.html`，所以先 `python3 build.py`。
   `supabase functions deploy ingest --project-ref azgtjxznqdppistljerl`（CLI），或用 Supabase MCP 的 deploy 工具。
   部署完在 `HANDOFF.md` 記下部署的 commit。
 - **資料庫**：改欄位或排程要在 Supabase 上執行 SQL，並同步更新 `schema.sql`。
+- **桌機 worker**：跑的是 Miranda 桌機上這個資料夾裡的程式，不用部署。改了 `tools/desk/` 之後她的桌機要 `git pull`。
+  1. 第一次：`node tools/desk/login.mjs`（用 Reader 的信箱和密碼），再 `sh tools/desk/install.sh`。
+  2. 看紀錄：`tail -f ~/Library/Logs/reader-desk.log`。
+  3. 停掉：`sh tools/desk/install.sh --remove`。
+  4. 切回後端的 Gemini：把 `src/config.json` 的 `"ingest":"desk"` 拿掉，重建。
 
 前端和後端有相依時（例如新欄位），先部署後端和資料庫，再合併前端。
 
@@ -104,6 +116,11 @@ CLI 裡打 `/backlog` 會照這個流程跑一輪（`.claude/commands/backlog.md
 - 存進使用者資料的鍵不要用章節序號（`c3`）。章節重切後序號會變。用秒數。
 - 句子的 id 是 `t{秒數}-{句序}`，使用者的畫線和筆記靠它對應。改切句邏輯（`splitSentences`）會讓既有的畫線對不上。
 - 中文影片不翻譯；英文影片先可讀（分析都在了）、再背景翻譯。影片在 `status=ready` 之後 `work.phase` 可能還是 `translate`。
+- **桌機模式的列用 `status = desk`**，翻譯中是 `work.phase = desk-translate`。不要改成 `queued`／`processing`／`translate`／`analyse`：
+  後端每分鐘的排程只認那幾個字，一改它就會拿 Gemini 去跑同一支影片。
+- 桌機 worker 用她的登入（anon key 加她的 session）讀寫資料庫，只碰得到她自己的列。session 存在 `~/.config/reader-desk/`，不在 repo。
+- 桌機做到一半的東西（逐字稿、分析）存在 `~/.cache/reader-desk/<影片 id>/`，重試會接著用。網頁每次重新排入會換一個 `work.req`，worker 看到不同就清掉重來。
+- 字幕和 Whisper 都沒有講者。這種逐字稿的講者一律是「講者」，送給 Claude 時不帶這個名字。
 
 ## 查問題
 

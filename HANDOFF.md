@@ -2,6 +2,40 @@
 
 每次收工更新這一頁。最新的放最上面，舊的可以刪。規則見 `CLAUDE.md`。
 
+## 2026-11-25：分析搬到桌機，用 Miranda 的 Claude 帳號寫（本機 CLI）
+
+分支 `desk-claude-analysis`，**還沒合併**。合併後網頁才會改走桌機。
+
+還要做的，照順序：
+
+1. Miranda 在桌機執行 `node tools/desk/login.mjs`（Reader 的信箱和密碼）。
+2. `sh tools/desk/install.sh`，裝每 2 分鐘一次的排程。
+3. 用一支真影片從頭跑到尾（排隊 → ready → 翻譯完）。到這裡才算驗證過寫資料庫那一段。
+4. 合併 PR。前端才會顯示「等桌機接手」、每段的第一性原理和名詞。
+
+做了什麼：
+
+- 新流程在 `tools/desk/`：抓字幕（`yt-dlp`）→ 沒有字幕才下載聲音用 Whisper 聽寫 → 沒標點就請 Claude 補 → Claude 寫整份分析 → 可以閱讀 → 非中文再翻譯。全文在 `PROMPTS.md` 前半。
+- 網頁在桌機模式（`src/config.json` 的 `"ingest":"desk"`）不再呼叫後端的 `start`／`step`／`reprocess`，只把列設成 `status = desk`。
+- 每段多兩個欄位：`segs[].principle`（這一段的第一性原理）和 `segs[].terms[{term,note}]`（名詞說明）。顯示在閱讀頁每段整理的下面。這兩段提示詞是新寫的，在 `tools/desk/prompts.mjs` 的 `SECTION_EXTRA`，等她看。
+- 「只重做章節和摘要」在桌機模式會保留原本的逐字稿和翻譯，只請 Claude 重寫分析。她舊的 Gemini 影片可以這樣一支一支換成新格式。
+- 後端沒有動、沒有部署。`pipeline.js` 只多匯出 `OWNER` 和 `translatePrompt` 給桌機用。
+
+驗證到哪：
+
+- 七組測試全過（原本五組加 `desk.test.mjs`、`ui-desk.test.mjs`）。
+- 真的跑過一支：Steve Jobs 史丹佛演講（`UF8uR6Z6KLc`，15 分鐘，有字幕），`--dry` 模式，不到 2 分鐘寫完 8 段。
+- 從 macOS 排程裡呼叫 `claude -p` 可以用她的登入（試過一次性的工作）。
+- **沒試過的**：寫回資料庫（要她先登入）、Whisper 那條路跑真的影片、補標點跑真的影片、翻譯跑真的影片、超過一小時的影片。
+
+知道的限制：
+
+- 沒有講者、沒有投影片上的字。
+- 桌機關著或睡著就不會動，影片會停在「等桌機接手」。
+- worker 跑的是桌機上這個資料夾目前 checkout 的程式。切到別的分支，排程跑的就是那個分支的版本。
+- 用的是她 Claude 訂閱的額度。分析用 CLI 的預設模型，補標點和翻譯用 Sonnet（`READER_DESK_MODEL`、`READER_DESK_FAST_MODEL` 可以改）。
+- `docs/claude-analysis.md` 那條手動的路（`reader_apply_analysis`）不會存 `principle` 和 `terms`。
+
 ## 2026-11-23 晚：分析改由 Claude 寫，分段整理改成自由格式
 
 - Miranda 決定：影片的分析預設由 Claude 寫再寫回資料庫，Gemini 只當備援。做法在 `docs/claude-analysis.md`。
