@@ -6,12 +6,15 @@
 
 分支 `desk-claude-analysis`，**還沒合併**。合併後網頁才會改走桌機。
 
-還要做的，照順序：
+還要做的，照順序（**跑分析的是 Miranda 的 Mac mini，不是寫這段程式的那台筆電**）：
 
-1. Miranda 在桌機執行 `node tools/desk/login.mjs`（Reader 的信箱和密碼）。
-2. `sh tools/desk/install.sh`，裝每 2 分鐘一次的排程。
-3. 用一支真影片從頭跑到尾（排隊 → ready → 翻譯完）。到這裡才算驗證過寫資料庫那一段。
-4. 合併 PR。前端才會顯示「等桌機接手」、每段的第一性原理和名詞。
+1. 在 Mac mini 上照 `docs/desk-setup.md` 做：clone、`git checkout desk-claude-analysis`、`sh tools/desk/setup.sh`。
+2. 用一支真影片從頭跑到尾（排隊 → ready → 翻譯完）。到這裡才算驗證過寫資料庫那一段。
+   合併前網頁還是舊的，貼網址會走 Gemini。所以這一步要嘛先合併，要嘛在 Mac mini 上手動排一支：請 Mac mini 上的 Claude Code 用 `tools/desk/supa.mjs` 插一列 `status = desk`。
+3. 合併 PR。前端才會顯示「等桌機接手」、每段的第一性原理和名詞。
+4. Mac mini 上 `git checkout main && git pull`，之後都留在 `main`。
+
+筆電上沒有登入 Reader，也沒有裝排程，只有 `~/.cache/reader-desk/` 裡試跑留下的檔案。
 
 做了什麼：
 

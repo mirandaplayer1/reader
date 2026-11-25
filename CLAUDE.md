@@ -67,7 +67,7 @@ UI 測試讀的是建好的 `index.html`，所以先 `python3 build.py`。
   部署完在 `HANDOFF.md` 記下部署的 commit。
 - **資料庫**：改欄位或排程要在 Supabase 上執行 SQL，並同步更新 `schema.sql`。
 - **桌機 worker**：跑的是 Miranda 桌機上這個資料夾裡的程式，不用部署。改了 `tools/desk/` 之後她的桌機要 `git pull`。
-  1. 第一次：`node tools/desk/login.mjs`（用 Reader 的信箱和密碼），再 `sh tools/desk/install.sh`。
+  1. 第一次：`sh tools/desk/setup.sh`（裝工具、登入 Reader、裝排程）。整份步驟在 `docs/desk-setup.md`。跑分析的是她的 Mac mini。
   2. 看紀錄：`tail -f ~/Library/Logs/reader-desk.log`。
   3. 停掉：`sh tools/desk/install.sh --remove`。
   4. 切回後端的 Gemini：把 `src/config.json` 的 `"ingest":"desk"` 拿掉，重建。
