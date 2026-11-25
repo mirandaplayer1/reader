@@ -2,6 +2,16 @@
 
 每次收工更新這一頁。最新的放最上面，舊的可以刪。規則見 `CLAUDE.md`。
 
+## 2026-11-25：她的 36 支影片全部改成新格式
+
+- 36 支影片的分析都已由 Claude 寫好並寫回資料庫（`work.by = claude`，每段都有 `body`）。
+  最後一支是 Pieter Levels 的 3.7 小時訪談（`oFtjKbXKqbg`），37 段，總覽也重寫了。
+- repo 這次沒有程式變更。**還沒做的**：
+  - 新影片仍然走 Gemini（而且額度用完）。「新影片預設由 Claude 寫」還沒有自動化，目前要有人在對話裡照 `docs/claude-analysis.md` 手動做。
+  - 後端還是第 15 版，沒有重新部署（原因見下一節）。
+- 寫入很長的分析時（超過約兩萬字），`reader_apply_analysis` 每次都要送完整的 `sections`，沒有分批附加的方式。
+  先把每段存成本機檔案再一次送出；送出後查 `jsonb_array_length(content->'segs')` 確認段數，遇過一次 502 沒寫入。
+
 ## 2026-11-23 晚：分析改由 Claude 寫，分段整理改成自由格式
 
 - Miranda 決定：影片的分析預設由 Claude 寫再寫回資料庫，Gemini 只當備援。做法在 `docs/claude-analysis.md`。
