@@ -1126,8 +1126,8 @@ function md(src){const out=[];let list=null,tbl=null;
     if(m=/^[-*•]\s+(.+)$/.exec(l)){if(tbl||list&&list.tag!=="ul")flush();(list=list||{tag:"ul",items:[]}).items.push(m[1]);return}
     if(m=/^\d+[.、)]\s*(.+)$/.exec(l)){if(tbl||list&&list.tag!=="ol")flush();(list=list||{tag:"ol",items:[]}).items.push(m[1]);return}
     flush();out.push(`<p>${inl(l)}</p>`)});flush();return out.join("")}
-/* What the desktop analysis adds to a section: its own first principle, and a few names or hard words explained. */
-const segExtra=g=>`${g.principle?`<div class="eyebrow">這一段的第一性原理</div><p class="core">${esc(g.principle)}</p>`:""}${(g.terms||[]).length?`<div class="eyebrow">名詞</div><dl class="terms">${g.terms.map(x=>`<div><dt>${esc(x.term)}</dt><dd>${esc(x.note)}</dd></div>`).join("")}</dl>`:""}`;
+/* What the desktop analysis adds to a section: a few names or hard words explained. */
+const segExtra=g=>`${(g.terms||[]).length?`<div class="eyebrow">名詞</div><dl class="terms">${g.terms.map(x=>`<div><dt>${esc(x.term)}</dt><dd>${esc(x.note)}</dd></div>`).join("")}</dl>`:""}`;
 const pointLi=x=>{const m=/^([^：:，。]{1,14})[：:]\s*(.+)$/.exec(x);return m?`<li><b>${esc(m[1])}</b>：${esc(m[2])}</li>`:`<li>${esc(x)}</li>`};
 function checkHtml(ck){const rows=[["邏輯最穩的幾環",ck.solid],["沒有說明的假設",ck.assumptions],["證據的限制",ck.evidence],["前後矛盾的地方",ck.contradictions]].filter(x=>x[1]&&x[1].length);
   return rows.length?`<section class="brief-c"><div class="eyebrow">推論強弱檢查</div>${rows.map(([h,l])=>`<h4>${h}</h4><ul>${l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`).join("")}</section>`:""}

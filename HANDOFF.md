@@ -11,7 +11,7 @@
 1. 在 Mac mini 上照 `docs/desk-setup.md` 做：clone、`git checkout desk-claude-analysis`、`sh tools/desk/setup.sh`。
 2. 用一支真影片從頭跑到尾（排隊 → ready → 翻譯完）。到這裡才算驗證過寫資料庫那一段。
    合併前網頁還是舊的，貼網址會走 Gemini。所以這一步要嘛先合併，要嘛在 Mac mini 上手動排一支：請 Mac mini 上的 Claude Code 用 `tools/desk/supa.mjs` 插一列 `status = desk`。
-3. 合併 PR。前端才會顯示「等桌機接手」、每段的第一性原理和名詞。
+3. 合併 PR。前端才會顯示「等桌機接手」和每段的名詞。
 4. Mac mini 上 `git checkout main && git pull`，之後都留在 `main`。
 
 筆電上沒有登入 Reader，也沒有裝排程，只有 `~/.cache/reader-desk/` 裡試跑留下的檔案。
@@ -20,7 +20,8 @@
 
 - 新流程在 `tools/desk/`：抓字幕（`yt-dlp`）→ 沒有字幕才下載聲音用 Whisper 聽寫 → 沒標點就請 Claude 補 → Claude 寫整份分析 → 可以閱讀 → 非中文再翻譯。全文在 `PROMPTS.md` 前半。
 - 網頁在桌機模式（`src/config.json` 的 `"ingest":"desk"`）不再呼叫後端的 `start`／`step`／`reprocess`，只把列設成 `status = desk`。
-- 每段多兩個欄位：`segs[].principle`（這一段的第一性原理）和 `segs[].terms[{term,note}]`（名詞說明）。顯示在閱讀頁每段整理的下面。這兩段提示詞是新寫的，在 `tools/desk/prompts.mjs` 的 `SECTION_EXTRA`，等她看。
+- 每段多一個欄位：`segs[].terms[{term,note}]`（名詞說明）。顯示在閱讀頁每段整理的下面。提示詞是新寫的，在 `tools/desk/prompts.mjs` 的 `SECTION_EXTRA`，等她看。
+- 每段的第一性原理做了又拿掉：她 2026-11-25 看過後說不要。第一性原理只在總覽有一段。不要再加回每一段。
 - 「只重做章節和摘要」在桌機模式會保留原本的逐字稿和翻譯，只請 Claude 重寫分析。她舊的 Gemini 影片可以這樣一支一支換成新格式。
 - 後端沒有動、沒有部署。`pipeline.js` 只多匯出 `OWNER` 和 `translatePrompt` 給桌機用。
 
@@ -39,7 +40,7 @@
 - 桌機關著或睡著就不會動，影片會停在「等桌機接手」。
 - worker 跑的是桌機上這個資料夾目前 checkout 的程式。切到別的分支，排程跑的就是那個分支的版本。
 - 用的是她 Claude 訂閱的額度。分析用 CLI 的預設模型，補標點和翻譯用 Sonnet（`READER_DESK_MODEL`、`READER_DESK_FAST_MODEL` 可以改）。
-- `docs/claude-analysis.md` 那條手動的路（`reader_apply_analysis`）不會存 `principle` 和 `terms`。
+- `docs/claude-analysis.md` 那條手動的路（`reader_apply_analysis`）不會存 `terms`。
 
 ## 2026-11-23 晚：分析改由 Claude 寫，分段整理改成自由格式
 

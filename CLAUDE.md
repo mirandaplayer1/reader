@@ -52,7 +52,7 @@ node tests/ui-highlight.test.mjs    # 選取文字畫重點
 node tests/ui-points.test.mjs       # 畫線、筆記、重點頁、觀點、舊資料轉換、兩台裝置不互相覆蓋
 node tests/ui-transcript.test.mjs   # 中文影片和未翻譯影片的逐字稿顯示
 node tests/desk.test.mjs            # 桌機 worker，YouTube／Whisper／Claude／資料庫都是假的。改 tools/desk/ 必跑
-node tests/ui-desk.test.mjs         # 桌機模式的網頁：排隊、進度、每段的第一性原理和名詞
+node tests/ui-desk.test.mjs         # 桌機模式的網頁：排隊、進度、每段的名詞
 ```
 
 UI 測試讀的是建好的 `index.html`，所以先 `python3 build.py`。

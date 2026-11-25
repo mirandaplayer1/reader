@@ -89,14 +89,13 @@ Tan 區分了兩種 AI。每月 20 美元的聊天機器人是「你不擁有的
 | 整個人生放在一個系統裡，外洩怎麼辦 | 正因如此才必須歸你。現狀並不是隱私，而是資料散落在十個雲端，除了你之外誰都搜得到。「保管權就是安全模型。」 |
 </example_b>`;
 
-// New on 2026-11-25: two more things for every section.
-export const SECTION_EXTRA = `# 每一段另外寫兩樣
-- 這一段的第一性原理（principle）：一到兩句。寫出這一段的結論最終靠哪個前提或機制成立，讓讀者只讀這句也能重建這一段的推論。照講者的強度寫，不要寫成口號，也不要重複整支影片的第一性原理。
-- 名詞說明（terms）：從這一段的逐字稿挑 0 到 5 個讀者可能不熟的詞，各寫一句繁體中文說明。可以挑兩種：專有名詞（人名、產品、公司、技術、理論、典故），和較難的英文單字或片語。term 照逐字稿裡的寫法；逐字稿明顯聽錯的名字寫正確的寫法，並在說明最後加一句「逐字稿寫成 ○○」。英文單字的說明先給中文意思，再說它在這一段指什麼。說明詞義可以用一般知識，但不要替講者加主張。日常用詞不要挑；同一個詞只在它第一次出現的那一段說明；這一段沒有就給空陣列。`;
+// New on 2026-11-25: a short list of names and hard words for every section.
+export const SECTION_EXTRA = `# 每一段另外寫名詞說明
+從這一段的逐字稿挑 0 到 5 個讀者可能不熟的詞，放進 terms，各寫一句繁體中文說明。可以挑兩種：專有名詞（人名、產品、公司、技術、理論、典故），和較難的英文單字或片語。term 照逐字稿裡的寫法；逐字稿明顯聽錯的名字寫正確的寫法，並在說明最後加一句「逐字稿寫成 ○○」。英文單字的說明先給中文意思，再說它在這一段指什麼。說明詞義可以用一般知識，但不要替講者加主張。日常用詞不要挑；同一個詞只在它第一次出現的那一段說明；這一段沒有就給空陣列。`;
 
 export const OUTPUT = `# 輸出
 把三份成果放進 JSON。(A) 的標題放 headline，第一性原理放 principle，主題區塊放 groups（每個區塊的名稱放 title，條列放 points），核心提醒放 reminder。
-(B) 的每一段是 sections 裡的一項，照時間順序，第一段從逐字稿第一行開始，整份逐字稿都要分到：t 是這一段開始的秒數，必須是逐字稿裡某一行開頭方括號裡的數字；title 是這一段的標題；body 是這一段的整理全文，段落之間空一行，條列每行用「- 」開頭，有先後的步驟用「1. 」編號，要強調的引導詞用 **粗體**，表格用 | 欄 | 欄 | 的寫法（第一列是欄名），不要巢狀條列，也不要小標題；principle 是這一段的第一性原理；terms 是這一段的名詞說明。
+(B) 的每一段是 sections 裡的一項，照時間順序，第一段從逐字稿第一行開始，整份逐字稿都要分到：t 是這一段開始的秒數，必須是逐字稿裡某一行開頭方括號裡的數字；title 是這一段的標題；body 是這一段的整理全文，段落之間空一行，條列每行用「- 」開頭，有先後的步驟用「1. 」編號，要強調的引導詞用 **粗體**，表格用 | 欄 | 欄 | 的寫法（第一列是欄名），不要巢狀條列，也不要小標題；terms 是這一段的名詞說明。
 (C) 的四項依序放 check 的 solid、assumptions、evidence、contradictions，每一項都是條列；哪一項沒有內容就給空陣列。
 lang 是逐字稿語言的 BCP-47 代碼（例如 en、zh-TW、ja）。`;
 
@@ -107,7 +106,7 @@ export const ANALYSIS_SCHEMA = O({
   groups: L(O({ title: S, points: L(S) })),
   reminder: S,
   check: O({ solid: L(S), assumptions: L(S), evidence: L(S), contradictions: L(S) }),
-  sections: L(O({ t: { type: 'integer' }, title: S, body: S, principle: S, terms: L(O({ term: S, note: S })) })),
+  sections: L(O({ t: { type: 'integer' }, title: S, body: S, terms: L(O({ term: S, note: S })) })),
 });
 
 // Captions do not say who is speaking; those turns carry the placeholder 講者, which is not shown to the model as a name.

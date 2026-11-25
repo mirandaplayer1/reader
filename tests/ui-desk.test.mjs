@@ -1,5 +1,5 @@
 // Desktop mode in the real page: a pasted URL is only put in line (no backend call), the list says what the desktop
-// is doing, and once the desktop has written the video the reading page shows each section's first principle and terms.
+// is doing, and once the desktop has written the video the reading page shows each section's terms under its write-up, and no per-section first principle.
 import { createRequire } from 'module';
 import fs from 'fs';
 import os from 'os';
@@ -73,9 +73,9 @@ await p.click('.item-row:nth-child(2) .item'); await p.waitForTimeout(500);
 assert((await p.textContent('.thesis')).startsWith('價格是協調'), 'overview headline');
 await p.click('[data-tab="read"]').catch(() => {}); await p.waitForTimeout(300);
 const seg = p.locator('#seg-c0 .absorb');
-assert((await seg.locator('.core').textContent()) === '因為資源不夠分，選了一個就得放棄另一個。', 'section first principle');
+assert((await seg.locator('.core').count()) === 0 && !(await seg.textContent()).includes('第一性原理'), 'no first principle under a section');
 assert((await seg.locator('.terms dt').allTextContents()).join('|') === 'opportunity cost|Adam Smith', 'terms');
-assert((await p.locator('#seg-c1 .absorb .terms').count()) === 0 && (await p.locator('#seg-c1 .absorb .core').count()) === 0, 'a section without extras shows none');
+assert((await p.locator('#seg-c1 .absorb .terms').count()) === 0, 'a section without terms shows none');
 await seg.scrollIntoViewIfNeeded(); await p.screenshot({ path: D + '/desk-read-phone.png' });
 await p.setViewportSize({ width: 1280, height: 800 }); await p.waitForTimeout(300); await seg.scrollIntoViewIfNeeded(); await p.screenshot({ path: D + '/desk-read-desktop.png' });
 console.log('reading page ok | backend calls', backendCalls, '| page errors', JSON.stringify(errs));

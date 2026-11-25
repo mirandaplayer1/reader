@@ -58,7 +58,7 @@ export async function analyse(t, dir, deps) {
 
 /* ---------- 3. put it in the shape the reader shows ---------- */
 // pipeline.js does the assembling, exactly as it does for an analysis written by the backend: sections are snapped to
-// the transcript, sentences are split and given their ids. The two fields it does not know are added afterwards.
+// the transcript, sentences are split and given their ids. The terms, which it does not know, are added afterwards.
 export async function assemble({ vid, title, channel, duration, turns, given, zh = {}, visuals = [], source = '' }) {
   const row = { video_id: vid, title: title || '', content: null, work: { phase: 'outline', turns, visuals, channel: channel || '', duration, length: duration, given, zh } };
   const patch = await ingestStep(row, {});
@@ -66,7 +66,6 @@ export async function assemble({ vid, title, channel, duration, turns, given, zh
   c.segs.forEach((g) => {
     const m = given.sections.filter((x) => String((x && x.title) || '').trim() === g.title).sort((a, b) => Math.abs(a.t - g.t) - Math.abs(b.t - g.t))[0];
     if (!m) return;
-    const p = String(m.principle || '').trim(); if (p) g.principle = p;
     const terms = (Array.isArray(m.terms) ? m.terms : []).map((x) => ({ term: String((x && x.term) || '').trim(), note: String((x && x.note) || '').trim() })).filter((x) => x.term && x.note).slice(0, 6);
     if (terms.length) g.terms = terms;
   });

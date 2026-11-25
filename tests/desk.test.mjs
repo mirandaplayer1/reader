@@ -1,6 +1,6 @@
 // The desktop worker with everything outside it faked: no YouTube, no Whisper, no Claude, no database.
 // Proves the plumbing: which captions are picked, that punctuation can never change a word, that a queued video
-// ends up readable with every section's first principle and terms, and that translation fills every sentence.
+// ends up readable with every section's terms, and that translation fills every sentence.
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -74,8 +74,8 @@ assert(phases.join(',').startsWith('desk-transcript,desk-tidy,desk-analysis,tran
 const ready = saved.find((p) => p.status === 'ready'), c = row.content;
 assert(ready && ready.work.phase === 'desk-translate' && ready.work.by === 'claude' && ready.work.source === 'captions', 'readable before translation; never a phase the backend would pick up');
 assert(c.title === 'A Talk' && c.channel === 'Chan' && c.thesis === '標題。第二句。' && c.brief.principle === '原理。' && c.segs.length === 2, 'overview and sections');
-assert(c.segs[0].body.startsWith('第一段') && c.segs[0].principle === '這一段靠甲成立。' && c.segs[0].terms.length === 1 && c.segs[0].terms[0].term === 'conatus', 'section principle and terms');
-assert(!('principle' in c.segs[1]) && !('terms' in c.segs[1]) && c.segs[1].t === 300, 'empty extras are left out; section snapped to a real line');
+assert(c.segs[0].body.startsWith('第一段') && !('principle' in c.segs[0]) && c.segs[0].terms.length === 1 && c.segs[0].terms[0].term === 'conatus', 'section terms; a principle the model adds anyway is not kept');
+assert(!('terms' in c.segs[1]) && c.segs[1].t === 300, 'empty extras are left out; section snapped to a real line');
 const sents = c.segs.flatMap((g) => g.turns.flatMap((tu) => tu.s));
 assert(sents.length > 100 && sents.every((p) => p[1] && p[1].startsWith('譯')), 'every sentence translated');
 const end = saved[saved.length - 1];
@@ -91,7 +91,7 @@ let failed = ''; try { await W.processRow(zrow, deps2); } catch (e) { failed = e
 assert(failed === 'Claude 沒有回應' && listened === 1, 'first try fails after listening');
 const z = await W.processRow(zrow, deps2);
 assert(listened === 1 && z.status === 'ready' && z.work.phase === 'ready' && z.work.source === 'whisper' && z.content.lang === 'zh-TW', 'second try does not listen again; Chinese is finished without translation');
-assert(z.content.segs[0].turns[0].s.every((p) => p[1] === p[0]) && z.content.segs[0].principle === '價格是訊號。', 'Chinese shown as it is');
+assert(z.content.segs[0].turns[0].s.every((p) => p[1] === p[0]), 'Chinese shown as it is');
 console.log('whisper path ok');
 
 // --- re-run on a video that already has a transcript keeps every sentence (so highlights still line up)
