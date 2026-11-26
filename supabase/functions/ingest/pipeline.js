@@ -224,6 +224,7 @@ const tidyPoints = (list) => (Array.isArray(list) ? list : []).map(String).filte
 export async function ingestStep(row, deps) {
   const work = Object.assign({ phase: "meta", next: 0, turns: [], visuals: [] }, row.work || {});
   const url = "https://www.youtube.com/watch?v=" + row.video_id;
+  if (work.phase === "local") return {};   // the owner's Mac does this one (tools/local/worker.mjs)
   if (work.phase === "translate") return translateStep(row, work, deps);
   if (work.phase === "analyse") return analyseStep(row, work, deps);
 

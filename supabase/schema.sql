@@ -84,7 +84,8 @@ select cron.schedule('reader-tick', '* * * * *', $job$
     headers := jsonb_build_object('content-type', 'application/json', 'Authorization', 'Bearer <anon key>'),
     body := '{"action":"tick"}'::jsonb,
     timeout_milliseconds := 5000)
-  where exists (select 1 from public.videos where status in ('queued', 'processing') or work->>'phase' in ('translate', 'analyse'));
+  -- a video waiting for the owner's Mac (phase local / local_translate) is not work for the function
+  where exists (select 1 from public.videos where (status in ('queued', 'processing') and coalesce(work->>'phase', '') <> 'local') or work->>'phase' in ('translate', 'analyse'));
 $job$);
 
 -- Writes an analysis that was produced outside the edge function (by Claude, see docs/claude-analysis.md) into one video.

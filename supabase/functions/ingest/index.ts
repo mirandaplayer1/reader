@@ -4,7 +4,9 @@
 //   { action: "deepen", video_id, chapter }  -> translates one batch or writes the analysis for a chapter
 //   { action: "reprocess", video_id, mode }  -> "text" redoes chapters and summaries, "all" starts over
 //   { action: "tick" }                       -> sent by the database every minute; advances waiting videos in the background
-// Secrets: GEMINI_API_KEY (required), ANTHROPIC_API_KEY (optional, used for the text stages when present),
+// Secrets: TRANSCRIBE ("local", the default, or "gemini"). With "local" a new video waits for the owner's Mac
+//          (tools/local/worker.mjs): Whisper transcribes it there and Claude Code writes the analysis. Nothing here calls a model.
+//          GEMINI_API_KEY (needed for "gemini" and for the background steps), ANTHROPIC_API_KEY (optional, used for the text stages when present),
 //          GEMINI_VIDEO_MODEL / GEMINI_TEXT_MODEL / CLAUDE_MODEL (optional overrides).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { deepenStep, ingestStep, parseVideoId, reprocessPatch } from "./pipeline.js";
@@ -20,8 +22,11 @@ const json = (body: unknown, status = 200) =>
 const MAX_FAILS = 3;   // tries per step before the video is given up on; nothing retries after that until the owner asks
 const ACTIVE = ["queued", "processing"];
 // Waiting for background work: still being read, or readable with translation or chapter notes still to do.
-const WAITING = "status.in.(queued,processing),work->>phase.in.(translate,analyse)";
-const waiting = (r: any) => ACTIVE.includes(r.status) || ["translate", "analyse"].includes(r.work?.phase);
+// A video waiting for the owner's Mac (phase "local") is not work for this function.
+const WAITING = "and(status.in.(queued,processing),or(work->>phase.is.null,work->>phase.neq.local)),work->>phase.in.(translate,analyse)";
+const waiting = (r: any) => (ACTIVE.includes(r.status) && r.work?.phase !== "local") || ["translate", "analyse"].includes(r.work?.phase);
+const LOCAL = (Deno.env.get("TRANSCRIBE") || "local") === "local";
+const LOCAL_WORK = (redo?: string) => ({ work: { phase: "local", ...(redo ? { redo } : {}) }, progress: { phase: "local", done: 0, total: null } });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // The platform stops a worker 150 seconds after it BOOTS, and one worker can serve several requests in a row.
@@ -142,8 +147,8 @@ Deno.serve(async (req) => {
     const { data: allowed } = await sb.rpc("reader_access");
     if (!allowed) return json({ error: "這個帳號沒有使用權限。" }, 403);
 
-    const geminiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiKey) return json({ error: "後端還沒有設定 GEMINI_API_KEY。" }, 500);
+    const geminiKey = Deno.env.get("GEMINI_API_KEY") || "";
+    if (!geminiKey && !LOCAL) return json({ error: "後端還沒有設定 GEMINI_API_KEY。" }, 500);
     const body = await req.json().catch(() => ({}));
     const pick = (v: unknown) => (typeof v === "string" && /^[a-z0-9.\-]{3,60}$/.test(v) ? v : "");
     const deps = {
@@ -171,12 +176,14 @@ Deno.serve(async (req) => {
       const { data: existing } = await sb.from("videos").select("video_id,title,status,progress,error").eq("video_id", vid).maybeSingle();
       if (existing && existing.status !== "error") return json(summary(existing));
       if (existing) {   // a failed video picks up where it stopped
-        const again = { status: "processing", error: null, fails: 0, lock_until: null };
+        const { data: full } = await sb.from("videos").select("work").eq("video_id", vid).maybeSingle();
+        const again = { status: "processing", error: null, fails: 0, lock_until: null,
+          ...(LOCAL && (!full?.work?.phase || full.work.phase === "local") ? LOCAL_WORK(full?.work?.redo) : {}) };
         const { error } = await sb.from("videos").update(again).eq("video_id", vid);
         if (error) throw error;
         return json(summary({ ...existing, ...again }));
       }
-      const row = { user_id: user.id, video_id: vid, url: String(body.url).slice(0, 500), title: "", status: "queued", work: {}, progress: { phase: "meta", done: 0, total: null }, error: null, content: null };
+      const row = { user_id: user.id, video_id: vid, url: String(body.url).slice(0, 500), title: "", status: "queued", ...(LOCAL ? LOCAL_WORK() : { work: {}, progress: { phase: "meta", done: 0, total: null } }), error: null, content: null };
       const { error } = await sb.from("videos").upsert(row);
       if (error) throw error;
       return json(summary(row));
@@ -188,13 +195,16 @@ Deno.serve(async (req) => {
     if (!row) return json({ error: "找不到這支影片。" }, 404);
 
     if (body.action === "reprocess") {
-      const patch = reprocessPatch(row, body.mode === "all" ? "all" : "text");
+      const mode = body.mode === "all" ? "all" : "text";
+      const patch = LOCAL ? { status: "processing", error: null, ...LOCAL_WORK(mode) } : reprocessPatch(row, mode);
       const { error } = await sb.from("videos").update({ ...patch, fails: 0, lock_until: null, updated_at: new Date().toISOString() }).eq("video_id", vid);
       if (error) throw error;
       return json(summary({ ...row, ...patch }));
     }
 
     if (body.action === "step" && row.status === "ready") return json(summary(row));
+    // The owner's Mac is doing this one; the page only waits and shows how far it got.
+    if (body.action === "step" && row.work?.phase === "local" && row.status !== "error") return json({ ...summary(row), busy: true, wait: 20 });
     if (body.action === "step" && !fits(row.work?.phase)) return json({ ...summary(row), busy: true });
     if (!(await claim(sb, row))) return json({ ...summary(row), busy: true });
     {   // the background job may have saved a step since the row was read

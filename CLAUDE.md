@@ -33,6 +33,7 @@ supabase/functions/ingest/
   pipeline.js                   分析流程和所有提示詞。純邏輯，不依賴 Deno，測試直接 import
   index.ts                      Edge function：驗證、鎖、重試、每分鐘的背景排程
 supabase/schema.sql             資料表、權限、排程的定義（文件用途，實際變更要另外套用到資料庫）
+tools/local/                    Miranda 的 Mac 上跑的處理程式：yt-dlp＋Whisper 聽寫、Claude Code 寫分析、寫回資料庫（launchd 每兩分鐘）
 tests/                          測試
 tools/prompts_doc.py            重建 PROMPTS.md
 PROMPTS.md                      流程圖和每個提示詞的說明，給 Miranda 讀和改
@@ -46,6 +47,7 @@ node tests/ui-flow.test.mjs         # 整個前端流程，後端是假的。需
 node tests/ui-highlight.test.mjs    # 選取文字畫重點
 node tests/ui-points.test.mjs       # 畫線、筆記、重點頁、觀點、舊資料轉換、兩台裝置不互相覆蓋
 node tests/ui-transcript.test.mjs   # 中文影片和未翻譯影片的逐字稿顯示
+node tests/local-worker.test.mjs    # Mac 處理程式的純邏輯：Whisper 段落轉 turn、給 Claude Code 的提示詞、回答的檢查
 ```
 
 UI 測試讀的是建好的 `index.html`，所以先 `python3 build.py`。

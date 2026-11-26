@@ -1454,7 +1454,7 @@ async function drive(vid){
     if(j.error){fails++;if(j.fatal||j.status==="error"||fails>=3){setLib(vid,{status:"error",error:j.error,note:""});break}
       setLib(vid,{note:`遇到問題，第 ${fails} 次重試中：${j.error}`});await sleep(j.httpStatus===429?20000:3000*fails);continue}
     fails=0;setLib(vid,{title:j.title,status:j.status,progress:j.progress,error:j.error,note:""});
-    if(j.busy){await sleep(4000);continue}
+    if(j.busy){await sleep((j.wait||4)*1000);continue}
     if(j.status==="ready"){delete cache[vid];toast("處理完成："+(j.title||vid));break}
     if(j.status==="error")break;
   }}finally{driving.delete(vid)}
@@ -1515,6 +1515,9 @@ function statusText(it){
   if(it.note)return it.note;
   const p=it.progress||{};
   if(p.phase==="transcribe")return p.total?`正在讀影片內容，${p.done||0} / ${p.total} 段（每段 5 分鐘）`:`正在讀影片內容，已完成 ${p.done||0} 段（每段 5 分鐘）`;
+  if(p.phase==="local")return "等你的 Mac 處理，Mac 開著就會自動開始";
+  if(p.phase==="listen")return "你的 Mac 正在聽寫…";
+  if(p.phase==="write")return "Claude 正在寫分析…";
   if(p.phase==="outline"&&p.total>1)return `正在整理章節和摘要，${p.done||0} / ${p.total}`;
   return "正在"+(STEP[p.phase]||"排隊")+"…";
 }
