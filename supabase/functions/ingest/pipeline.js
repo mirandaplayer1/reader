@@ -5,6 +5,9 @@
 export const CHUNK_SECONDS = 300;      // video is read five minutes at a time: longer clips lose words and drift in time
 export const MAX_CHUNKS = 96;          // hard stop at eight hours
 export const TRANSLATE_BATCH = 50;     // sentences per translation call
+const WRITE_PARALLEL = 3;              // batches of sections written at the same time (more runs into output-per-minute limits)
+const WRITE_MAX = 3, WRITE_SPAN = 25 * 60;   // a batch: up to 3 consecutive sections and 25 minutes of transcript
+const WRITE_TRIES = 3;                 // a section that keeps failing is left for later
 
 const GEMINI = "https://generativelanguage.googleapis.com/v1beta";
 
@@ -100,11 +103,9 @@ const LIST = (items) => ({ type: "ARRAY", items });
 const OBJ = (properties) => ({ type: "OBJECT", properties, required: Object.keys(properties) });
 const CHECK = OBJ({ solid: LIST(STR), assumptions: LIST(STR), evidence: LIST(STR), contradictions: LIST(STR) });
 const META = { lang: STR, title: STR, host: STR, headline: STR, principle: STR, groups: LIST(OBJ({ title: STR, points: LIST(STR) })), reminder: STR, check: CHECK };
-const TABLES = LIST(OBJ({ title: STR, headers: LIST(STR), rows: LIST(OBJ({ cells: LIST(STR) })) }));
-const SECTION_ITEM = OBJ({ t: INT, title: STR, body: STR });
 const SCHEMA = {
-  full: OBJ({ ...META, sections: LIST(SECTION_ITEM) }),
-  sections: OBJ({ sections: LIST(SECTION_ITEM) }),
+  plan: OBJ({ ...META, sections: LIST(OBJ({ t: INT, title: STR })) }),
+  bodies: OBJ({ sections: LIST(OBJ({ t: INT, body: STR })) }),
   synth: OBJ(META),
   translate: OBJ({ zh: LIST(STR) }),
   analysis: OBJ({ body: STR }),
@@ -201,9 +202,9 @@ const OWNER = `# 任務
 
 # 最後自我檢查（不輸出）
 逐條比對 (A) 和 (B) 的每個條列與逐字稿：是否有誇大、誤讀、遺漏講者的限制條件，或術語前後不一致？發現問題就修正後再輸出。`;
-// For the cases that cannot be one request (a very long video, or one section written again), her own parts are reused.
+// Where the sections are written apart from the plan (a few at a time, or one written again), her own parts are reused.
 const part = (name) => OWNER.split(/\n\n(?=# )/).find((x) => x.startsWith("# " + name));
-const RULES = part("寫作規範"), DECOMPOSE = part("步驟一"), BRIEF = part("步驟二"), SECTION = part("步驟三"), CHECK_SPEC = part("步驟四"), SELF_CHECK = part("最後自我檢查");
+const RULES = part("寫作規範"), SECTION = part("步驟三"), SELF_CHECK = part("最後自我檢查");
 
 const tidyTables = (list) => (Array.isArray(list) ? list : []).map((t) => {
   const headers = (Array.isArray(t && t.headers) ? t.headers : []).map(String).slice(0, 5);
@@ -218,7 +219,7 @@ const written = (x) => (x && String(x.body || "").trim()
   : { role: String((x && x.role) || ""), points: tidyPoints(x && x.points), tables: tidyTables(x && x.tables) });
 const tidyPoints = (list) => (Array.isArray(list) ? list : []).map(String).filter(Boolean).slice(0, 12);
 
-/* ---------- ingest: meta -> transcribe (chunk by chunk) -> outline (the whole analysis, one request) -> ready (-> translate, in the background) ---------- */
+/* ---------- ingest: meta -> transcribe (chunk by chunk) -> outline (plan the sections, then write them a few at a time) -> ready (-> translate, in the background) ---------- */
 
 export async function ingestStep(row, deps) {
   const work = Object.assign({ phase: "meta", next: 0, turns: [], visuals: [] }, row.work || {});
@@ -294,17 +295,18 @@ export async function ingestStep(row, deps) {
     return { status: "processing", work, progress: { phase: ended ? "outline" : "transcribe", done: work.next, total: ended ? work.next : (work.length ? Math.ceil(work.length / CHUNK_SECONDS) : null) } };
   }
 
-  // The whole analysis is one request: her prompt, then the whole transcript. The model finds the sections itself.
-  const WINDOW = 3600, ONE_REQUEST = 100 * 60;   // a longer video cannot be answered inside the platform's time limit in one go
+  // The analysis takes two kinds of steps. First her whole prompt and the whole transcript go out once: the model decides
+  // where the sections are and writes (A) and (C), but only names each section. Then the sections are written a few at a
+  // time, in parallel. One answer with every section written is around 10,000 tokens, which takes longer than the
+  // platform's 150 seconds; the plan and each batch fit easily, and a failed batch is retried on its own.
   const META_SPEC =
     `"lang":"<逐字稿語言的 BCP-47 代碼，例如 en、zh-TW、ja>","title":"<影片標題，看不出來就寫最貼切的一句>",` +
     `"host":"<訪問者或主持人的 speaker 標籤，沒有就寫空字串>",` +
     `"headline":"<(A) 的標題>","principle":"<(A) 的第一性原理>","groups":[{"title":"<主題區塊的名稱>","points":["<條列>"]}],"reminder":"<(A) 的核心提醒>",` +
     `"check":{"solid":["<邏輯最穩的一環和原因>"],"assumptions":["<未說明的假設>"],"evidence":["<證據的問題>"],"contradictions":["<矛盾>"]}`;
-  const SECTION_SPEC =
-    `{"t":<這一段開始的秒數，必須是逐字稿裡某一行開頭方括號裡的數字>,"title":"<你為這一段標註的標題>","body":"<這一段的整理全文>"}`;
   const OUT_A = `(A) 的標題放 headline，第一性原理放 principle，主題區塊放 groups（每個區塊的名稱放 title，條列放 points），核心提醒放 reminder。`;
-  const OUT_B = `(B) 的每一段是 sections 裡的一項，照時間順序，第一段從逐字稿第一行開始，整份逐字稿都要分到：t 是這一段開始的秒數，title 是這一段的標題，${BODY}`;
+  const OUT_PLAN = `(B) 的每一段是 sections 裡的一項，照時間順序，第一段從逐字稿第一行開始，整份逐字稿都要分到：t 是這一段開始的秒數，title 是這一段的標題。`;
+  const PLAN_SPEC = `{"t":<這一段開始的秒數，必須是逐字稿裡某一行開頭方括號裡的數字>,"title":"<你為這一段標註的標題>"}`;
   const OUT_C = `(C) 的四項依序放 check 的 solid、assumptions、evidence、contradictions，每一項都是條列；哪一項沒有內容就給空陣列。`;
   const STAMP = `每一行開頭的方括號是那一行開始的秒數，這就是時間戳。`;
   const lines = (turns) => turns.map((t) => `[${t.t}] ${t.speaker}: ${t.text}`).join("\n");
@@ -314,7 +316,7 @@ export async function ingestStep(row, deps) {
     const starts = work.turns.map((t) => t.t);
     const snap = (t) => starts.reduce((best, x) => (Math.abs(x - t) < Math.abs(best - t) ? x : best), starts[0]);
     const sections = (Array.isArray(list) ? list : [])
-      .map((x) => ({ t: snap(Number(x && x.t) || 0), title: String((x && x.title) || "").trim(), ...written(x) }))
+      .map((x) => ({ t: snap(Number(x && x.t) || 0), title: String((x && x.title) || "").trim(), ...written(x), ...(x && x.deep === false ? { deep: false } : {}) }))
       .filter((x) => x.title).sort((x, y) => x.t - y.t).filter((x, i, arr) => i === 0 || x.t > arr[i - 1].t);
     if (!sections.length) throw new Error("沒有產生分段，請重試。");
     sections[0].t = starts[0];
@@ -324,7 +326,7 @@ export async function ingestStep(row, deps) {
       const turns = work.turns.filter((t) => t.t >= x.t && t.t < end)
         .map((t) => ({ sp: t.speaker, t: t.t, s: splitSentences(t.text).map((y) => [y, (work.zh && work.zh[y]) || null]) }));
       const { t, title, ...text } = x;
-      return { id: "c" + i, t, title, deep: true, ...text, turns };
+      return { id: "c" + i, t, title, deep: true, ...text, turns };   // text.deep is false for a section still to be written
     });
     const content = {
       vid: row.video_id, lang: String(meta.lang || "en"), title: row.title || String(meta.title || ""), channel: work.channel || "",
@@ -342,9 +344,9 @@ export async function ingestStep(row, deps) {
     const same = /^zh/i.test(content.lang);
     let total = 0, have = 0;
     segs.forEach((g) => g.turns.forEach((tu) => tu.s.forEach((p) => { if (same && p[1] == null) p[1] = p[0]; total++; if (p[1] != null) have++; })));
-    const more = !same && have < total;
-    return { status: "ready", title: content.title, content, work: { phase: more ? "translate" : "ready", channel: work.channel },
-      progress: more ? { phase: "translate", done: have, total } : { phase: "ready", done: 1, total: 1 }, error: null };
+    const more = !same && have < total, open = segs.filter((g) => g.deep === false).length;
+    return { status: "ready", title: content.title, content, work: { phase: more ? "translate" : open ? "analyse" : "ready", channel: work.channel },
+      progress: more ? { phase: "translate", done: have, total } : open ? { phase: "analyse", done: segs.length - open, total: segs.length } : { phase: "ready", done: 1, total: 1 }, error: null };
   };
 
   if (work.phase === "outline" || work.phase === "seams" || work.phase === "synth") {
@@ -352,30 +354,62 @@ export async function ingestStep(row, deps) {
     // It can be put on a finished video directly; the transcript is then taken from what the video already has.
     if (!work.turns.length && row.content) Object.assign(work, reprocessPatch(row, "text").work, { given: work.given });
     if (work.given && Array.isArray(work.given.sections)) return finish(work.given, work.given.sections);
-    const first = work.turns[0].t, last = work.turns[work.turns.length - 1].t;
-    if (last - first <= ONE_REQUEST) {
+    if (!work.plan) {
       const prompt =
-        `${OWNER}\n\n# 輸出\n把三份成果放進下面這個 JSON。${OUT_A}${OUT_B}${OUT_C}\nJSON：{${META_SPEC},"sections":[${SECTION_SPEC}]}\n\n` +
+        `${OWNER}\n\n# 輸出\n這一次先交 (A)、(C) 和 (B) 的分段。(B) 每一段的整理全文下一步才寫，這一次每段只要開始的秒數和標題，但分段要照步驟三的判斷切好。` +
+        `${OUT_A}${OUT_PLAN}${OUT_C}\nJSON：{${META_SPEC},"sections":[${PLAN_SPEC}]}\n\n` +
         `# 逐字稿\n${STAMP}\n<transcript>\n${lines(work.turns)}${visLines(0, Infinity)}\n</transcript>`;
-      const out = await llmJSON(deps, prompt, 32768, SCHEMA.full);
-      return finish(out, out.sections);
+      const out = await llmJSON(deps, prompt, 16000, SCHEMA.plan);
+      const starts = work.turns.map((t) => t.t);
+      const snap = (t) => starts.reduce((best, x) => (Math.abs(x - t) < Math.abs(best - t) ? x : best), starts[0]);
+      const sections = (Array.isArray(out.sections) ? out.sections : [])
+        .map((x) => ({ t: snap(Number(x && x.t) || 0), title: String((x && x.title) || "").trim() }))
+        .filter((x) => x.title).sort((x, y) => x.t - y.t).filter((x, i, arr) => i === 0 || x.t > arr[i - 1].t);
+      if (!sections.length) throw new Error("沒有產生分段，請重試。");
+      sections[0].t = starts[0];
+      const { sections: _, ...meta } = out;
+      work.plan = { meta, sections };
+      return { status: "processing", work, progress: { phase: "outline", done: 0, total: sections.length } };
     }
-    // Too long for one answer: (A) and (C) are written from the whole transcript, (B) an hour at a time, all at the same moment.
-    const windows = Math.ceil((last - first + 1) / WINDOW);
-    const overview = llmJSON(deps,
-      `# 任務\n分析下方的逐字稿，產出兩份成果：(A) 第一性原理摘要，(C) 推論強弱檢查。這份逐字稿很長，(B) 分段整理另外處理，這一次不用寫。\n\n` +
-      `${RULES}\n\n${DECOMPOSE}\n\n${BRIEF}\n\n${CHECK_SPEC}\n\n${SELF_CHECK}\n\n# 輸出\n把成果放進下面這個 JSON。${OUT_A}${OUT_C}\nJSON：{${META_SPEC}}\n\n` +
-      `# 逐字稿\n<transcript>\n${work.turns.map((t) => `${t.speaker}: ${t.text}`).join("\n").slice(0, 600000)}\n</transcript>`, 16000, SCHEMA.synth);
-    const cuts = Array.from({ length: windows }, (_, w) => {
-      const a = first + w * WINDOW, b = a + WINDOW, some = work.turns.filter((t) => t.t >= a && t.t < b);
-      if (!some.length) return Promise.resolve({ sections: [] });
+    const plan = work.plan, list = plan.sections, tries = Object.assign({}, work.tries);
+    const ends = list.map((x, i) => (i + 1 < list.length ? list[i + 1].t : Infinity));
+    const open = list.map((x, i) => (!x.body && (tries[i] || 0) < WRITE_TRIES ? i : -1)).filter((i) => i >= 0);
+    // Consecutive sections, up to WRITE_SPAN seconds and WRITE_MAX of them, go out together.
+    const batches = [];
+    for (const i of open) {
+      const cur = batches[batches.length - 1];
+      if (cur && cur[cur.length - 1] === i - 1 && cur.length < WRITE_MAX && ends[i] - list[cur[0]].t <= WRITE_SPAN) cur.push(i);
+      else batches.push([i]);
+    }
+    const now = batches.slice(0, WRITE_PARALLEL);
+    now.flat().forEach((i) => { tries[i] = (tries[i] || 0) + 1; });
+    const outline = list.map((x, i) => `${i + 1}. [${x.t}] ${x.title}`).join("\n");
+    const res = await Promise.allSettled(now.map((idx) => {
+      const a = list[idx[0]].t, b = ends[idx[idx.length - 1]];
+      const parts = idx.map((i) => `## 第 ${i + 1} 段（t = ${list[i].t}）：${list[i].title}\n${lines(work.turns.filter((t) => t.t >= list[i].t && t.t < ends[i]))}`).join("\n\n");
       return llmJSON(deps,
-        `# 任務\n分析下方的逐字稿，產出 (B) 分段整理。這是一支長影片逐字稿的第 ${w + 1} 部分（共 ${windows} 部分），這一次只整理這一部分。\n\n` +
-        `${RULES}\n\n${SECTION}\n\n${SELF_CHECK}\n\n# 輸出\n把成果放進下面這個 JSON。${OUT_B}\nJSON：{"sections":[${SECTION_SPEC}]}\n\n` +
-        `# 逐字稿\n${STAMP}\n<transcript>\n${lines(some)}${visLines(a, b)}\n</transcript>`, 24000, SCHEMA.sections);
+        `# 任務\n分析下方的逐字稿，產出 (B) 分段整理。整支影片已經依主題轉折分好段，(A) 第一性原理摘要也寫好了，都附在下面，讓你知道整體論證。這一次只寫指定的 ${idx.length} 段，分段和標題照給定的，不要改。\n\n` +
+        `${RULES}\n\n${SECTION}\n\n${SELF_CHECK}\n\n# 輸出\n每一段是 sections 裡的一項，t 照抄給定的秒數，${BODY}\nJSON：{"sections":[{"t":<這一段給定的秒數>,"body":"<這一段的整理全文>"}]}\n\n` +
+        `# 整支影片的 (A) 第一性原理摘要\n${plan.meta.headline || ""}\n${plan.meta.principle || ""}\n\n# 整支影片的分段\n${outline}\n\n` +
+        `# 這一次要寫的逐字稿\n${STAMP}\n<transcript>\n${parts}${visLines(a, b)}\n</transcript>`, 12000, SCHEMA.bodies);
+    }));
+    // Nothing written yet and nothing worked: fail the step, so a broken key or model stops after the usual three tries.
+    // Once some sections are in, a failure only counts against its own sections, and the step keeps them.
+    if (now.length && !res.some((r) => r.status === "fulfilled") && !list.some((x) => x.body)) throw res[0].reason;
+    res.forEach((r, k) => {
+      if (r.status !== "fulfilled") return;
+      const got = Array.isArray(r.value.sections) ? r.value.sections : [];
+      now[k].forEach((i, j) => {
+        const hit = got.find((x) => Number(x && x.t) === list[i].t) || (got.length === now[k].length ? got[j] : null);
+        const body = String((hit && hit.body) || "").trim();
+        if (body) list[i].body = body;
+      });
     });
-    const [meta, ...parts] = await Promise.all([overview, ...cuts]);
-    return finish(meta, parts.flatMap((x) => (Array.isArray(x.sections) ? x.sections : [])));
+    const done = list.filter((x) => x.body).length;
+    const left = list.some((x, i) => !x.body && (tries[i] || 0) < WRITE_TRIES);
+    if (left) return { status: "processing", work: { ...work, tries }, progress: { phase: "outline", done, total: list.length } };
+    // A section that kept failing is left unwritten: it is picked up again in the background, or from the reader.
+    return finish(plan.meta, list.map((x) => (x.body ? x : { ...x, role: "", points: [], tables: [], deep: false })));
   }
 
   return {};

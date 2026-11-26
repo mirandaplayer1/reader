@@ -26,7 +26,8 @@ const fetchStub = async (url, opt) => {
   } else {
     const p = parts[0].text;
     const sec = (t, title) => ({ t, title, body: '這一段提出整場的核心機制：用付款當作驗證。\\n\\n**心智模型：** 有人刷卡才算數，註冊和稱讚不算。\\n\\n- 兩週上線一個小產品。\\n- 多數嘗試會失敗。\\n\\n1. 先放付款按鈕\\n2. 再寫功能\\n\\n| 做法 | 代價 |\\n|---|---|\\n| 先募資 | 時間長 |\\n| 先上線 | 兩週 |' });
-    if (p.includes('"sections"')) out = { lang: 'en', title: 'x', host: 'Lex Fridman', headline: '一個人靠快速上線的小實驗找到會賺錢的產品。', principle: '沒有人能事先知道哪個點子會成，所以要讓每次嘗試都便宜。', groups: [{ title: '起點', points: ['付款驗證：有人刷卡才算數。', '兩週上線。'] }], reminder: '先放一個付款按鈕。', check: { solid: ['付款是有成本的訊號。'], assumptions: ['假設每個產品都能兩週做完。'], evidence: [], contradictions: [] },
+    if (p.includes('# 這一次要寫的逐字稿')) out = { sections: [...p.matchAll(/^## 第 \d+ 段（t = (\d+)）/gm)].map(m => ({ t: +m[1], body: sec(0, '').body })) };
+    else if (p.includes('"sections"')) out = { lang: 'en', title: 'x', host: 'Lex Fridman', headline: '一個人靠快速上線的小實驗找到會賺錢的產品。', principle: '沒有人能事先知道哪個點子會成，所以要讓每次嘗試都便宜。', groups: [{ title: '起點', points: ['付款驗證：有人刷卡才算數。', '兩週上線。'] }], reminder: '先放一個付款按鈕。', check: { solid: ['付款是有成本的訊號。'], assumptions: ['假設每個產品都能兩週做完。'], evidence: [], contradictions: [] },
       sections: [sec(0, '開場'), sec(125, '不募資快速驗證'), sec(574, '低潮'), sec(1195, '旅居')] };
     else if (p.includes('"zh":[')) out = { zh: p.split('\n').filter(l => /^\d+\. /.test(l)).map(l => '（譯）' + l.replace(/^\d+\. /, '').slice(0, 24)) };
     else out = { body: '這一段提出整場的核心機制：用付款當作驗證。\\n\\n**心智模型：** 有人刷卡才算數，註冊和稱讚不算。\\n\\n- 兩週上線一個小產品。\\n- 多數嘗試會失敗。\\n\\n1. 先放付款按鈕\\n2. 再寫功能\\n\\n| 做法 | 代價 |\\n|---|---|\\n| 先募資 | 時間長 |\\n| 先上線 | 兩週 |', key: [4, 5] };

@@ -2,6 +2,18 @@
 
 每次收工更新這一頁。最新的放最上面，舊的可以刪。規則見 `CLAUDE.md`。
 
+## 2026-11-26：新影片自動分析，(B) 拆成分批寫（分支 `claude/project-thread-pimtf4`，還沒部署）
+
+- `pipeline.js` 的 `outline` 階段改成兩種步驟：第一次送她的提示詞＋整份逐字稿，只回 (A)、(C) 和每段的 `t`／`title`（存在 `work.plan`）；
+  之後每一步同時送 3 批、每批最多 3 段 25 分鐘，寫每段的 `body`。原因：Claude 一次寫完整份要約 130 秒，貼著 150 秒上限。
+  長影片（>100 分鐘）的特例和「每個整點一定切一刀」一起拿掉了，不管多長都是 AI 看整份決定分段。
+- 某一批一直失敗（每段 `WRITE_TRIES = 3`）：其他段照寫，影片照樣 `ready`，那段 `deep: false`，背景的 `analyse` 階段再補。
+  一段都還沒寫好就全失敗才讓整步失敗（走 `MAX_FAILS`），所以金鑰壞掉會照常停下。
+- 前端沒改。進度照舊顯示「正在整理章節和摘要，x / n」。
+- 要讓 Claude 寫：在 Supabase 設 function secret `ANTHROPIC_API_KEY`（`llmJSON` 早就支援，模型預設 `claude-sonnet-5-5`，`CLAUDE_MODEL` 可換）。
+  聽寫一律是 Gemini，所以 Gemini 一定要有額度。
+- **還沒做**：部署後端（第 16 版）、用測試帳號跑一支真影片量時間。等 Miranda 選方案、確認新的輸出指示文字、儲值 Gemini。
+
 ## 2026-11-25：她的 36 支影片全部改成新格式
 
 - 36 支影片的分析都已由 Claude 寫好並寫回資料庫（`work.by = claude`，每段都有 `body`）。
