@@ -11,6 +11,8 @@
 //
 //   node tools/local/worker.mjs            one round: every waiting video, then exit
 //   node tools/local/worker.mjs --check    only checks that the tools and the sign-in work
+//   node tools/local/worker.mjs --dry <id> does one video start to finish without signing in or saving anything:
+//                                          the transcript, the analysis and the built content land in ~/Library/Caches/reader-worker/<id>/
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs";
@@ -52,7 +54,8 @@ async function rest(method, query, body) {
   if (!r.ok) throw new Error("資料庫 " + method + " " + r.status + "：" + (await r.text()).slice(0, 300));
   return method === "GET" ? r.json() : null;
 }
-const save = (vid, patch) => rest("PATCH", "video_id=eq." + encodeURIComponent(vid), { ...patch, updated_at: new Date().toISOString() });
+const DRY = process.argv.includes("--dry");
+const save = (vid, patch) => DRY ? Promise.resolve(log(vid, "(dry)", JSON.stringify(patch.progress || patch.work || {}))) : rest("PATCH", "video_id=eq." + encodeURIComponent(vid), { ...patch, updated_at: new Date().toISOString() });
 
 /* ---------- tools on this machine ---------- */
 
@@ -148,7 +151,9 @@ async function analyse(row) {
     const a = await download(vid, dir);
     log(vid, "audio", a.duration + "s", a.title);
     await save(vid, { title: a.title || row.title || "", progress: { phase: "listen", done: 0, total: null } });
+    const t0 = Date.now();
     const heard = await transcribe(a.file, dir, a.lang);
+    log(vid, "whisper took", Math.round((Date.now() - t0) / 1000) + "s");
     let segments = heard.segments;
     if (/^zh/i.test(heard.lang)) segments = await toTraditional(segments);
     const turns = turnsFromSegments(segments, /^zh|^ja/i.test(heard.lang) ? "講者" : "Speaker");
@@ -161,11 +166,12 @@ async function analyse(row) {
 
   await save(vid, { title: base.title, progress: { phase: "write", done: 0, total: null } });
   const prompt = analysisPrompt(ROOT, base.turns, base.lang);
-  let given, last;
+  let given, last; const t1 = Date.now();
   for (let i = 0; i < 2 && !given; i++) {
     try { given = readAnalysis(await claude(prompt), base.turns); } catch (e) { last = e; log(vid, "analysis try", i + 1, e.message); }
   }
   if (!given) throw last;
+  log(vid, "claude took", Math.round((Date.now() - t1) / 1000) + "s");
   given.lang = given.lang || base.lang;
   fs.writeFileSync(path.join(dir, "analysis.json"), JSON.stringify(given, null, 1));
 
@@ -177,6 +183,7 @@ async function analyse(row) {
     work: { phase: english && SETTINGS.translate ? "local_translate" : "ready", channel: built.work.channel || "", by: "claude", whisper: true },
     progress: english && SETTINGS.translate ? built.progress : { phase: "ready", done: 1, total: 1 },
   });
+  if (DRY) fs.writeFileSync(path.join(dir, "content.json"), JSON.stringify(built.content));
   log(vid, "ready:", built.content.segs.length, "sections");
   return english && SETTINGS.translate ? { ...row, title: built.title, status: "ready", content: built.content, work: { phase: "translate" } } : null;
 }
@@ -196,6 +203,13 @@ async function translate(row) {
 
 async function main() {
   fs.mkdirSync(WORK, { recursive: true });
+  if (DRY) {
+    const vid = process.argv[process.argv.indexOf("--dry") + 1], began = Date.now();
+    const next = await analyse({ video_id: vid, title: "", work: { phase: "local" }, content: null });
+    const dir = path.join(WORK, vid);
+    log("done in", Math.round((Date.now() - began) / 1000) + "s.", next ? "English: translation would follow." : "", "Files:", fs.readdirSync(dir).join(", "));
+    return;
+  }
   if (!SETTINGS.email) throw new Error("~/.reader-worker.json 裡沒有 email。先跑 tools/local/setup.sh。");
   await signIn();
   if (process.argv.includes("--check")) {
